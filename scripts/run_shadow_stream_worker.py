@@ -121,7 +121,11 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
         ),
         tca_db_path=str(args.tca_db),
     )
-    capital = float(risk_cfg.get("initial_capital", 10000.0))
+    if "initial_capital" not in risk_cfg:
+        raise ValueError(
+            "risk.initial_capital must be set in config before shadow stream worker runs."
+        )
+    capital = float(risk_cfg.get("initial_capital"))
     router.set_capital(capital, source="shadow_stream_worker")
     router.configure_market_adapters(config.get("markets", {}))
     await router.start_market_data()

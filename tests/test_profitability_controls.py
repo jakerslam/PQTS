@@ -245,6 +245,64 @@ def test_strategy_allocator_multi_horizon_respects_sleeves():
     assert abs(weights["hold_carry"] - 0.50) < 1e-6
 
 
+def test_strategy_allocator_constrained_enforces_corr_market_and_borrow_limits():
+    allocator = StrategyCapitalAllocator(max_weight=0.9, min_weight=0.0, capacity_haircut=0.0)
+    rows = [
+        StrategyBudgetInput(
+            strategy_id="crypto_mm",
+            expected_return=0.30,
+            annual_vol=0.24,
+            annual_turnover=5.0,
+            cost_per_turnover=0.004,
+            capacity_ratio=0.8,
+            market="crypto",
+            short_exposure_ratio=0.10,
+            borrow_bps=8.0,
+        ),
+        StrategyBudgetInput(
+            strategy_id="crypto_short",
+            expected_return=0.32,
+            annual_vol=0.26,
+            annual_turnover=5.5,
+            cost_per_turnover=0.004,
+            capacity_ratio=0.8,
+            market="crypto",
+            short_exposure_ratio=0.40,
+            borrow_bps=60.0,
+        ),
+        StrategyBudgetInput(
+            strategy_id="equity_swing",
+            expected_return=0.20,
+            annual_vol=0.16,
+            annual_turnover=2.0,
+            cost_per_turnover=0.004,
+            capacity_ratio=0.7,
+            market="equities",
+            short_exposure_ratio=0.0,
+            borrow_bps=0.0,
+        ),
+    ]
+    weights = allocator.allocate_constrained(
+        rows,
+        correlation_matrix={("crypto_mm", "crypto_short"): 0.95},
+        max_pair_correlation=0.80,
+        market_caps={"crypto": 0.55, "equities": 0.60},
+        max_total_short_exposure=0.18,
+        max_weighted_borrow_bps=20.0,
+    )
+
+    assert abs(sum(weights.values()) - 1.0) < 1e-9
+    assert weights["crypto_mm"] + weights["crypto_short"] <= 0.56
+    short_exposure = (
+        weights["crypto_mm"] * 0.10 + weights["crypto_short"] * 0.40 + weights["equity_swing"] * 0.0
+    )
+    assert short_exposure <= 0.1801
+    weighted_borrow = (
+        weights["crypto_mm"] * 8.0 + weights["crypto_short"] * 60.0 + weights["equity_swing"] * 0.0
+    )
+    assert weighted_borrow <= 20.1
+
+
 def test_market_data_quality_monitor_flags_drift_and_missing_symbols():
     monitor = MarketDataQualityMonitor(
         min_completeness=0.95,

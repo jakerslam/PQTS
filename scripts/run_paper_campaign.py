@@ -172,6 +172,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-calibration-alerts", type=int, default=0)
     parser.add_argument("--promotion-min-days", type=int, default=30)
     parser.add_argument("--promotion-max-days", type=int, default=90)
+    parser.add_argument("--promotion-min-net-pnl-usd", type=float, default=0.0)
+    parser.add_argument("--promotion-max-kill-switch-triggers", type=int, default=0)
     return parser
 
 
@@ -206,7 +208,9 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
         fill_provider=fill_provider,
     )
 
-    capital = float(risk_cfg.get("initial_capital", 10000.0))
+    if "initial_capital" not in risk_cfg:
+        raise ValueError("risk.initial_capital must be set in config before paper campaign runs.")
+    capital = float(risk_cfg.get("initial_capital"))
     router.set_capital(capital, source="paper_campaign")
 
     router.configure_market_adapters(config.get("markets", {}))
@@ -326,12 +330,16 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         "reject_rate": stats.reject_rate,
                     },
                     ops_summary=ops_health.get("summary", {}),
+                    revenue_summary=(revenue_payload or {}).get("summary", {}),
                     thresholds=PromotionGateThresholds(
                         min_days=int(args.promotion_min_days),
                         max_days=int(args.promotion_max_days),
                         min_fills=int(args.min_fills),
                         max_reject_rate=float(args.max_reject_rate),
                         max_critical_alerts=0,
+                        min_net_pnl_after_costs_usd=float(args.promotion_min_net_pnl_usd),
+                        max_slippage_mape_pct=float(args.max_mape_pct),
+                        max_kill_switch_triggers=int(args.promotion_max_kill_switch_triggers),
                     ),
                 )
                 revenue_payload = revenue_diagnostics.payload(

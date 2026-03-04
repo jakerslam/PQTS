@@ -222,6 +222,8 @@ notifications:
 runtime:
   operator_tier: pro
   state_path: data/engine_state.json
+  strict_strategy_contracts: true
+  ops_events_path: data/analytics/ops_events.jsonl
   autopilot:
     mode: hybrid
     auto_apply_on_start: true
@@ -234,3 +236,11 @@ runtime:
       ml: 0.20
       order_flow: 0.10
       liquidity_sweep: 0.10
+  autopilot_policy_packs:
+    simple:
+      allowed_strategies: ['trend_following', 'mean_reversion', 'swing_trend', 'hold_carry']
+      min_active_strategies: 1
+      max_active_strategies: 3
+    pro:
+      min_active_strategies: 2
+      max_active_strategies: 8

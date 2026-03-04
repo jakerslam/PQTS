@@ -124,3 +124,42 @@ def test_engine_applies_autopilot_selection_and_exposes_state(tmp_path):
     assert "scalping" in state["active_strategies"]
     assert "mean_reversion" not in state["active_strategies"]
     assert state["autopilot_mode"] == "auto"
+
+
+def test_engine_autopilot_respects_simple_tier_policy_pack(tmp_path):
+    config = {
+        "mode": "paper_trading",
+        "runtime": {
+            "operator_tier": "simple",
+            "autopilot": {
+                "mode": "auto",
+                "auto_apply_on_start": False,
+                "max_active_strategies": 4,
+                "ai_rank_weight": 3.0,
+            },
+        },
+        "markets": {
+            "crypto": {"enabled": True},
+            "equities": {"enabled": True},
+            "forex": {"enabled": False},
+        },
+        "strategies": {
+            "ml": {"enabled": True, "markets": ["crypto"]},
+            "liquidity_sweep": {"enabled": True, "markets": ["crypto"]},
+            "trend_following": {"enabled": True, "markets": ["equities"]},
+            "mean_reversion": {"enabled": True, "markets": ["equities"]},
+        },
+        "risk": {"initial_capital": 100000.0},
+    }
+    config_path = tmp_path / "autopilot_simple.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    engine = TradingEngine(str(config_path))
+    payload = engine.apply_autopilot_strategy_selection(
+        ai_recommendations=["ml", "liquidity_sweep", "trend_following", "mean_reversion"]
+    )
+    selected = payload["policy_enforcement"]["selected"]
+
+    assert "ml" not in selected
+    assert "liquidity_sweep" not in selected
+    assert selected

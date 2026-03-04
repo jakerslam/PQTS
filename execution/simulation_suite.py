@@ -443,6 +443,9 @@ class SimulationSuiteRunner:
                             min_fills=self.min_fills,
                             max_reject_rate=self.max_reject_rate,
                             max_critical_alerts=0,
+                            min_net_pnl_after_costs_usd=0.0,
+                            max_slippage_mape_pct=self.max_mape_pct,
+                            max_kill_switch_triggers=0,
                         ),
                     )
                     calibration_alerts = sum(

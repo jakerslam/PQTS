@@ -11,8 +11,12 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import yaml
 
+from analytics.ops_observability import OpsEventStore
 from core.autopilot import HumanStrategyOverride, StrategyAutopilot
+from core.autopilot_policy import enforce_autopilot_policy, resolve_autopilot_policy_pack
 from core.market_data_quality import DataQualityReport, MarketDataQualityMonitor
+from core.operator_tier import resolve_operator_tier
+from core.strategy_contracts import validate_strategy_contract
 from core.toggle_manager import MarketStrategyToggleManager, ToggleValidationError
 from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFillModelConfig
 from execution.risk_aware_router import OrderResult, RiskAwareRouter
@@ -102,14 +106,23 @@ class TradingEngine:
         self.mode = self.config.get("mode", "paper_trading")
         self.toggle_manager = MarketStrategyToggleManager(self.config)
         runtime_cfg = self.config.get("runtime", {})
+        self.operator_tier = resolve_operator_tier(self.config)
         self.autopilot = StrategyAutopilot(runtime_cfg.get("autopilot", {}))
+        self.autopilot_policy = resolve_autopilot_policy_pack(
+            self.config,
+            tier_name=self.operator_tier.name,
+        )
         self.autopilot_auto_apply_on_start = bool(
             runtime_cfg.get("autopilot", {}).get(
                 "auto_apply_on_start",
                 self.autopilot.mode != "manual",
             )
         )
+        self.strict_strategy_contracts = bool(runtime_cfg.get("strict_strategy_contracts", True))
         self.last_autopilot_decision: Dict[str, Any] = {}
+        self.ops_events = OpsEventStore(
+            path=str(runtime_cfg.get("ops_events_path", "data/analytics/ops_events.jsonl"))
+        )
         self.positions: Dict[str, Position] = {}
         self.orders: Dict[str, Order] = {}
         self.market_data: Dict[str, MarketData] = {}
@@ -295,6 +308,22 @@ class TradingEngine:
 
         for strategy_name in sorted(active_strategies):
             strategy_cfg = self.toggle_manager.get_strategy_config(strategy_name)
+            contract = validate_strategy_contract(
+                strategy_name,
+                strategy_cfg,
+                known_markets=tuple(self.toggle_manager.list_markets()),
+            )
+            if not contract.valid:
+                if self.strict_strategy_contracts:
+                    raise ValueError(
+                        f"Strategy contract failed for {strategy_name}: {contract.violations}"
+                    )
+                logger.warning(
+                    "Strategy skipped due to contract failure (%s): %s",
+                    strategy_name,
+                    contract.violations,
+                )
+                continue
             target_markets = strategy_targets.get(strategy_name, set())
             enabled_markets = sorted(target_markets.intersection(active_markets))
             if not enabled_markets:
@@ -304,6 +333,7 @@ class TradingEngine:
                 )
                 continue
             strategy_cfg["enabled_markets"] = enabled_markets
+            strategy_cfg["contract_violations"] = list(contract.violations)
             self.strategy_configs[strategy_name] = strategy_cfg
             logger.info(
                 "Strategy enabled: %s (markets=%s)",
@@ -785,6 +815,7 @@ class TradingEngine:
         _, profile = self._effective_risk_config()
         state["risk_profile"] = profile.name
         state["risk_profile_scale"] = float(profile.risk_limit_scale)
+        state["operator_tier"] = self.operator_tier.name
         state["autopilot_mode"] = self.autopilot.mode
         state["autopilot_last_decision"] = dict(self.last_autopilot_decision)
         return state
@@ -833,6 +864,14 @@ class TradingEngine:
         self.autopilot.set_mode(mode)
         logger.info("Autopilot mode set to %s", self.autopilot.mode)
 
+    def set_operator_tier(self, tier_name: str) -> None:
+        self.operator_tier = resolve_operator_tier(self.config, override=tier_name)
+        self.autopilot_policy = resolve_autopilot_policy_pack(
+            self.config,
+            tier_name=self.operator_tier.name,
+        )
+        logger.info("Operator tier set to %s", self.operator_tier.name)
+
     def apply_autopilot_strategy_selection(
         self,
         *,
@@ -862,13 +901,48 @@ class TradingEngine:
             ai_recommendations=(ai_recommendations or []),
             human_override=override,
         )
-        self.toggle_manager.set_active_strategies(decision.selected_strategies)
-        self.last_autopilot_decision = decision.to_dict()
+        enforced = enforce_autopilot_policy(
+            selected=decision.selected_strategies,
+            ranked_candidates=list(decision.candidate_scores.keys()),
+            policy=self.autopilot_policy,
+        )
+        self.toggle_manager.set_active_strategies(enforced.selected)
+        self.last_autopilot_decision = {
+            **decision.to_dict(),
+            "operator_tier": self.operator_tier.name,
+            "policy_pack": {
+                "name": self.autopilot_policy.name,
+                "allowed_strategies": (
+                    sorted(self.autopilot_policy.allowed_strategies)
+                    if self.autopilot_policy.allowed_strategies is not None
+                    else []
+                ),
+                "min_active_strategies": int(self.autopilot_policy.min_active_strategies),
+                "max_active_strategies": int(self.autopilot_policy.max_active_strategies),
+            },
+            "policy_enforcement": enforced.to_dict(),
+        }
         self._sync_toggle_state()
+        self.ops_events.emit(
+            category="autopilot",
+            severity="info",
+            message="autopilot_strategy_selection_applied",
+            metrics={
+                "selected_count": len(enforced.selected),
+                "dropped_count": len(enforced.dropped),
+                "added_count": len(enforced.added),
+            },
+            metadata={
+                "mode": decision.mode,
+                "operator_tier": self.operator_tier.name,
+                "selected_strategies": list(enforced.selected),
+                "policy_reasons": list(enforced.reasons),
+            },
+        )
         logger.info(
             "Autopilot applied: mode=%s selected=%s",
             decision.mode,
-            decision.selected_strategies,
+            enforced.selected,
         )
         return dict(self.last_autopilot_decision)
 

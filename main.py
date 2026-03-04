@@ -79,6 +79,7 @@ def apply_cli_toggles(engine: TradingEngine, args: argparse.Namespace) -> str:
         args.autopilot_include or args.autopilot_exclude or args.autopilot_replace
     )
     tier = resolve_operator_tier(engine.config, override=(args.operator_tier or None))
+    engine.set_operator_tier(tier.name)
     validate_operator_tier_overrides(
         tier=tier,
         has_market_override=bool(args.markets),

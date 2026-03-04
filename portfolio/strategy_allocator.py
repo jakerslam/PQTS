@@ -17,6 +17,9 @@ class StrategyBudgetInput:
     cost_per_turnover: float
     capacity_ratio: float
     horizon: str = "intraday"
+    market: str = "global"
+    short_exposure_ratio: float = 0.0
+    borrow_bps: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -174,3 +177,109 @@ class StrategyCapitalAllocator:
         if total <= 1e-12:
             return self.allocate_utility(rows, utility=utility)
         return {sid: float(weight / total) for sid, weight in final_weights.items()}
+
+    @staticmethod
+    def _pairwise_correlation(
+        correlation_matrix: Optional[Dict[tuple[str, str], float]],
+        a: str,
+        b: str,
+    ) -> float:
+        if not correlation_matrix:
+            return 0.0
+        if (a, b) in correlation_matrix:
+            return float(correlation_matrix[(a, b)])
+        if (b, a) in correlation_matrix:
+            return float(correlation_matrix[(b, a)])
+        return 0.0
+
+    def allocate_constrained(
+        self,
+        inputs: Iterable[StrategyBudgetInput],
+        *,
+        correlation_matrix: Optional[Dict[tuple[str, str], float]] = None,
+        max_pair_correlation: float = 0.85,
+        market_caps: Optional[Dict[str, float]] = None,
+        max_total_short_exposure: Optional[float] = None,
+        max_weighted_borrow_bps: Optional[float] = None,
+        utility: Optional[StrategyUtilityConfig] = None,
+    ) -> Dict[str, float]:
+        """
+        Constrained allocation:
+        1) utility allocation baseline
+        2) pairwise correlation cap throttling
+        3) per-market capital caps
+        4) total short exposure budget
+        5) weighted borrow-cost budget
+        """
+        rows: List[StrategyBudgetInput] = list(inputs)
+        if not rows:
+            return {}
+
+        weights = dict(self.allocate_utility(rows, utility=utility))
+        row_by_id = {row.strategy_id: row for row in rows}
+
+        # Pairwise correlation throttling.
+        ids = sorted(weights.keys())
+        for i, left in enumerate(ids):
+            for right in ids[i + 1 :]:
+                corr = self._pairwise_correlation(correlation_matrix, left, right)
+                if abs(corr) <= float(max_pair_correlation):
+                    continue
+                # Throttle the lower-scored leg of highly correlated pair.
+                if weights[left] <= weights[right]:
+                    target = left
+                else:
+                    target = right
+                throttle = float(max_pair_correlation) / max(abs(corr), 1e-9)
+                weights[target] *= max(min(throttle, 1.0), 0.0)
+
+        # Market caps.
+        if market_caps:
+            caps = {str(k): max(float(v), 0.0) for k, v in market_caps.items()}
+            market_weight: Dict[str, float] = {}
+            for strategy_id, weight in weights.items():
+                market = str(row_by_id[strategy_id].market or "global").strip().lower()
+                market_weight[market] = market_weight.get(market, 0.0) + float(weight)
+            for market, used in market_weight.items():
+                cap = caps.get(market)
+                if cap is None or used <= cap + 1e-12:
+                    continue
+                scale = cap / max(used, 1e-12)
+                for strategy_id in list(weights.keys()):
+                    row_market = str(row_by_id[strategy_id].market or "global").strip().lower()
+                    if row_market == market:
+                        weights[strategy_id] *= max(min(scale, 1.0), 0.0)
+
+        # Short exposure budget.
+        if max_total_short_exposure is not None:
+            short_used = 0.0
+            for strategy_id, weight in weights.items():
+                row = row_by_id[strategy_id]
+                short_used += float(weight) * max(float(row.short_exposure_ratio), 0.0)
+            budget = max(float(max_total_short_exposure), 0.0)
+            if short_used > budget + 1e-12 and short_used > 0:
+                scale = budget / short_used
+                for strategy_id in list(weights.keys()):
+                    row = row_by_id[strategy_id]
+                    if float(row.short_exposure_ratio) > 0.0:
+                        weights[strategy_id] *= max(min(scale, 1.0), 0.0)
+
+        # Weighted borrow-cost budget.
+        if max_weighted_borrow_bps is not None:
+            borrow_used = 0.0
+            total = sum(weights.values())
+            if total > 0:
+                for strategy_id, weight in weights.items():
+                    row = row_by_id[strategy_id]
+                    borrow_used += (float(weight) / total) * max(float(row.borrow_bps), 0.0)
+            budget_bps = max(float(max_weighted_borrow_bps), 0.0)
+            if borrow_used > budget_bps + 1e-12 and borrow_used > 0:
+                scale = budget_bps / borrow_used
+                for strategy_id in list(weights.keys()):
+                    row = row_by_id[strategy_id]
+                    if float(row.borrow_bps) > 0.0:
+                        weights[strategy_id] *= max(min(scale, 1.0), 0.0)
+
+        vec = np.array([max(float(weights[row.strategy_id]), 0.0) for row in rows], dtype=float)
+        vec = self._clip(self._normalize(vec))
+        return {row.strategy_id: float(weight) for row, weight in zip(rows, vec)}

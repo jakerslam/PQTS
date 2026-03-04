@@ -41,6 +41,11 @@ python dashboard/start.py
 python main.py config/paper.yaml
 # or enforce a specific user risk tolerance profile:
 python main.py config/paper.yaml --risk-profile conservative
+# or run AI autopilot with human strategy overrides:
+python main.py config/paper.yaml \
+  --autopilot-mode auto \
+  --autopilot-include mean_reversion \
+  --autopilot-exclude ml
 ```
 
 ## ⚡ One-Command Demo
@@ -58,6 +63,21 @@ The demo runs a deterministic paper-simulation slice, emits:
 - a markdown demo report in `data/reports/`
 - a Protheus handoff blob for agent-pilot workflows
 - an attribution event row in `data/analytics/attribution_events.jsonl`
+
+Preset launch paths:
+
+```bash
+python demo.py --preset casual --source quickstart
+python demo.py --preset pro --source quant_desk --track-upgrade-intent
+python scripts/funnel_report.py
+```
+
+Ops certification + retention:
+
+```bash
+python scripts/run_exchange_certification.py --venues binance,coinbase,alpaca,oanda
+python scripts/enforce_data_retention.py --root data --max-age-days 365 --max-total-files 10000
+```
 
 ## 🧪 Simulation Suite + Telemetry
 
@@ -177,6 +197,7 @@ Access at `http://localhost:8501`
 ## 📚 Documentation
 
 - [System Overview](docs/OVERVIEW.md)
+- [World-Class Execution Pack](docs/WORLD_CLASS_EXECUTION_PACK.md)
 - [Backtesting Guide](docs/BACKTESTING.md)
 - [Simulation Telemetry](docs/SIMULATION_TELEMETRY.md)
 - [World-Class 30/60/90 Plan](docs/WORLD_CLASS_30_60_90.md)

@@ -152,6 +152,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--market", choices=["crypto", "equities", "forex", "all"], default="crypto"
     )
     parser.add_argument(
+        "--preset",
+        choices=["casual", "pro"],
+        default="",
+        help="Convenience preset for casual or pro launch paths.",
+    )
+    parser.add_argument(
         "--operator-tier",
         choices=["simple", "pro"],
         default="",
@@ -177,12 +183,39 @@ def build_parser() -> argparse.ArgumentParser:
             "(conservative, balanced, aggressive, professional, or custom key)."
         ),
     )
+    parser.add_argument(
+        "--upgrade-url",
+        default="https://github.com/jakerslam/pqts",
+        help="URL shown for upgrade/next-step funnel tracking.",
+    )
+    parser.add_argument(
+        "--track-upgrade-intent",
+        action="store_true",
+        help="Log an upgrade intent attribution event.",
+    )
     parser.add_argument("--out-dir", default="data/reports")
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.preset == "casual":
+        args.market = "crypto"
+        if args.strat == "ml-ensemble":
+            args.strat = "swing-casual"
+        if not args.operator_tier:
+            args.operator_tier = "simple"
+        if not args.risk_profile:
+            args.risk_profile = "balanced"
+    elif args.preset == "pro":
+        args.market = "all"
+        if args.strat == "ml-ensemble":
+            args.strat = "multi-venue-ensemble"
+        if not args.operator_tier:
+            args.operator_tier = "pro"
+        if not args.risk_profile:
+            args.risk_profile = "professional"
+
     config = _load_yaml(args.config)
     try:
         operator_tier = resolve_operator_tier(config, override=(args.operator_tier or None))
@@ -249,9 +282,20 @@ def main() -> int:
         "report_path": str(report_path),
         "handoff_blob_path": str(handoff_path),
         "dashboard_url": "http://localhost:8050",
+        "upgrade_url": str(args.upgrade_url),
         "operator_tier": operator_tier.name,
         "campaign_result": campaign_result,
     }
+    if bool(args.track_upgrade_intent):
+        log_event(
+            event="upgrade_to_protheus",
+            source=args.source,
+            metadata={
+                "upgrade_url": str(args.upgrade_url),
+                "preset": str(args.preset or ""),
+                "operator_tier": operator_tier.name,
+            },
+        )
     print(json.dumps(summary, sort_keys=True))
     return 0
 
