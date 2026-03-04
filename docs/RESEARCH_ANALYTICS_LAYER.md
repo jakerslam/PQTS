@@ -47,6 +47,18 @@ Provide one canonical, machine-readable artifact per strategy run so research, e
   - Agent cycle emits report artifacts
   - Regime-conditioned TCA summary behavior
 
+6. Dashboard API:
+- `analytics/research_api.py`
+- Exposes deterministic, dashboard-facing accessors:
+  - `get_stage_gate_health(...)`
+  - `get_pilot_ab_metrics(...)`
+  - `get_lineage_drilldown(experiment_id)`
+- Uses `stage_metrics`, `promotion_audit`, and canonical report artifacts to provide measurable stage readiness, pilot-vs-control deltas, and provenance drilldowns.
+
+7. Dashboard wiring:
+- `dashboard/app.py`
+- Strategy table now attempts to render real stage-gate strategy rows from `data/research.db` and falls back to deterministic demo rows when research data is unavailable.
+
 ## Artifact Structure
 
 Each report JSON includes:

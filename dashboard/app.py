@@ -1,4 +1,5 @@
 # Real-time Trading Dashboard
+import logging
 import dash
 from dash import dcc, html, Input, Output
 import plotly.graph_objects as go
@@ -11,9 +12,28 @@ import asyncio
 import threading
 from pathlib import Path
 
+from analytics.research_api import ResearchDashboardAPI
+
 # Initialize Dash app
 app = dash.Dash(__name__)
 app.title = "PQTS Trading Dashboard"
+
+logger = logging.getLogger(__name__)
+
+
+def _load_stage_gate_snapshot():
+    db_path = Path("data/research.db")
+    if not db_path.exists():
+        return None
+
+    api = ResearchDashboardAPI(str(db_path))
+    try:
+        return api.get_stage_gate_health(target_stage="live_canary", lookback_days=365)
+    except Exception as exc:
+        logger.warning("Unable to load research stage-gate snapshot: %s", exc)
+        return None
+    finally:
+        api.close()
 
 # Layout
 app.layout = html.Div([
@@ -338,33 +358,46 @@ def update_trades_table(n):
     Input("interval-component", "n_intervals")
 )
 def update_strategy_table(n):
-    # Demo strategy metrics
-    strategies = [
-        {"name": "Scalping", "trades": 45, "win_rate": 62, "profit": 450.00, "active": True},
-        {"name": "Trend Following", "trades": 12, "win_rate": 58, "profit": 320.00, "active": True},
-        {"name": "Mean Reversion", "trades": 8, "win_rate": 75, "profit": 180.00, "active": True},
-        {"name": "Arbitrage", "trades": 23, "win_rate": 82, "profit": 290.00, "active": False},
-    ]
-    
+    stage_gate = _load_stage_gate_snapshot()
+    if stage_gate and stage_gate.get("strategies"):
+        strategies = [
+            {
+                "name": item["experiment_id"],
+                "samples": int(item["summary"]["samples"]),
+                "sharpe": float(item["summary"]["avg_sharpe"]),
+                "profit": float(item["summary"]["total_pnl"]),
+                "gate_status": "PASS" if item["passed"] else "HOLD",
+            }
+            for item in stage_gate["strategies"][:6]
+        ]
+    else:
+        # Demo strategy metrics
+        strategies = [
+            {"name": "Scalping", "samples": 45, "sharpe": 1.15, "profit": 450.00, "gate_status": "PASS"},
+            {"name": "Trend Following", "samples": 12, "sharpe": 0.94, "profit": 320.00, "gate_status": "PASS"},
+            {"name": "Mean Reversion", "samples": 8, "sharpe": 0.73, "profit": 180.00, "gate_status": "HOLD"},
+            {"name": "Arbitrage", "samples": 23, "sharpe": 1.42, "profit": 290.00, "gate_status": "PASS"},
+        ]
+
     rows = []
     for strat in strategies:
         profit_color = "#00ff88" if strat["profit"] >= 0 else "#ff4444"
-        status_color = "#00ff88" if strat["active"] else "#888888"
+        status_color = "#00ff88" if strat["gate_status"] == "PASS" else "#ffa500"
         rows.append(html.Tr([
             html.Td(strat["name"]),
-            html.Td(strat["trades"]),
-            html.Td(f"{strat['win_rate']}%"),
+            html.Td(strat["samples"]),
+            html.Td(f"{strat['sharpe']:.2f}"),
             html.Td(f"${strat['profit']:+.2f}", style={"color": profit_color}),
-            html.Td("●", style={"color": status_color}),
+            html.Td(strat["gate_status"], style={"color": status_color}),
         ]))
     
     return html.Table([
         html.Thead(html.Tr([
             html.Th("Strategy"),
-            html.Th("Trades"),
-            html.Th("Win Rate"),
+            html.Th("Samples"),
+            html.Th("Sharpe"),
             html.Th("Profit"),
-            html.Th("Status")
+            html.Th("Gate")
         ])),
         html.Tbody(rows)
     ])
