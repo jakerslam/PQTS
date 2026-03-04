@@ -1,366 +1,378 @@
 # Real-time Trading Dashboard
-import streamlit as st
-import pandas as pd
+import dash
+from dash import dcc, html, Input, Output
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import json
+import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
-from pathlib import Path
+import json
 import asyncio
+import threading
+from pathlib import Path
 
-# Page config
-st.set_page_config(
-    page_title="PQTS Dashboard",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
+# Initialize Dash app
+app = dash.Dash(__name__)
+app.title = "PQTS Trading Dashboard"
+
+# Layout
+app.layout = html.Div([
+    html.Div([
+        html.H1("Protheus Quant Trading System", className="title"),
+        html.Div(id="clock", className="clock")
+    ], className="header"),
+    
+    # Summary Cards
+    html.Div([
+        html.Div([
+            html.H3("Portfolio Value"),
+            html.H2(id="portfolio-value", children="$0.00"),
+            html.P(id="portfolio-change", children="0.00%")
+        ], className="card"),
+        
+        html.Div([
+            html.H3("Today's P&L"),
+            html.H2(id="daily-pnl", children="$0.00"),
+            html.P(id="daily-trades", children="0 trades")
+        ], className="card"),
+        
+        html.Div([
+            html.H3("Open Positions"),
+            html.H2(id="open-positions", children="0"),
+            html.P(id="position-exposure", children="0% invested")
+        ], className="card"),
+        
+        html.Div([
+            html.H3("Win Rate"),
+            html.H2(id="win-rate", children="0%"),
+            html.P(id="total-trades", children="0 total")
+        ], className="card"),
+    ], className="summary-row"),
+    
+    # Main Content
+    html.Div([
+        # Left Column - Charts
+        html.Div([
+            # Equity Curve
+            html.Div([
+                html.H3("Equity Curve"),
+                dcc.Graph(id="equity-chart", style={"height": "400px"})
+            ], className="chart-container"),
+            
+            # Price Chart
+            html.Div([
+                html.H3("Price Chart"),
+                dcc.Graph(id="price-chart", style={"height": "400px"})
+            ], className="chart-container"),
+        ], className="column-left"),
+        
+        # Right Column - Tables
+        html.Div([
+            # Positions Table
+            html.Div([
+                html.H3("Open Positions"),
+                html.Div(id="positions-table")
+            ], className="table-container"),
+            
+            # Recent Trades
+            html.Div([
+                html.H3("Recent Trades"),
+                html.Div(id="trades-table")
+            ], className="table-container"),
+            
+            # Strategy Performance
+            html.Div([
+                html.H3("Strategy Performance"),
+                html.Div(id="strategy-table")
+            ], className="table-container"),
+        ], className="column-right"),
+    ], className="main-content"),
+    
+    # Update interval
+    dcc.Interval(id="interval-component", interval=5000, n_intervals=0)  # 5 seconds
+], className="dashboard")
+
+# Callbacks
+@app.callback(
+    Output("clock", "children"),
+    Input("interval-component", "n_intervals")
 )
+def update_clock(n):
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# Custom CSS
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        border-radius: 10px;
-        padding: 20px;
-        text-align: center;
-    }
-    .positive {
-        color: #00cc00;
-    }
-    .negative {
-        color: #ff0000;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-class TradingDashboard:
-    """
-    Real-time trading dashboard for PQTS.
-    Displays portfolio, positions, orders, and performance metrics.
-    """
-    
-    def __init__(self):
-        self.data_dir = Path("data")
-        self.analytics_dir = self.data_dir / "analytics"
-        
-    def load_portfolio_data(self) -> dict:
-        """Load current portfolio data"""
-        try:
-            portfolio_file = self.analytics_dir / "portfolio.json"
-            if portfolio_file.exists():
-                with open(portfolio_file) as f:
-                    return json.load(f)
-        except Exception as e:
-            st.error(f"Error loading portfolio: {e}")
-        
-        return {
-            "total_equity": 10000.0,
-            "cash": 5000.0,
-            "positions_value": 5000.0,
+@app.callback(
+    [
+        Output("portfolio-value", "children"),
+        Output("portfolio-change", "children"),
+        Output("daily-pnl", "children"),
+        Output("daily-trades", "children"),
+        Output("open-positions", "children"),
+        Output("win-rate", "children"),
+        Output("total-trades", "children"),
+    ],
+    Input("interval-component", "n_intervals")
+)
+def update_summary(n):
+    # Load data from analytics file
+    try:
+        with open("data/analytics/account.json", "r") as f:
+            account = json.load(f)
+    except:
+        account = {
+            "portfolio_value": 10000.0,
             "daily_pnl": 0.0,
-            "daily_pnl_pct": 0.0
+            "daily_return": 0.0,
+            "daily_trades": 0,
+            "open_positions": 0,
+            "win_rate": 0.0,
+            "total_trades": 0
         }
     
-    def load_positions(self) -> pd.DataFrame:
-        """Load current positions"""
-        try:
-            positions_file = self.analytics_dir / "positions.json"
-            if positions_file.exists():
-                with open(positions_file) as f:
-                    data = json.load(f)
-                    return pd.DataFrame(data)
-        except Exception as e:
-            pass
-        
-        # Sample data for demonstration
-        return pd.DataFrame([
-            {"symbol": "BTCUSDT", "quantity": 0.5, "avg_entry": 45000, "current": 47000, "pnl": 1000, "pnl_pct": 4.44, "market": "crypto"},
-            {"symbol": "ETHUSDT", "quantity": 5.0, "avg_entry": 2800, "current": 3200, "pnl": 2000, "pnl_pct": 14.29, "market": "crypto"},
-        ])
-    
-    def load_orders(self) -> pd.DataFrame:
-        """Load recent orders"""
-        try:
-            orders_file = self.analytics_dir / "orders.json"
-            if orders_file.exists():
-                with open(orders_file) as f:
-                    data = json.load(f)
-                    return pd.DataFrame(data)
-        except Exception as e:
-            pass
-        
-        # Sample data
-        return pd.DataFrame([
-            {"timestamp": "2024-01-15 10:30:00", "symbol": "BTCUSDT", "side": "buy", "quantity": 0.1, "price": 45000, "status": "filled"},
-            {"timestamp": "2024-01-15 11:45:00", "symbol": "ETHUSDT", "side": "buy", "quantity": 1.0, "price": 2800, "status": "filled"},
-        ])
-    
-    def load_equity_curve(self) -> pd.DataFrame:
-        """Load equity curve data"""
-        try:
-            equity_file = self.analytics_dir / "equity_curve.json"
-            if equity_file.exists():
-                with open(equity_file) as f:
-                    data = json.load(f)
-                    return pd.DataFrame(data)
-        except Exception as e:
-            pass
-        
-        # Generate sample equity curve
-        dates = pd.date_range(start='2024-01-01', end='2024-01-15', freq='H')
-        equity = 10000 + (dates - dates[0]).total_seconds() / 3600 * 50 + \
-                 pd.Series(range(len(dates))).apply(lambda x: 100 if x % 24 == 0 else 0).cumsum()
-        
-        return pd.DataFrame({
-            'timestamp': dates,
-            'equity': equity
-        })
-    
-    def load_performance_metrics(self) -> dict:
-        """Load performance metrics"""
-        try:
-            metrics_file = self.analytics_dir / "performance.json"
-            if metrics_file.exists():
-                with open(metrics_file) as f:
-                    return json.load(f)
-        except Exception as e:
-            pass
-        
-        return {
-            "total_return_pct": 15.5,
-            "sharpe_ratio": 1.45,
-            "sortino_ratio": 1.82,
-            "max_drawdown_pct": -8.2,
-            "win_rate": 58.3,
-            "profit_factor": 1.65,
-            "avg_trade": 125.50,
-            "total_trades": 124,
-            "winning_trades": 72,
-            "losing_trades": 52
-        }
-    
-    def render_header(self):
-        """Render header section"""
-        st.markdown('<h1 class="main-header">📈 Protheus Quant Trading System</h1>', 
-                   unsafe_allow_html=True)
-        st.markdown(f"*Real-time dashboard | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
-    
-    def render_portfolio_summary(self, portfolio: dict):
-        """Render portfolio summary cards"""
-        col1, col2, col3, col4, col5 = st.columns(5)
-        
-        with col1:
-            st.metric(
-                "Total Equity",
-                f"${portfolio.get('total_equity', 0):,.2f}",
-                f"{portfolio.get('daily_pnl_pct', 0):.2f}%"
-            )
-        
-        with col2:
-            st.metric(
-                "Cash",
-                f"${portfolio.get('cash', 0):,.2f}"
-            )
-        
-        with col3:
-            st.metric(
-                "Positions Value",
-                f"${portfolio.get('positions_value', 0):,.2f}"
-            )
-        
-        with col4:
-            st.metric(
-                "Daily P&L",
-                f"${portfolio.get('daily_pnl', 0):,.2f}",
-                f"{portfolio.get('daily_pnl_pct', 0):.2f}%"
-            )
-        
-        with col5:
-            unrealized = portfolio.get('unrealized_pnl', 0)
-            st.metric(
-                "Unrealized P&L",
-                f"${unrealized:,.2f}",
-                f"{portfolio.get('unrealized_pnl_pct', 0):.2f}%"
-            )
-    
-    def render_equity_chart(self, equity_df: pd.DataFrame):
-        """Render equity curve chart"""
-        st.subheader("📊 Equity Curve")
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=equity_df['timestamp'],
-            y=equity_df['equity'],
-            mode='lines',
-            name='Equity',
-            line=dict(color='#1f77b4', width=2)
-        ))
-        
-        fig.update_layout(
-            xaxis_title="Time",
-            yaxis_title="Equity ($)",
-            height=400,
-            hovermode='x unified'
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
-    def render_positions(self, positions_df: pd.DataFrame):
-        """Render positions table"""
-        st.subheader("📌 Open Positions")
-        
-        if not positions_df.empty:
-            # Format for display
-            display_df = positions_df.copy()
-            
-            # Color coding for P&L
-            def color_pnl(val):
-                if isinstance(val, (int, float)):
-                    return 'color: green' if val > 0 else 'color: red' if val < 0 else ''
-                return ''
-            
-            st.dataframe(
-                display_df.style.applymap(color_pnl, subset=['pnl', 'pnl_pct']),
-                use_container_width=True
-            )
-            
-            # Total exposure
-            total_long = display_df[display_df['quantity'] > 0]['current'].sum()
-            total_short = display_df[display_df['quantity'] < 0]['current'].sum()
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.info(f"**Long Exposure:** ${total_long:,.2f}")
-            with col2:
-                st.info(f"**Short Exposure:** ${abs(total_short):,.2f}")
-        else:
-            st.info("No open positions")
-    
-    def render_orders(self, orders_df: pd.DataFrame):
-        """Render orders table"""
-        st.subheader("📋 Recent Orders")
-        
-        if not orders_df.empty:
-            st.dataframe(orders_df, use_container_width=True)
-        else:
-            st.info("No recent orders")
-    
-    def render_performance_metrics(self, metrics: dict):
-        """Render performance metrics"""
-        st.subheader("🎯 Performance Metrics")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Total Return", f"{metrics.get('total_return_pct', 0):.2f}%")
-            st.metric("Sharpe Ratio", f"{metrics.get('sharpe_ratio', 0):.2f}")
-            st.metric("Sortino Ratio", f"{metrics.get('sortino_ratio', 0):.2f}")
-        
-        with col2:
-            st.metric("Max Drawdown", f"{metrics.get('max_drawdown_pct', 0):.2f}%")
-            st.metric("Win Rate", f"{metrics.get('win_rate', 0):.1f}%")
-            st.metric("Profit Factor", f"{metrics.get('profit_factor', 0):.2f}")
-        
-        with col3:
-            st.metric("Total Trades", metrics.get('total_trades', 0))
-            st.metric("Winning Trades", metrics.get('winning_trades', 0))
-            st.metric("Losing Trades", metrics.get('losing_trades', 0))
-    
-    def render_strategy_allocation(self):
-        """Render strategy allocation chart"""
-        st.subheader("🤖 Strategy Allocation")
-        
-        strategies = pd.DataFrame({
-            'Strategy': ['Scalping', 'Trend Following', 'Mean Reversion', 'ML Ensemble', 'Arbitrage'],
-            'Allocation': [30, 25, 20, 15, 10],
-            'Active': [True, True, False, True, False]
-        })
-        
-        fig = go.Figure(data=[go.Pie(
-            labels=strategies['Strategy'],
-            values=strategies['Allocation'],
-            hole=.3
-        )])
-        
-        fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Strategy status
-        st.write("**Strategy Status:**")
-        for _, row in strategies.iterrows():
-            status = "🟢 Active" if row['Active'] else "🔴 Paused"
-            st.write(f"- {row['Strategy']}: {row['Allocation']}% | {status}")
-    
-    def run(self):
-        """Run the dashboard"""
-        self.render_header()
-        
-        # Sidebar
-        st.sidebar.title("🔧 Settings")
-        st.sidebar.selectbox("Timeframe", ["1H", "4H", "1D", "1W"])
-        st.sidebar.selectbox("Market", ["All", "Crypto", "Equities", "Forex"])
-        st.sidebar.checkbox("Auto-refresh", value=True)
-        
-        if st.sidebar.button("🔄 Force Refresh"):
-            st.rerun()
-        
-        # Load data
-        portfolio = self.load_portfolio_data()
-        positions = self.load_positions()
-        orders = self.load_orders()
-        equity = self.load_equity_curve()
-        metrics = self.load_performance_metrics()
-        
-        # Main content
-        self.render_portfolio_summary(portfolio)
-        
-        st.divider()
-        
-        # Tabs
-        tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "📌 Positions", "📋 Orders", "⚙️ Configuration"])
-        
-        with tab1:
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                self.render_equity_chart(equity)
-            
-            with col2:
-                self.render_strategy_allocation()
-            
-            self.render_performance_metrics(metrics)
-        
-        with tab2:
-            self.render_positions(positions)
-        
-        with tab3:
-            self.render_orders(orders)
-        
-        with tab4:
-            st.subheader("⚙️ System Configuration")
-            
-            st.write("**Risk Settings:**")
-            st.json({
-                "max_portfolio_risk_pct": 2.0,
-                "max_position_risk_pct": 1.0,
-                "max_drawdown_pct": 10.0,
-                "max_leverage": 2.0
-            })
-            
-            st.write("**Active Markets:**")
-            st.json({
-                "crypto": {"enabled": True, "exchanges": ["binance", "coinbase"]},
-                "equities": {"enabled": True, "broker": "alpaca"},
-                "forex": {"enabled": False}
-            })
+    return (
+        f"${account['portfolio_value']:,.2f}",
+        f"{account.get('daily_return', 0):+.2f}%",
+        f"${account['daily_pnl']:+.2f}",
+        f"{account['daily_trades']} trades",
+        str(account['open_positions']),
+        f"{account['win_rate']:.1f}%",
+        f"{account['total_trades']} total"
+    )
 
+@app.callback(
+    Output("equity-chart", "figure"),
+    Input("interval-component", "n_intervals")
+)
+def update_equity_chart(n):
+    # Load equity curve
+    try:
+        with open("data/analytics/equity_curve.json", "r") as f:
+            equity_data = json.load(f)
+    except:
+        equity_data = []
+    
+    if not equity_data:
+        # Demo data
+        dates = pd.date_range(start=datetime.now() - timedelta(days=30), 
+                             periods=100, freq='H')
+        values = 10000 + np.cumsum(np.random.randn(100) * 50)
+        equity_data = [{"timestamp": d.isoformat(), "value": v} 
+                        for d, v in zip(dates, values)]
+    
+    df = pd.DataFrame(equity_data)
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df['timestamp'],
+        y=df['value'],
+        mode='lines',
+        name='Portfolio Value',
+        line=dict(color='#00ff88', width=2)
+    ))
+    
+    fig.update_layout(
+        template='plotly_dark',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=40, r=40, t=40, b=40),
+        xaxis_title="Time",
+        yaxis_title="Value ($)",
+        showlegend=False
+    )
+    
+    return fig
+
+@app.callback(
+    Output("price-chart", "figure"),
+    Input("interval-component", "n_intervals")
+)
+def update_price_chart(n):
+    # Demo candlestick data
+    np.random.seed(42)
+    n_periods = 100
+    
+    base = 45000
+    noise = np.cumsum(np.random.randn(n_periods) * 100)
+    
+    dates = pd.date_range(start=datetime.now() - timedelta(hours=100), 
+                         periods=n_periods, freq='H')
+    
+    opens = base + noise + np.random.randn(n_periods) * 50
+    closes = opens + np.random.randn(n_periods) * 100
+    highs = np.maximum(opens, closes) + np.abs(np.random.randn(n_periods)) * 100
+    lows = np.minimum(opens, closes) - np.abs(np.random.randn(n_periods)) * 100
+    volumes = np.random.randint(1000000, 5000000, n_periods)
+    
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                       vertical_spacing=0.03,
+                       row_heights=[0.7, 0.3])
+    
+    fig.add_trace(go.Candlestick(
+        x=dates,
+        open=opens,
+        high=highs,
+        low=lows,
+        close=closes,
+        name="BTCUSDT",
+        increasing_line_color='#00ff88',
+        decreasing_line_color='#ff4444'
+    ), row=1, col=1)
+    
+    fig.add_trace(go.Bar(
+        x=dates,
+        y=volumes,
+        name="Volume",
+        marker_color='#888888'
+    ), row=2, col=1)
+    
+    # Add moving averages
+    fig.add_trace(go.Scatter(
+        x=dates,
+        y=pd.Series(closes).rolling(20).mean(),
+        mode='lines',
+        name='SMA 20',
+        line=dict(color='#ffa500', width=1)
+    ), row=1, col=1)
+    
+    fig.update_layout(
+        template='plotly_dark',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=40, r=40, t=40, b=40),
+        xaxis_rangeslider_visible=False,
+        showlegend=False
+    )
+    
+    fig.update_xaxes(title_text="Time", row=2, col=1)
+    fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+    fig.update_yaxes(title_text="Volume", row=2, col=1)
+    
+    return fig
+
+@app.callback(
+    Output("positions-table", "children"),
+    Input("interval-component", "n_intervals")
+)
+def update_positions_table(n):
+    # Demo positions
+    positions = [
+        {"symbol": "BTCUSDT", "side": "LONG", "qty": 0.25, 
+         "entry": 45200.00, "current": 45650.00, "pnl": 112.50, "pnl_pct": 1.0},
+        {"symbol": "ETHUSDT", "side": "LONG", "qty": 2.5,
+         "entry": 2400.00, "current": 2425.00, "pnl": 62.50, "pnl_pct": 1.04},
+    ]
+    
+    rows = []
+    for pos in positions:
+        pnl_color = "#00ff88" if pos["pnl"] >= 0 else "#ff4444"
+        rows.append(html.Tr([
+            html.Td(pos["symbol"]),
+            html.Td(pos["side"], style={"color": pnl_color}),
+            html.Td(f"{pos['qty']:.4f}"),
+            html.Td(f"${pos['entry']:,.2f}"),
+            html.Td(f"${pos['current']:,.2f}"),
+            html.Td(f"${pos['pnl']:+.2f}", style={"color": pnl_color}),
+            html.Td(f"{pos['pnl_pct']:+.2f}%", style={"color": pnl_color}),
+        ]))
+    
+    return html.Table([
+        html.Thead(html.Tr([
+            html.Th("Symbol"),
+            html.Th("Side"),
+            html.Th("Quantity"),
+            html.Th("Entry"),
+            html.Th("Current"),
+            html.Th("P&L"),
+            html.Th("P&L %")
+        ])),
+        html.Tbody(rows)
+    ])
+
+@app.callback(
+    Output("trades-table", "children"),
+    Input("interval-component", "n_intervals")
+)
+def update_trades_table(n):
+    # Demo trades
+    trades = [
+        {"time": datetime.now() - timedelta(minutes=5), "symbol": "BTCUSDT", 
+         "action": "BUY", "qty": 0.1, "price": 45200.00, "pnl": None},
+        {"time": datetime.now() - timedelta(hours=1), "symbol": "ETHUSDT",
+         "action": "BUY", "qty": 1.0, "price": 2400.00, "pnl": None},
+        {"time": datetime.now() - timedelta(hours=3), "symbol": "BTCUSDT",
+         "action": "SELL", "qty": 0.05, "price": 45600.00, "pnl": 20.00},
+    ]
+    
+    rows = []
+    for trade in trades:
+        pnl_cell = "-"
+        if trade["pnl"] is not None:
+            pnl_color = "#00ff88" if trade["pnl"] >= 0 else "#ff4444"
+            pnl_cell = html.Td(f"${trade['pnl']:+.2f}", style={"color": pnl_color})
+        else:
+            pnl_cell = html.Td("-")
+        
+        rows.append(html.Tr([
+            html.Td(trade["time"].strftime("%H:%M:%S")),
+            html.Td(trade["symbol"]),
+            html.Td(trade["action"]),
+            html.Td(f"{trade['qty']:.4f}"),
+            html.Td(f"${trade['price']:,.2f}"),
+            pnl_cell
+        ]))
+    
+    return html.Table([
+        html.Thead(html.Tr([
+            html.Th("Time"),
+            html.Th("Symbol"),
+            html.Th("Action"),
+            html.Th("Quantity"),
+            html.Th("Price"),
+            html.Th("P&L")
+        ])),
+        html.Tbody(rows)
+    ])
+
+@app.callback(
+    Output("strategy-table", "children"),
+    Input("interval-component", "n_intervals")
+)
+def update_strategy_table(n):
+    # Demo strategy metrics
+    strategies = [
+        {"name": "Scalping", "trades": 45, "win_rate": 62, "profit": 450.00, "active": True},
+        {"name": "Trend Following", "trades": 12, "win_rate": 58, "profit": 320.00, "active": True},
+        {"name": "Mean Reversion", "trades": 8, "win_rate": 75, "profit": 180.00, "active": True},
+        {"name": "Arbitrage", "trades": 23, "win_rate": 82, "profit": 290.00, "active": False},
+    ]
+    
+    rows = []
+    for strat in strategies:
+        profit_color = "#00ff88" if strat["profit"] >= 0 else "#ff4444"
+        status_color = "#00ff88" if strat["active"] else "#888888"
+        rows.append(html.Tr([
+            html.Td(strat["name"]),
+            html.Td(strat["trades"]),
+            html.Td(f"{strat['win_rate']}%"),
+            html.Td(f"${strat['profit']:+.2f}", style={"color": profit_color}),
+            html.Td("●", style={"color": status_color}),
+        ]))
+    
+    return html.Table([
+        html.Thead(html.Tr([
+            html.Th("Strategy"),
+            html.Th("Trades"),
+            html.Th("Win Rate"),
+            html.Th("Profit"),
+            html.Th("Status")
+        ])),
+        html.Tbody(rows)
+    ])
+
+# External stylesheet
+app.css.append_css({
+    "external_url": "https://codepen.io/chriddyp/pen/bWLwgP.css"
+})
 
 if __name__ == "__main__":
-    dashboard = TradingDashboard()
-    dashboard.run()
+    app.run_server(debug=True, host="0.0.0.0", port=8050)

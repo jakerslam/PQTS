@@ -1,7 +1,10 @@
-# Coinbase Pro Market Adapter
+# Coinbase Pro Adapter
 import logging
 import asyncio
 import aiohttp
+import hmac
+import hashlib
+import json
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -12,13 +15,14 @@ class CoinbaseAdapter:
     Coinbase Pro / Advanced Trade adapter for crypto trading.
     """
     
-    def __init__(self, api_key: str, api_secret: str, passphrase: str, sandbox: bool = True):
+    def __init__(self, api_key: str, api_secret: str, passphrase: str,
+                 sandbox: bool = True):
         self.api_key = api_key
         self.api_secret = api_secret
         self.passphrase = passphrase
         self.sandbox = sandbox
         
-        # Base URLs
+        # Base URL
         if sandbox:
             self.base_url = "https://api-public.sandbox.exchange.coinbase.com"
         else:
@@ -33,9 +37,8 @@ class CoinbaseAdapter:
         self.session = aiohttp.ClientSession()
         
         try:
-            # Test connection
-            await self.get_accounts()
-            logger.info("Coinbase connection successful")
+            accounts = await self.get_accounts()
+            logger.info(f"Coinbase connection successful: {len(accounts)} accounts")
         except Exception as e:
             logger.error(f"Coinbase connection failed: {e}")
             raise
@@ -46,121 +49,104 @@ class CoinbaseAdapter:
             await self.session.close()
             self.session = None
     
-    def _sign_request(self, method: str, path: str, body: str = "") -> Dict:
+    def _generate_signature(self, timestamp: str, method: str, 
+                           path: str, body: str = '') -> tuple:
         """Generate request signature"""
-        import hmac
-        import hashlib
-        import base64
-        import json
-        
-        timestamp = str(datetime.utcnow().timestamp())
         message = timestamp + method.upper() + path + body
-        
-        hmac_key = base64.b64decode(self.api_secret)
         signature = hmac.new(
-            hmac_key,
+            self.api_secret.encode('utf-8'),
             message.encode('utf-8'),
             hashlib.sha256
-        ).digest()
+        ).hexdigest()
         
-        return {
-            'CB-ACCESS-KEY': self.api_key,
-            'CB-ACCESS-SIGN': base64.b64encode(signature).decode('utf-8'),
-            'CB-ACCESS-TIMESTAMP': timestamp,
-            'CB-ACCESS-PASSPHRASE': self.passphrase,
-            'Content-Type': 'application/json'
-        }
+        return signature
     
-    async def _request(self, method: str, path: str, params: dict = None) -> dict:
+    async def _request(self, method: str, path: str,
+                      params: dict = None, json_data: dict = None) -> dict:
         """Make API request"""
         if not self.session:
             raise RuntimeError("Not connected")
         
         url = f"{self.base_url}{path}"
-        headers = self._sign_request(method, path)
+        timestamp = str(datetime.utcnow().timestamp())
+        body = json.dumps(json_data) if json_data else ''
         
-        async with self.session.request(method, url, headers=headers, params=params) as response:
+        signature = self._generate_signature(timestamp, method, path, body)
+        
+        headers = {
+            'CB-ACCESS-KEY': self.api_key,
+            'CB-ACCESS-SIGN': signature,
+            'CB-ACCESS-TIMESTAMP': timestamp,
+            'CB-ACCESS-PASSPHRASE': self.passphrase,
+            'Content-Type': 'application/json'
+        }
+        
+        async with self.session.request(method, url, headers=headers,
+                                       params=params, json=json_data) as response:
             data = await response.json()
             
-            if response.status != 200:
+            if response.status not in [200, 201]:
                 logger.error(f"Coinbase API error: {data}")
                 raise Exception(f"API error: {data}")
             
             return data
     
-    async def get_accounts(self) -> List[Dict]:
-        """Get all accounts"""
+    async def get_accounts(self) -> List[dict]:
+        """Get accounts"""
         return await self._request('GET', '/accounts')
     
-    async def get_balance(self, currency: str) -> float:
-        """Get balance for specific currency"""
-        accounts = await self.get_accounts()
-        for account in accounts:
-            if account['currency'] == currency:
-                return float(account['available'])
-        return 0.0
+    async def get_account(self, account_id: str) -> dict:
+        """Get specific account"""
+        return await self._request('GET', f'/accounts/{account_id}')
     
-    async def get_orderbook(self, symbol: str, level: int = 2) -> Dict:
-        """Get order book"""
-        path = f"/products/{symbol}/book"
-        return await self._request('GET', path, {'level': level})
+    async def get_products(self) -> List[dict]:
+        """Get available trading pairs"""
+        return await self._request('GET', '/products')
     
-    async def get_ticker(self, symbol: str) -> Dict:
-        """Get ticker data"""
-        path = f"/products/{symbol}/ticker"
-        return await self._request('GET', path)
+    async def get_product_ticker(self, product_id: str) -> dict:
+        """Get product ticker"""
+        return await self._request('GET', f'/products/{product_id}/ticker')
     
-    async def get_candles(self, symbol: str, granularity: int = 3600) -> List[List]:
-        """Get historical candles [time, low, high, open, close, volume]"""
-        path = f"/products/{symbol}/candles"
-        return await self._request('GET', path, {'granularity': granularity})
-    
-    async def place_order(self, symbol: str, side: str, order_type: str,
-                         quantity: float, price: Optional[float] = None) -> Dict:
-        """Place order"""
-        path = "/orders"
+    async def get_candles(self, product_id: str, granularity: int = 3600,
+                         start: datetime = None, end: datetime = None) -> List[list]:
+        """Get historical candles"""
+        params = {'granularity': granularity}
         
-        body = {
-            'product_id': symbol,
+        if start:
+            params['start'] = start.isoformat()
+        if end:
+            params['end'] = end.isoformat()
+        
+        return await self._request('GET', f'/products/{product_id}/candles',
+                                  params=params)
+    
+    async def place_order(self, product_id: str, side: str, 
+                         order_type: str = 'limit',
+                         size: float = None, price: float = None,
+                         funds: float = None) -> dict:
+        """Place an order"""
+        order_data = {
+            'product_id': product_id,
             'side': side.lower(),
-            'size': str(quantity)
+            'type': order_type.lower()
         }
         
-        if order_type.upper() == 'LIMIT':
-            body['type'] = 'limit'
-            body['price'] = str(price)
-            body['post_only'] = True
+        if order_type.lower() == 'market':
+            if side.lower() == 'buy' and funds:
+                order_data['funds'] = str(funds)
+            elif size:
+                order_data['size'] = str(size)
         else:
-            body['type'] = 'market'
+            order_data['size'] = str(size)
+            order_data['price'] = str(price)
         
-        import json
-        headers = self._sign_request('POST', path, json.dumps(body))
-        
-        async with self.session.post(
-            f"{self.base_url}{path}", 
-            headers=headers, 
-            json=body
-        ) as response:
-            data = await response.json()
-            
-            if response.status != 200:
-                logger.error(f"Order placement error: {data}")
-                raise Exception(f"Order error: {data}")
-            
-            return data
+        return await self._request('POST', '/orders', json_data=order_data)
     
-    async def cancel_order(self, order_id: str) -> Dict:
-        """Cancel order"""
-        path = f"/orders/{order_id}"
-        return await self._request('DELETE', path)
+    async def get_orders(self, status: str = 'open') -> List[dict]:
+        """Get orders"""
+        params = {'status': status}
+        return await self._request('GET', '/orders', params=params)
     
-    async def get_open_orders(self) -> List[Dict]:
-        """Get open orders"""
-        return await self._request('GET', '/orders')
-    
-    async def get_fills(self, symbol: Optional[str] = None) -> List[Dict]:
-        """Get recent fills"""
-        params = {}
-        if symbol:
-            params['product_id'] = symbol
-        return await self._request('GET', '/fills', params=params)
+    async def cancel_order(self, order_id: str) -> dict:
+        """Cancel an order"""
+        return await self._request('DELETE', f'/orders/{order_id}')
