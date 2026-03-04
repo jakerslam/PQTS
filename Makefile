@@ -3,7 +3,7 @@ PYTHON ?= python3
 VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 
-.PHONY: setup setup-lock demo sim-suite stream-worker reconcile slo-report error-budget test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -20,6 +20,15 @@ sim-suite:
 stream-worker:
 	$(VENV_PY) scripts/run_shadow_stream_worker.py --cycles 10 --sleep-seconds 1.0
 
+ws-ingestion:
+	$(VENV_PY) scripts/run_ws_ingestion.py --cycles 30 --sleep-seconds 1.0
+
+tournament:
+	$(VENV_PY) scripts/run_strategy_tournament.py --start 2026-01-01T00:00:00Z --end 2026-02-01T00:00:00Z
+
+canary-ramp:
+	$(VENV_PY) scripts/run_canary_ramp.py
+
 reconcile:
 	$(VENV_PY) scripts/run_reconciliation_daemon.py --cycles 10 --sleep-seconds 5.0 --halt-on-mismatch
 
@@ -28,6 +37,9 @@ slo-report:
 
 error-budget:
 	$(VENV_PY) scripts/weekly_error_budget_review.py --window-days 7
+
+control-plane:
+	$(VENV_PY) scripts/control_plane_report.py
 
 test:
 	$(VENV_PY) -m pytest -q

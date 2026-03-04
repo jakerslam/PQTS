@@ -14,6 +14,7 @@ import pandas as pd
 try:
     from backtesting.purged_cv import BacktestValidator, PurgedKFold
 except Exception:  # pragma: no cover - fallback for minimal environments
+
     class PurgedKFold:  # type: ignore[override]
         def __init__(self, n_splits: int = 5, pct_purge: float = 0.01, pct_embargo: float = 0.01):
             self.n_splits = n_splits
@@ -38,7 +39,12 @@ except Exception:  # pragma: no cover - fallback for minimal environments
                 yield train_idx, test_idx
 
     class BacktestValidator:  # type: ignore[override]
-        def __init__(self, min_sharpe: float = 0.8, min_profit_factor: float = 1.4, max_drawdown: float = 0.15):
+        def __init__(
+            self,
+            min_sharpe: float = 0.8,
+            min_profit_factor: float = 1.4,
+            max_drawdown: float = 0.15,
+        ):
             self.min_sharpe = min_sharpe
             self.min_pf = min_profit_factor
             self.max_dd = max_drawdown
@@ -62,15 +68,20 @@ except Exception:  # pragma: no cover - fallback for minimal environments
                 reasons.append("low_profit_factor")
             if dd > self.max_dd:
                 reasons.append("high_drawdown")
-            return {"passed": len(reasons) == 0, "reasons": reasons, "metrics": {"sharpe": sharpe, "profit_factor": pf, "max_drawdown": dd}}
+            return {
+                "passed": len(reasons) == 0,
+                "reasons": reasons,
+                "metrics": {"sharpe": sharpe, "profit_factor": pf, "max_drawdown": dd},
+            }
 
+
+from portfolio.strategy_allocator import StrategyBudgetInput, StrategyCapitalAllocator
 from research.auto_generator import AutoStrategyGenerator, StrategyVariant
 from research.database import BacktestResult, Experiment, ResearchDatabase
+from research.r_analytics_bridge import RAnalyticsBridge
 from research.regime_detector import MarketRegime, RegimeDetector
 from research.report_builder import ResearchAnalyticsReportBuilder
-from research.r_analytics_bridge import RAnalyticsBridge
 from research.walk_forward import WalkForwardTester, WalkForwardWindow
-from portfolio.strategy_allocator import StrategyBudgetInput, StrategyCapitalAllocator
 
 logger = logging.getLogger(__name__)
 
@@ -146,9 +157,7 @@ class AIResearchAgent:
         self.min_profit_factor = float(config.get("min_profit_factor", 1.25))
         self.max_pbo = float(config.get("max_pbo", 0.4))
         self.min_deflated_sharpe = float(config.get("min_deflated_sharpe", 0.8))
-        self.min_walk_forward_consistency = float(
-            config.get("min_walk_forward_consistency", 0.4)
-        )
+        self.min_walk_forward_consistency = float(config.get("min_walk_forward_consistency", 0.4))
 
         # Optional R analytics validator
         r_cfg = config.get("r_analytics", {})
@@ -182,7 +191,9 @@ class AIResearchAgent:
         self.deployable_capital = float(
             capacity_cfg.get(
                 "deployable_capital",
-                config.get("deployable_capital", config.get("risk", {}).get("initial_capital", 0.0)),
+                config.get(
+                    "deployable_capital", config.get("risk", {}).get("initial_capital", 0.0)
+                ),
             )
         )
         self.max_annual_turnover_notional = float(
@@ -214,6 +225,13 @@ class AIResearchAgent:
                 "max_slippage_mape": float(config.get("live_max_slippage_mape", 20.0)),
                 "max_kill_switch_triggers": int(config.get("live_max_kill_switch_triggers", 0)),
             },
+        }
+        self.live_allowed_strategy_types = {
+            str(name).strip().lower()
+            for name in config.get(
+                "live_allowed_strategy_types", ["market_making", "funding_arbitrage"]
+            )
+            if str(name).strip()
         }
 
         # Agent objective constraints
@@ -394,7 +412,9 @@ class AIResearchAgent:
         position = signal.clip(-1.0, 1.0)
         turnover = position.diff().abs().fillna(0.0)
 
-        cost_per_turnover = (self.commission_bps + self.slippage_bps + self.borrow_funding_bps) / 10000.0
+        cost_per_turnover = (
+            self.commission_bps + self.slippage_bps + self.borrow_funding_bps
+        ) / 10000.0
         pnl_series = position.shift(1).fillna(0.0) * returns - turnover * cost_per_turnover
         pnl_series = pnl_series.replace([np.inf, -np.inf], 0.0).fillna(0.0)
 
@@ -440,7 +460,9 @@ class AIResearchAgent:
             "returns_series": pnl_series,
         }
 
-    def _run_purged_cv(self, variant: StrategyVariant, data: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
+    def _run_purged_cv(
+        self, variant: StrategyVariant, data: Dict[str, pd.DataFrame]
+    ) -> Dict[str, Any]:
         returns = self._aggregate_market_returns(data)
         if len(returns) < 40:
             fallback = self._run_deterministic_backtest(variant, data)
@@ -486,7 +508,9 @@ class AIResearchAgent:
                 "cv_fold_sharpes": [],
             }
 
-        merged_oos_returns = np.concatenate(oos_returns) if oos_returns else np.array([], dtype=float)
+        merged_oos_returns = (
+            np.concatenate(oos_returns) if oos_returns else np.array([], dtype=float)
+        )
         validator = BacktestValidator(
             min_sharpe=self.min_sharpe_for_promotion,
             min_profit_factor=self.min_profit_factor,
@@ -570,7 +594,9 @@ class AIResearchAgent:
         penalty = np.sqrt(2.0 * np.log(float(n_trials))) / np.sqrt(252.0)
         return float(sharpe - penalty)
 
-    def _compute_fitness(self, metrics: Dict[str, Any], cv_stats: Dict[str, Any], deflated_sharpe: float) -> float:
+    def _compute_fitness(
+        self, metrics: Dict[str, Any], cv_stats: Dict[str, Any], deflated_sharpe: float
+    ) -> float:
         capacity_penalty = max(float(metrics["capacity_ratio"]) - 1.0, 0.0)
         drawdown_penalty = float(metrics["max_drawdown"])
         pbo_penalty = float(cv_stats["pbo_estimate"])
@@ -590,7 +616,9 @@ class AIResearchAgent:
     def _rank_strategies(self, results: List[Dict]) -> List[Dict]:
         return sorted(results, key=lambda row: row["fitness"], reverse=True)
 
-    def _walk_forward_test(self, top_strategies: List[Dict], data: Dict[str, pd.DataFrame]) -> List[Dict]:
+    def _walk_forward_test(
+        self, top_strategies: List[Dict], data: Dict[str, pd.DataFrame]
+    ) -> List[Dict]:
         confirmed: List[Dict] = []
         windows = self._build_walk_forward_windows(data)
 
@@ -677,7 +705,8 @@ class AIResearchAgent:
                 "validator": bool(result["validator_passed"]),
                 "drawdown": float(metrics["max_drawdown"]) <= self.max_drawdown,
                 "wf_sharpe": float(result["walk_forward_sharpe"]) >= self.min_sharpe_for_promotion,
-                "wf_consistency": float(result["walk_forward_consistency"]) >= self.min_walk_forward_consistency,
+                "wf_consistency": float(result["walk_forward_consistency"])
+                >= self.min_walk_forward_consistency,
                 "deflated_sharpe": float(result["deflated_sharpe"]) >= self.min_deflated_sharpe,
                 "pbo": float(result["pbo_estimate"]) <= self.max_pbo,
                 "capacity": float(metrics["capacity_ratio"]) <= 1.0,
@@ -782,7 +811,8 @@ class AIResearchAgent:
             "sharpe": summary["avg_sharpe"] >= gate["min_avg_sharpe"],
             "drawdown": summary["avg_drawdown"] <= gate["max_avg_drawdown"],
             "slippage_mape": summary["avg_slippage_mape"] <= gate["max_slippage_mape"],
-            "kill_switches": summary["total_kill_switch_triggers"] <= gate["max_kill_switch_triggers"],
+            "kill_switches": summary["total_kill_switch_triggers"]
+            <= gate["max_kill_switch_triggers"],
         }
         return {
             "strategy_id": strategy_id,
@@ -794,9 +824,27 @@ class AIResearchAgent:
         }
 
     def promote_from_stage(self, strategy_id: str, target_stage: str) -> bool:
+        if target_stage in {"live_canary", "live"}:
+            experiment = self.db.get_experiment(strategy_id)
+            strategy_type = str((experiment or {}).get("strategy_name", "")).strip().lower()
+            if strategy_type and strategy_type not in self.live_allowed_strategy_types:
+                logger.warning(
+                    "Promotion blocked for %s -> %s: strategy type '%s' outside live scope %s",
+                    strategy_id,
+                    target_stage,
+                    strategy_type,
+                    sorted(self.live_allowed_strategy_types),
+                )
+                return False
+
         assessment = self.evaluate_stage_gate(strategy_id, target_stage)
         if not assessment["passed"]:
-            logger.warning("Promotion blocked for %s -> %s: %s", strategy_id, target_stage, assessment["checks"])
+            logger.warning(
+                "Promotion blocked for %s -> %s: %s",
+                strategy_id,
+                target_stage,
+                assessment["checks"],
+            )
             return False
 
         updated = self.db.update_experiment_status(
@@ -884,7 +932,8 @@ class AIResearchAgent:
 
             gate_checks = {
                 "validator": bool(row.get("validator_passed", False)),
-                "deflated_sharpe": float(row.get("deflated_sharpe", 0.0)) >= self.min_deflated_sharpe,
+                "deflated_sharpe": float(row.get("deflated_sharpe", 0.0))
+                >= self.min_deflated_sharpe,
                 "pbo": float(row.get("pbo_estimate", 1.0)) <= self.max_pbo,
                 "capacity": float(row.get("metrics", {}).get("capacity_ratio", 0.0)) <= 1.0,
                 "economics": float(row.get("net_expected_return", 0.0)) > 0.0,
@@ -980,7 +1029,9 @@ class AIResearchAgent:
             )
             if not active:
                 self.paper_trading.remove(strategy_id)
-                self.db.update_experiment_status(strategy_id, "backtest", reason="paper_monitor_demote")
+                self.db.update_experiment_status(
+                    strategy_id, "backtest", reason="paper_monitor_demote"
+                )
 
             metrics[strategy_id] = {
                 "status": "active" if active else "demoted",
@@ -1000,7 +1051,9 @@ class AIResearchAgent:
         _ = data  # Data retained in signature for future regime-specific scoring.
         optimal = self.regime_detector.get_optimal_strategies(current_regime)
         strategy_type = optimal[0] if optimal else "market_making"
-        logger.info("Generating regime-specific strategies for %s: %s", current_regime.value, optimal)
+        logger.info(
+            "Generating regime-specific strategies for %s: %s", current_regime.value, optimal
+        )
         return self.generator.generate_strategy_variants(strategy_type, n_per_feature_set=10)
 
     # =========================================================================
@@ -1024,7 +1077,9 @@ class AIResearchAgent:
         for name, sharpe, vol in scenarios:
             gross_return = sharpe * vol
             net_return = gross_return - cost_drag
-            required_capital = (target_annual_profit / net_return) if net_return > 0 else float("inf")
+            required_capital = (
+                (target_annual_profit / net_return) if net_return > 0 else float("inf")
+            )
             rows.append(
                 {
                     "scenario": name,
@@ -1034,7 +1089,11 @@ class AIResearchAgent:
                     "cost_drag": cost_drag,
                     "net_return": net_return,
                     "required_capital": required_capital,
-                    "feasible_with_capital": deployable_capital >= required_capital if required_capital != float("inf") else False,
+                    "feasible_with_capital": (
+                        deployable_capital >= required_capital
+                        if required_capital != float("inf")
+                        else False
+                    ),
                 }
             )
 

@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from analytics.paper_readiness import PaperTrackRecordEvaluator
+from execution.order_ledger import ImmutableOrderLedger
 from execution.realistic_costs import (
     Bps,
     NotionalUSD,
@@ -236,6 +237,9 @@ class RiskAwareRouter:
         self.tca_db = TCADatabase(
             tca_db_path or broker_config.get("tca_db_path", "data/tca_records.csv")
         )
+        self.order_ledger = ImmutableOrderLedger(
+            broker_config.get("order_ledger_path", "data/analytics/order_ledger.jsonl")
+        )
         self.eta_by_symbol_venue: Dict[Tuple[str, str], float] = {}
         self.market_venues: Dict[str, VenueClient] = {}
         self._markets_config: Dict[str, Any] = {}
@@ -362,13 +366,103 @@ class RiskAwareRouter:
     ) -> OrderResult:
         """Serialized order-admission wrapper that prevents race-condition bypass."""
         async with self._submit_order_lock:
-            return await self._submit_order_unlocked(
+            result = await self._submit_order_unlocked(
                 order=order,
                 market_data=market_data,
                 portfolio=portfolio,
                 strategy_returns=strategy_returns,
                 portfolio_changes=portfolio_changes,
             )
+            self._record_order_ledger(order=order, result=result)
+            return result
+
+    def _record_order_ledger(self, *, order: OrderRequest, result: OrderResult) -> None:
+        """
+        Mirror router result into immutable order-lifecycle ledger.
+
+        Any ledger exception is contained and logged so execution flow is not
+        blocked by observability persistence issues.
+        """
+        audit = result.audit_log if isinstance(result.audit_log, dict) else {}
+        order_id = str(result.order_id or audit.get("order_id", "")).strip()
+        if not order_id:
+            return
+
+        venue = str(result.exchange or (audit.get("routing", {}) or {}).get("exchange", "unknown"))
+        requested_qty = float(order.quantity)
+        side = str(order.side).lower()
+        symbol = str(order.symbol)
+        submitted_meta = {
+            "order_type": str(order.order_type.value),
+            "price": float(order.price or 0.0),
+        }
+
+        try:
+            self.order_ledger.record(
+                order_id=order_id,
+                state="submitted",
+                symbol=symbol,
+                side=side,
+                venue=venue,
+                quantity=requested_qty,
+                metadata=submitted_meta,
+            )
+
+            if not result.success:
+                self.order_ledger.record(
+                    order_id=order_id,
+                    state="rejected",
+                    symbol=symbol,
+                    side=side,
+                    venue=venue,
+                    quantity=0.0,
+                    metadata={
+                        "reason": str(result.rejected_reason or audit.get("reject_reason", ""))
+                    },
+                )
+                return
+
+            self.order_ledger.record(
+                order_id=order_id,
+                state="acknowledged",
+                symbol=symbol,
+                side=side,
+                venue=venue,
+                quantity=requested_qty,
+                metadata={"decision": str(result.decision.value)},
+            )
+
+            fill = audit.get("fill", {}) if isinstance(audit.get("fill"), dict) else {}
+            executed_qty = float(fill.get("executed_qty", requested_qty))
+            fill_meta = {
+                "executed_price": float(fill.get("executed_price", 0.0)),
+                "fill_ratio": float(executed_qty / max(requested_qty, 1e-12)),
+            }
+            if executed_qty + 1e-12 < requested_qty:
+                self.order_ledger.record(
+                    order_id=order_id,
+                    state="partially_filled",
+                    symbol=symbol,
+                    side=side,
+                    venue=venue,
+                    quantity=executed_qty,
+                    metadata={
+                        **fill_meta,
+                        "remaining_qty": float(max(requested_qty - executed_qty, 0.0)),
+                    },
+                )
+            else:
+                self.order_ledger.record(
+                    order_id=order_id,
+                    state="filled",
+                    symbol=symbol,
+                    side=side,
+                    venue=venue,
+                    quantity=executed_qty,
+                    metadata=fill_meta,
+                )
+        except Exception as exc:
+            logger.warning("Order ledger update failed for %s: %s", order_id, exc)
 
     async def _submit_order_unlocked(
         self,

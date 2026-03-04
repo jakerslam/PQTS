@@ -1,15 +1,17 @@
 # Research Database
+import hashlib
+import json
 import logging
 import sqlite3
-import pandas as pd
-import json
-import hashlib
-from typing import Any, Dict, List, Optional
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class BacktestResult:
@@ -25,6 +27,7 @@ class BacktestResult:
     timestamp: datetime
     fitness: float = 0.0
 
+
 @dataclass
 class Experiment:
     experiment_id: str
@@ -35,34 +38,35 @@ class Experiment:
     status: str  # 'backtest', 'walk_forward', 'paper', 'live'
     results: Optional[BacktestResult] = None
 
+
 class ResearchDatabase:
     """
     Research database for AI-driven strategy optimization.
-    
+
     Stores every experiment for meta-optimization:
     - Backtest results
     - Walk-forward performance
     - Live trading metrics
     - Regime-specific performance
     """
-    
+
     def __init__(self, db_path: str = "data/research.db"):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         self.conn = sqlite3.connect(str(self.db_path))
         self.conn.row_factory = sqlite3.Row
-        
+
         self._create_tables()
-        
+
         logger.info(f"ResearchDatabase initialized: {self.db_path}")
-    
+
     def _create_tables(self):
         """Create schema for research data"""
         cursor = self.conn.cursor()
-        
+
         # Experiments table
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS experiments (
                 experiment_id TEXT PRIMARY KEY,
                 strategy_name TEXT NOT NULL,
@@ -75,10 +79,10 @@ class ResearchDatabase:
                 promoted_at TIMESTAMP,
                 UNIQUE(strategy_name, variant_id)
             )
-        ''')
-        
+        """)
+
         # Backtest results
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS backtest_results (
                 result_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 experiment_id TEXT NOT NULL,
@@ -93,10 +97,10 @@ class ResearchDatabase:
                 data_end_date TEXT,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
-        ''')
-        
+        """)
+
         # Live performance metrics
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS live_metrics (
                 metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 experiment_id TEXT NOT NULL,
@@ -109,10 +113,10 @@ class ResearchDatabase:
                 num_positions INTEGER,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
-        ''')
+        """)
 
         # Stage metrics for promotion gating (paper, live_canary, live)
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS stage_metrics (
                 metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 experiment_id TEXT NOT NULL,
@@ -126,10 +130,10 @@ class ResearchDatabase:
                 notes TEXT,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
-        ''')
+        """)
 
         # Immutable pilot-arm assignment for control/treatment analytics.
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS pilot_assignments (
                 experiment_id TEXT PRIMARY KEY,
                 arm TEXT NOT NULL,
@@ -137,9 +141,9 @@ class ResearchDatabase:
                 assignment_hash TEXT NOT NULL,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
-        ''')
+        """)
 
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS promotion_audit (
                 audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 experiment_id TEXT NOT NULL,
@@ -149,10 +153,10 @@ class ResearchDatabase:
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
-        ''')
+        """)
 
         # Canonical strategy analytics report artifacts
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS analytics_reports (
                 report_id TEXT PRIMARY KEY,
                 experiment_id TEXT NOT NULL,
@@ -165,10 +169,10 @@ class ResearchDatabase:
                 summary TEXT,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
-        ''')
-        
+        """)
+
         # Feature importance tracking
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS feature_importance (
                 importance_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 experiment_id TEXT NOT NULL,
@@ -177,10 +181,10 @@ class ResearchDatabase:
                 calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
-        ''')
-        
+        """)
+
         # Regime detection history
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS regime_history (
                 regime_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -191,128 +195,139 @@ class ResearchDatabase:
                 trend_regime REAL,
                 liquidity_regime REAL
             )
-        ''')
-        
+        """)
+
         self.conn.commit()
         logger.info("Research database schema created")
-    
+
     def log_experiment(self, experiment: Experiment) -> str:
         """Log a new experiment to the database"""
         cursor = self.conn.cursor()
-        
+
         try:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT OR REPLACE INTO experiments 
                 (experiment_id, strategy_name, variant_id, features, parameters, status, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                experiment.experiment_id,
-                experiment.strategy_name,
-                experiment.variant_id,
-                json.dumps(experiment.features),
-                json.dumps(experiment.parameters),
-                experiment.status,
-                datetime.now().isoformat()
-            ))
-            
+            """,
+                (
+                    experiment.experiment_id,
+                    experiment.strategy_name,
+                    experiment.variant_id,
+                    json.dumps(experiment.features),
+                    json.dumps(experiment.parameters),
+                    experiment.status,
+                    datetime.now().isoformat(),
+                ),
+            )
+
             self.conn.commit()
             logger.info(f"Logged experiment: {experiment.experiment_id}")
             return experiment.experiment_id
-            
+
         except sqlite3.Error as e:
             logger.error(f"Failed to log experiment: {e}")
             return None
-    
+
     def log_backtest_result(self, result: BacktestResult) -> bool:
         """Log backtest results with fitness calculation"""
         cursor = self.conn.cursor()
-        
+
         # Calculate fitness: maximize sharpe, minimize drawdown
         fitness = result.sharpe - 0.5 * result.drawdown
-        
+
         try:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO backtest_results 
                 (experiment_id, pnl_pct, sharpe_ratio, max_drawdown_pct, 
                  win_rate_pct, total_trades, market_regime, fitness_score, data_end_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                result.strategy_id,
-                result.pnl,
-                result.sharpe,
-                result.drawdown,
-                result.win_rate,
-                result.total_trades,
-                result.market_regime,
-                fitness,
-                result.timestamp.isoformat()
-            ))
-            
+            """,
+                (
+                    result.strategy_id,
+                    result.pnl,
+                    result.sharpe,
+                    result.drawdown,
+                    result.win_rate,
+                    result.total_trades,
+                    result.market_regime,
+                    fitness,
+                    result.timestamp.isoformat(),
+                ),
+            )
+
             self.conn.commit()
             logger.info(f"Logged backtest for {result.strategy_id}: fitness={fitness:.3f}")
             return True
-            
+
         except sqlite3.Error as e:
             logger.error(f"Failed to log backtest result: {e}")
             return False
-    
+
     def log_live_metrics(self, experiment_id: str, metrics: Dict) -> bool:
         """Log real-time trading metrics"""
         cursor = self.conn.cursor()
-        
+
         try:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO live_metrics 
                 (experiment_id, timestamp, realized_pnl, unrealized_pnl,
                  sharpe_24h, drawdown_current, exposure, num_positions)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                experiment_id,
-                datetime.now().isoformat(),
-                metrics.get('realized_pnl', 0),
-                metrics.get('unrealized_pnl', 0),
-                metrics.get('sharpe_24h', 0),
-                metrics.get('drawdown_current', 0),
-                metrics.get('exposure', 0),
-                metrics.get('num_positions', 0)
-            ))
-            
+            """,
+                (
+                    experiment_id,
+                    datetime.now().isoformat(),
+                    metrics.get("realized_pnl", 0),
+                    metrics.get("unrealized_pnl", 0),
+                    metrics.get("sharpe_24h", 0),
+                    metrics.get("drawdown_current", 0),
+                    metrics.get("exposure", 0),
+                    metrics.get("num_positions", 0),
+                ),
+            )
+
             self.conn.commit()
             return True
-            
+
         except sqlite3.Error as e:
             logger.error(f"Failed to log live metrics: {e}")
             return False
-    
+
     def log_regime(self, symbol: str, regime: str, scores: Dict) -> bool:
         """Log market regime detection"""
         cursor = self.conn.cursor()
-        
+
         try:
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO regime_history 
                 (symbol, regime_type, regime_score, vol_regime, trend_regime, liquidity_regime)
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                symbol,
-                regime,
-                scores.get('overall', 0),
-                scores.get('volatility', 0),
-                scores.get('trend', 0),
-                scores.get('liquidity', 0)
-            ))
-            
+            """,
+                (
+                    symbol,
+                    regime,
+                    scores.get("overall", 0),
+                    scores.get("volatility", 0),
+                    scores.get("trend", 0),
+                    scores.get("liquidity", 0),
+                ),
+            )
+
             self.conn.commit()
             return True
-            
+
         except sqlite3.Error as e:
             logger.error(f"Failed to log regime: {e}")
             return False
-    
-    def get_top_experiments(self, n: int = 10, 
-                         regime: str = None) -> pd.DataFrame:
+
+    def get_top_experiments(self, n: int = 10, regime: str = None) -> pd.DataFrame:
         """Get top performing experiments for meta-optimization"""
-        query = '''
+        query = """
             SELECT e.experiment_id, e.strategy_name, e.features, e.parameters,
                    b.sharpe_ratio, b.max_drawdown_pct, b.win_rate_pct,
                    b.fitness_score, b.total_trades, b.market_regime,
@@ -322,53 +337,65 @@ class ResearchDatabase:
             WHERE b.run_at = (
                 SELECT MAX(run_at) FROM backtest_results WHERE experiment_id = e.experiment_id
             )
-        '''
-        
+        """
+
         if regime:
             query += f" AND b.market_regime = '{regime}'"
-        
+
         query += " ORDER BY b.fitness_score DESC LIMIT ?"
-        
+
         df = pd.read_sql_query(query, self.conn, params=(n,))
-        
+
         # Parse JSON columns
-        df['features'] = df['features'].apply(json.loads)
-        df['parameters'] = df['parameters'].apply(json.loads)
-        
+        df["features"] = df["features"].apply(json.loads)
+        df["parameters"] = df["parameters"].apply(json.loads)
+
         return df
-    
+
     def get_strategy_evolution(self, strategy_name: str) -> pd.DataFrame:
         """Get evolution of a strategy over time"""
-        query = '''
+        query = """
             SELECT b.*, e.variant_id
             FROM backtest_results b
             JOIN experiments e ON b.experiment_id = e.experiment_id
             WHERE e.strategy_name = ?
             ORDER BY b.run_at ASC
-        '''
-        
+        """
+
         return pd.read_sql_query(query, self.conn, params=(strategy_name,))
-    
+
     def promote_to_paper(self, experiment_id: str) -> bool:
         """Promote experiment from backtest to paper trading"""
         cursor = self.conn.cursor()
-        
+
         try:
             previous_status = self.get_experiment_status(experiment_id)
-            cursor.execute('''
+            cursor.execute(
+                """
                 UPDATE experiments 
                 SET status = 'paper', promoted_at = ?
                 WHERE experiment_id = ?
-            ''', (datetime.now().isoformat(), experiment_id))
-            cursor.execute('''
+            """,
+                (datetime.now().isoformat(), experiment_id),
+            )
+            cursor.execute(
+                """
                 INSERT INTO promotion_audit (experiment_id, from_stage, to_stage, reason, timestamp)
                 VALUES (?, ?, ?, ?, ?)
-            ''', (experiment_id, previous_status, 'paper', 'research_promotion', datetime.now().isoformat()))
-            
+            """,
+                (
+                    experiment_id,
+                    previous_status,
+                    "paper",
+                    "research_promotion",
+                    datetime.now().isoformat(),
+                ),
+            )
+
             self.conn.commit()
             logger.info(f"Promoted {experiment_id} to paper trading")
             return True
-            
+
         except sqlite3.Error as e:
             logger.error(f"Failed to promote experiment: {e}")
             return False
@@ -381,23 +408,60 @@ class ResearchDatabase:
         ).fetchone()
         return row["status"] if row else None
 
+    def get_experiment(self, experiment_id: str) -> Optional[Dict[str, Any]]:
+        cursor = self.conn.cursor()
+        row = cursor.execute(
+            """
+            SELECT experiment_id, strategy_name, variant_id, features, parameters, status,
+                   created_at, updated_at, promoted_at
+            FROM experiments
+            WHERE experiment_id = ?
+            """,
+            (experiment_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "experiment_id": str(row["experiment_id"]),
+            "strategy_name": str(row["strategy_name"]),
+            "variant_id": str(row["variant_id"]),
+            "features": json.loads(row["features"]) if row["features"] else [],
+            "parameters": json.loads(row["parameters"]) if row["parameters"] else {},
+            "status": str(row["status"]),
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "promoted_at": row["promoted_at"],
+        }
+
+    def list_experiments(self, status: Optional[str] = None) -> pd.DataFrame:
+        query = """
+            SELECT experiment_id, strategy_name, variant_id, status, created_at, updated_at, promoted_at
+            FROM experiments
+        """
+        params: tuple = ()
+        if status is not None:
+            query += " WHERE status = ?"
+            params = (status,)
+        query += " ORDER BY updated_at DESC"
+        return pd.read_sql_query(query, self.conn, params=params)
+
     def update_experiment_status(self, experiment_id: str, status: str, reason: str = "") -> bool:
         cursor = self.conn.cursor()
         try:
             previous_status = self.get_experiment_status(experiment_id)
             cursor.execute(
-                '''
+                """
                 UPDATE experiments
                 SET status = ?, updated_at = ?
                 WHERE experiment_id = ?
-                ''',
+                """,
                 (status, datetime.now().isoformat(), experiment_id),
             )
             cursor.execute(
-                '''
+                """
                 INSERT INTO promotion_audit (experiment_id, from_stage, to_stage, reason, timestamp)
                 VALUES (?, ?, ?, ?, ?)
-                ''',
+                """,
                 (experiment_id, previous_status, status, reason, datetime.now().isoformat()),
             )
             self.conn.commit()
@@ -426,9 +490,7 @@ class ResearchDatabase:
             return str(existing["arm"])
 
         if arm is None:
-            digest = hashlib.sha256(
-                f"{namespace}:{experiment_id}".encode("utf-8")
-            ).hexdigest()
+            digest = hashlib.sha256(f"{namespace}:{experiment_id}".encode("utf-8")).hexdigest()
             arm = "control" if int(digest[:2], 16) % 2 == 0 else "treatment"
             assignment_hash = digest
         else:
@@ -441,10 +503,10 @@ class ResearchDatabase:
             ).hexdigest()
 
         cursor.execute(
-            '''
+            """
             INSERT INTO pilot_assignments (experiment_id, arm, assigned_at, assignment_hash)
             VALUES (?, ?, ?, ?)
-            ''',
+            """,
             (experiment_id, arm, datetime.now().isoformat(), assignment_hash),
         )
         self.conn.commit()
@@ -453,11 +515,11 @@ class ResearchDatabase:
     def get_pilot_assignment(self, experiment_id: str) -> Optional[Dict[str, str]]:
         cursor = self.conn.cursor()
         row = cursor.execute(
-            '''
+            """
             SELECT experiment_id, arm, assigned_at, assignment_hash
             FROM pilot_assignments
             WHERE experiment_id = ?
-            ''',
+            """,
             (experiment_id,),
         ).fetchone()
         if row is None:
@@ -471,34 +533,36 @@ class ResearchDatabase:
 
     def list_pilot_assignments(self) -> pd.DataFrame:
         return pd.read_sql_query(
-            '''
+            """
             SELECT experiment_id, arm, assigned_at, assignment_hash
             FROM pilot_assignments
             ORDER BY assigned_at DESC
-            ''',
+            """,
             self.conn,
         )
 
-    def log_stage_metric(self, experiment_id: str, stage: str, metrics: Dict, timestamp: Optional[datetime] = None) -> bool:
+    def log_stage_metric(
+        self, experiment_id: str, stage: str, metrics: Dict, timestamp: Optional[datetime] = None
+    ) -> bool:
         ts = (timestamp or datetime.now()).isoformat()
         cursor = self.conn.cursor()
         try:
             cursor.execute(
-                '''
+                """
                 INSERT INTO stage_metrics
                 (experiment_id, stage, timestamp, pnl, sharpe, drawdown, slippage_mape, kill_switch_triggers, notes)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
+                """,
                 (
                     experiment_id,
                     stage,
                     ts,
-                    float(metrics.get('pnl', 0.0)),
-                    float(metrics.get('sharpe', 0.0)),
-                    float(metrics.get('drawdown', 0.0)),
-                    float(metrics.get('slippage_mape', 0.0)),
-                    int(metrics.get('kill_switch_triggers', 0)),
-                    json.dumps(metrics.get('notes', {})),
+                    float(metrics.get("pnl", 0.0)),
+                    float(metrics.get("sharpe", 0.0)),
+                    float(metrics.get("drawdown", 0.0)),
+                    float(metrics.get("slippage_mape", 0.0)),
+                    int(metrics.get("kill_switch_triggers", 0)),
+                    json.dumps(metrics.get("notes", {})),
                 ),
             )
             self.conn.commit()
@@ -507,8 +571,10 @@ class ResearchDatabase:
             logger.error(f"Failed to log stage metrics: {e}")
             return False
 
-    def get_stage_summary(self, experiment_id: str, stage: str, lookback_days: int = 365) -> Dict[str, float]:
-        query = '''
+    def get_stage_summary(
+        self, experiment_id: str, stage: str, lookback_days: int = 365
+    ) -> Dict[str, float]:
+        query = """
             SELECT
                 COUNT(*) AS samples,
                 MIN(timestamp) AS first_timestamp,
@@ -522,37 +588,44 @@ class ResearchDatabase:
             WHERE experiment_id = ?
               AND stage = ?
               AND timestamp >= datetime('now', ?)
-        '''
-        lookback = f'-{int(lookback_days)} days'
+        """
+        lookback = f"-{int(lookback_days)} days"
         frame = pd.read_sql_query(query, self.conn, params=(experiment_id, stage, lookback))
         if frame.empty:
             return {
-                'samples': 0,
-                'days': 0,
-                'avg_sharpe': 0.0,
-                'avg_drawdown': 0.0,
-                'avg_slippage_mape': 0.0,
-                'total_kill_switch_triggers': 0,
-                'total_pnl': 0.0,
+                "samples": 0,
+                "days": 0,
+                "avg_sharpe": 0.0,
+                "avg_drawdown": 0.0,
+                "avg_slippage_mape": 0.0,
+                "total_kill_switch_triggers": 0,
+                "total_pnl": 0.0,
             }
         row = frame.iloc[0]
-        first_ts = pd.to_datetime(row.get('first_timestamp')) if row.get('first_timestamp') else None
-        last_ts = pd.to_datetime(row.get('last_timestamp')) if row.get('last_timestamp') else None
-        days = int((last_ts - first_ts).days + 1) if first_ts is not None and last_ts is not None else 0
+        first_ts = (
+            pd.to_datetime(row.get("first_timestamp")) if row.get("first_timestamp") else None
+        )
+        last_ts = pd.to_datetime(row.get("last_timestamp")) if row.get("last_timestamp") else None
+        days = (
+            int((last_ts - first_ts).days + 1)
+            if first_ts is not None and last_ts is not None
+            else 0
+        )
         return {
-            'samples': int(row.get('samples') or 0),
-            'days': max(days, 0),
-            'avg_sharpe': float(row.get('avg_sharpe') or 0.0),
-            'avg_drawdown': float(row.get('avg_drawdown') or 0.0),
-            'avg_slippage_mape': float(row.get('avg_slippage_mape') or 0.0),
-            'total_kill_switch_triggers': int(row.get('total_kill_switch_triggers') or 0),
-            'total_pnl': float(row.get('total_pnl') or 0.0),
+            "samples": int(row.get("samples") or 0),
+            "days": max(days, 0),
+            "avg_sharpe": float(row.get("avg_sharpe") or 0.0),
+            "avg_drawdown": float(row.get("avg_drawdown") or 0.0),
+            "avg_slippage_mape": float(row.get("avg_slippage_mape") or 0.0),
+            "total_kill_switch_triggers": int(row.get("total_kill_switch_triggers") or 0),
+            "total_pnl": float(row.get("total_pnl") or 0.0),
         }
-    
-    def get_promotion_candidates(self, min_sharpe: float = 1.0,
-                                max_drawdown: float = 0.2) -> pd.DataFrame:
+
+    def get_promotion_candidates(
+        self, min_sharpe: float = 1.0, max_drawdown: float = 0.2
+    ) -> pd.DataFrame:
         """Get experiments ready for promotion to next stage"""
-        query = '''
+        query = """
             SELECT e.*, b.sharpe_ratio, b.max_drawdown_pct, b.fitness_score
             FROM experiments e
             JOIN backtest_results b ON e.experiment_id = b.experiment_id
@@ -560,10 +633,9 @@ class ResearchDatabase:
             AND b.sharpe_ratio >= ?
             AND b.max_drawdown_pct <= ?
             ORDER BY b.fitness_score DESC
-        '''
-        
-        return pd.read_sql_query(query, self.conn, 
-                                params=(min_sharpe, max_drawdown))
+        """
+
+        return pd.read_sql_query(query, self.conn, params=(min_sharpe, max_drawdown))
 
     def log_report_artifact(
         self,
@@ -580,11 +652,11 @@ class ResearchDatabase:
         cursor = self.conn.cursor()
         try:
             cursor.execute(
-                '''
+                """
                 INSERT OR REPLACE INTO analytics_reports
                 (report_id, experiment_id, created_at, report_path, report_sha256, schema_version, decision_action, promoted, summary)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''',
+                """,
                 (
                     report_id,
                     experiment_id,
@@ -604,11 +676,11 @@ class ResearchDatabase:
             return False
 
     def get_report_artifacts(self, experiment_id: Optional[str] = None) -> pd.DataFrame:
-        query = '''
+        query = """
             SELECT report_id, experiment_id, created_at, report_path,
                    report_sha256, schema_version, decision_action, promoted, summary
             FROM analytics_reports
-        '''
+        """
         params: tuple = ()
         if experiment_id:
             query += " WHERE experiment_id = ?"
@@ -621,6 +693,6 @@ class ResearchDatabase:
                 lambda text: json.loads(text) if isinstance(text, str) and text else {}
             )
         return frame
-    
+
     def close(self):
         self.conn.close()

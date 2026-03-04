@@ -108,6 +108,26 @@ Additional artifacts:
 - `data/reports/slo_health_<timestamp>.json`
 - `data/reports/error_budget_review_<timestamp>.json`
 
+Execution truth + promotion + canary ramp flow:
+
+```bash
+# 1) websocket market/order/fill ingestion
+python scripts/run_ws_ingestion.py --cycles 30 --sleep-seconds 1.0
+
+# 2) strategy tournament from partitioned data lake
+python scripts/run_strategy_tournament.py \
+  --start 2026-01-01T00:00:00Z \
+  --end 2026-02-01T00:00:00Z \
+  --sources binance:BTCUSDT,binance:ETHUSDT \
+  --strategy-types market_making,funding_arbitrage
+
+# 3) policy-driven canary allocation step (advance/hold/rollback/halt)
+python scripts/run_canary_ramp.py
+
+# 4) B2B control-plane usage + pricing readout
+python scripts/control_plane_report.py
+```
+
 ## 🎛️ Dashboard
 
 Launch the real-time dashboard:
@@ -155,6 +175,7 @@ Access at `http://localhost:8501`
 - [Backtesting Guide](docs/BACKTESTING.md)
 - [Simulation Telemetry](docs/SIMULATION_TELEMETRY.md)
 - [World-Class 30/60/90 Plan](docs/WORLD_CLASS_30_60_90.md)
+- [Max Utility + Revenue Playbook](docs/MAX_UTILITY_REVENUE_PLAYBOOK.md)
 - [Strategy Patterns](docs/ADVANCED_PATTERNS.md)
 - [Incident Runbook](docs/INCIDENT_RUNBOOK.md)
 - [Pricing And Packaging](docs/PRICING_AND_PACKAGING.md)
