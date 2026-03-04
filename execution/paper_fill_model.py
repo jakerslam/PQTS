@@ -19,7 +19,9 @@ class PaperFillModelConfig:
     min_partial_fill_ratio: float = 0.55
     adverse_selection_bps: float = 8.0
     min_slippage_bps: float = 1.0
-    stress_slippage_multiplier: float = 1.5
+    reality_stress_mode: bool = False
+    stress_slippage_multiplier: float = 2.5
+    stress_fill_ratio_multiplier: float = 0.70
     hard_reject_notional_usd: float = 250000.0
 
 
@@ -84,13 +86,17 @@ class MicrostructurePaperFillProvider:
             venue=venue,
             notional=notional,
         )
+        if bool(self.config.reality_stress_mode):
+            fill_ratio *= float(self.config.stress_fill_ratio_multiplier)
+            fill_ratio = float(max(min(fill_ratio, 1.0), 0.0))
         executed_qty = float(requested_qty) * fill_ratio
 
         impact_scale = max((notional / max(self.config.partial_fill_notional_usd, 1e-9)) - 1.0, 0.0)
         stochastic_component = (self._uniform(order_id, symbol, venue, "slippage") - 0.5) * 0.6
         slip_bps = self.config.adverse_selection_bps * (0.5 + impact_scale) + stochastic_component
         slip_bps = max(float(slip_bps), float(self.config.min_slippage_bps))
-        slip_bps *= float(self.config.stress_slippage_multiplier)
+        if bool(self.config.reality_stress_mode):
+            slip_bps *= float(self.config.stress_slippage_multiplier)
 
         if str(side).lower() == "buy":
             executed_price = float(reference_price) * (1.0 + (slip_bps / 10000.0))

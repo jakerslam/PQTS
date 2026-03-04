@@ -8,6 +8,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -16,6 +17,7 @@ from core.engine import TradingEngine
 from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFillModelConfig
 from execution.risk_aware_router import RiskAwareRouter
 from execution.smart_router import OrderRequest, OrderType, SmartOrderRouter
+from execution.tca_feedback import ExecutionFill
 from risk.kill_switches import RiskLimits
 
 
@@ -283,3 +285,213 @@ def test_engine_builds_microstructure_paper_fill_provider(tmp_path):
     router = engine._build_router()
 
     assert isinstance(router.fill_provider, MicrostructurePaperFillProvider)
+
+
+def test_paper_fill_reality_stress_mode_applies_higher_slippage_and_lower_fill():
+    baseline_provider = MicrostructurePaperFillProvider(
+        config=PaperFillModelConfig(
+            partial_fill_notional_usd=10_000.0,
+            hard_reject_notional_usd=100_000.0,
+            reality_stress_mode=False,
+        )
+    )
+    stress_provider = MicrostructurePaperFillProvider(
+        config=PaperFillModelConfig(
+            partial_fill_notional_usd=10_000.0,
+            hard_reject_notional_usd=100_000.0,
+            reality_stress_mode=True,
+            stress_slippage_multiplier=2.5,
+            stress_fill_ratio_multiplier=0.70,
+        )
+    )
+
+    baseline_fill = asyncio.run(
+        baseline_provider.get_fill(
+            order_id="stress_cmp",
+            symbol="BTC-USD",
+            venue="binance",
+            side="buy",
+            requested_qty=1.0,
+            reference_price=5000.0,
+        )
+    )
+    stress_fill = asyncio.run(
+        stress_provider.get_fill(
+            order_id="stress_cmp",
+            symbol="BTC-USD",
+            venue="binance",
+            side="buy",
+            requested_qty=1.0,
+            reference_price=5000.0,
+        )
+    )
+
+    baseline_slip_bps = ((baseline_fill.executed_price / 5000.0) - 1.0) * 10000.0
+    stress_slip_bps = ((stress_fill.executed_price / 5000.0) - 1.0) * 10000.0
+
+    assert stress_fill.executed_qty == pytest.approx(baseline_fill.executed_qty * 0.70)
+    assert stress_slip_bps == pytest.approx(baseline_slip_bps * 2.5)
+
+
+def test_router_rejects_post_trade_position_limit_breach(tmp_path):
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+            max_single_position_pct=0.20,
+        ),
+        broker_config={"enabled": True},
+        tca_db_path=str(tmp_path / "position_limit.csv"),
+    )
+    router.set_capital(100000.0, source="unit_test")
+
+    order = OrderRequest(
+        symbol="BTC-USD",
+        side="buy",
+        quantity=0.5,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+    )
+    market_data = {
+        "binance": {
+            "BTC-USD": {
+                "price": 50000.0,
+                "spread": 0.0002,
+                "volume_24h": 2_000_000,
+            }
+        },
+        "order_book": {
+            "bids": [(49990.0, 2.0), (49980.0, 4.0)],
+            "asks": [(50010.0, 1.5), (50020.0, 3.0)],
+        },
+    }
+    strategy_returns, portfolio_changes = _strategy_inputs()
+
+    result = asyncio.run(
+        router.submit_order(
+            order=order,
+            market_data=market_data,
+            portfolio=_portfolio_snapshot(),
+            strategy_returns=strategy_returns,
+            portfolio_changes=portfolio_changes,
+        )
+    )
+
+    assert result.success is False
+    assert "POSITION_LIMIT" in (result.rejected_reason or "")
+
+
+def test_router_submit_order_serializes_concurrent_admissions(tmp_path):
+    class BlockingFillProvider:
+        def __init__(self):
+            self.active = 0
+            self.max_active = 0
+
+        async def get_fill(self, *, order_id, symbol, venue, side, requested_qty, reference_price):
+            _ = order_id, side
+            self.active += 1
+            self.max_active = max(self.max_active, self.active)
+            await asyncio.sleep(0.02)
+            self.active -= 1
+            return ExecutionFill(
+                executed_price=float(reference_price),
+                executed_qty=float(requested_qty),
+                timestamp=datetime.now(timezone.utc),
+                venue=venue,
+                symbol=symbol,
+            )
+
+    fill_provider = BlockingFillProvider()
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+        ),
+        broker_config={"enabled": True},
+        fill_provider=fill_provider,
+        tca_db_path=str(tmp_path / "serialized_submit.csv"),
+    )
+    router.set_capital(100000.0, source="unit_test")
+    market_data = {
+        "binance": {
+            "BTC-USD": {
+                "price": 50000.0,
+                "spread": 0.0002,
+                "volume_24h": 2_000_000,
+            }
+        },
+        "order_book": {
+            "bids": [(49990.0, 2.0), (49980.0, 4.0)],
+            "asks": [(50010.0, 1.5), (50020.0, 3.0)],
+        },
+    }
+    strategy_returns, portfolio_changes = _strategy_inputs()
+
+    async def submit_once(order_id_suffix: str):
+        order = OrderRequest(
+            symbol="BTC-USD",
+            side="buy",
+            quantity=0.1,
+            order_type=OrderType.LIMIT,
+            price=50000.0,
+            time_in_force=f"GTC-{order_id_suffix}",
+        )
+        return await router.submit_order(
+            order=order,
+            market_data=market_data,
+            portfolio=_portfolio_snapshot(),
+            strategy_returns=strategy_returns,
+            portfolio_changes=portfolio_changes,
+        )
+
+    async def run_pair():
+        return await asyncio.gather(submit_once("a"), submit_once("b"))
+
+    first, second = asyncio.run(run_pair())
+    assert first.success is True
+    assert second.success is True
+    assert fill_provider.max_active == 1
+
+
+def test_router_rejects_when_emergency_state_already_active(tmp_path):
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+        ),
+        broker_config={"enabled": True},
+        tca_db_path=str(tmp_path / "emergency_gate.csv"),
+    )
+    router.set_capital(100000.0, source="unit_test")
+    router.risk_engine.is_halted = True
+
+    order = OrderRequest(
+        symbol="BTC-USD",
+        side="buy",
+        quantity=0.1,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+    )
+    strategy_returns, portfolio_changes = _strategy_inputs()
+    result = asyncio.run(
+        router.submit_order(
+            order=order,
+            market_data={
+                "last_price": 50000.0,
+                "order_book": {
+                    "bids": [(49990.0, 2.0)],
+                    "asks": [(50010.0, 2.0)],
+                },
+            },
+            portfolio=_portfolio_snapshot(),
+            strategy_returns=strategy_returns,
+            portfolio_changes=portfolio_changes,
+        )
+    )
+
+    assert result.success is False
+    assert result.decision.value == "halt"
+    assert "HALT" in (result.rejected_reason or "")

@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import logging
 from collections import deque
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -429,6 +430,7 @@ class TradingEngine:
         self.is_halted: bool = False
         self.order_count: int = 0
         self.cancelled_orders: List[str] = []
+        self._state_lock = threading.Lock()
     
     def pre_trade_check(self, 
                        order: Dict,
@@ -441,29 +443,30 @@ class TradingEngine:
         Returns:
             (decision, risk_state)
         """
-        state = self.risk_monitor.evaluate_all(
-            portfolio, strategy_returns, portfolio_changes
-        )
-        
-        # Check if already in emergency state
-        if self.is_flattening:
-            return RiskDecision.FLATTEN, state
-        
-        if self.is_halted and state.decision == RiskDecision.HALT:
-            return RiskDecision.HALT, state
-        
-        # Update emergency states
-        if state.decision == RiskDecision.FLATTEN:
-            self.is_flattening = True
-            self._initiate_flatten(portfolio)
-        
-        elif state.decision == RiskDecision.HALT:
-            self.is_halted = True
-        
-        elif state.decision == RiskDecision.ALLOW:
-            self.is_halted = False
-        
-        return state.decision, state
+        with self._state_lock:
+            state = self.risk_monitor.evaluate_all(
+                portfolio, strategy_returns, portfolio_changes
+            )
+            
+            # Check if already in emergency state
+            if self.is_flattening:
+                return RiskDecision.FLATTEN, state
+            
+            if self.is_halted and state.decision == RiskDecision.HALT:
+                return RiskDecision.HALT, state
+            
+            # Update emergency states
+            if state.decision == RiskDecision.FLATTEN:
+                self.is_flattening = True
+                self._initiate_flatten(portfolio)
+            
+            elif state.decision == RiskDecision.HALT:
+                self.is_halted = True
+            
+            elif state.decision == RiskDecision.ALLOW:
+                self.is_halted = False
+            
+            return state.decision, state
     
     def _initiate_flatten(self, portfolio: PortfolioState):
         """Begin flattening process."""
@@ -499,7 +502,28 @@ class TradingEngine:
         if risk_state.decision == RiskDecision.HALT:
             logger.warning("Engine is halted - no new orders allowed")
             return False
-        
+
+        max_single_position_pct = float(self.risk_monitor.limits.max_single_position_pct)
+        post_trade_position_pct = order.get("post_trade_position_pct")
+        if post_trade_position_pct is None:
+            capital = self.risk_monitor._get_capital()
+            current_position_notional = float(order.get("current_position_notional", 0.0))
+            order_notional = float(order.get("notional", 0.0))
+            side = str(order.get("side", "buy")).lower()
+            signed_delta = order_notional if side == "buy" else -order_notional
+            post_trade_notional = abs(current_position_notional + signed_delta)
+            post_trade_position_pct = post_trade_notional / capital if capital > 0 else float("inf")
+        else:
+            post_trade_position_pct = float(post_trade_position_pct)
+
+        if post_trade_position_pct > max_single_position_pct:
+            logger.warning(
+                "Post-trade position pct %.2f%% > limit %.2f%%",
+                post_trade_position_pct * 100.0,
+                max_single_position_pct * 100.0,
+            )
+            return False
+
         self.order_count += 1
         logger.info(f"Order #{self.order_count} approved: {order}")
         return True
@@ -519,13 +543,15 @@ class TradingEngine:
     
     def manual_kill(self, reason: str) -> RiskState:
         """Manual kill switch."""
-        state = self.risk_monitor.manual_flatten(reason)
-        self.is_flattening = True
-        return state
+        with self._state_lock:
+            state = self.risk_monitor.manual_flatten(reason)
+            self.is_flattening = True
+            return state
     
     def reset(self):
         """Reset engine after review."""
-        self.risk_monitor.reset()
-        self.is_flattening = False
-        self.is_halted = False
-        logger.info("Engine reset - resuming normal operations")
+        with self._state_lock:
+            self.risk_monitor.reset()
+            self.is_flattening = False
+            self.is_halted = False
+            logger.info("Engine reset - resuming normal operations")

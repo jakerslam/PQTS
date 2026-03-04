@@ -25,6 +25,7 @@ Integration:
 
 import logging
 import os
+import asyncio
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -247,6 +248,8 @@ class RiskAwareRouter:
             failure_slo=float(reliability_cfg.get("failure_slo", 0.01)),
             cooldown_seconds=int(reliability_cfg.get("cooldown_seconds", 300)),
         )
+        # Order admission gate to prevent race-condition bypass across state changes.
+        self._submit_order_lock = asyncio.Lock()
         
         # Audit logging (Step 5)
         self.audit_log: List[Dict] = []
@@ -281,8 +284,60 @@ class RiskAwareRouter:
                 "Capital must be injected, never hardcoded."
             )
         return self._capital
+
+    def _active_emergency_state(self) -> Optional[Tuple[RiskDecision, str]]:
+        """Return active emergency decision if router is currently halted/flattening."""
+        if self.risk_engine.is_flattening:
+            return RiskDecision.FLATTEN, "Router currently flattening positions"
+        if self.risk_engine.is_halted:
+            return RiskDecision.HALT, "Router currently halted by risk overlay"
+        return None
+
+    def _post_trade_position_pct(
+        self,
+        *,
+        order: OrderRequest,
+        portfolio: Dict[str, Any],
+        fallback_price: float,
+        capital: float,
+    ) -> float:
+        """Estimate post-trade absolute symbol exposure as a capital fraction."""
+        if capital <= 0:
+            return float("inf")
+
+        side = str(order.side).lower()
+        delta_qty = float(order.quantity)
+        if side == "sell":
+            delta_qty = -delta_qty
+
+        current_qty = float((portfolio.get("positions", {}) or {}).get(order.symbol, 0.0))
+        post_qty = current_qty + delta_qty
+
+        position_prices = portfolio.get("prices", {}) or {}
+        position_price = float(position_prices.get(order.symbol, fallback_price) or fallback_price)
+        if position_price <= 0:
+            return float("inf")
+
+        post_notional = abs(post_qty) * position_price
+        return float(post_notional / capital)
     
     async def submit_order(self,
+                          order: OrderRequest,
+                          market_data: Dict,
+                          portfolio: Dict,
+                          strategy_returns: Dict[str, Any],
+                          portfolio_changes: List[float]) -> OrderResult:
+        """Serialized order-admission wrapper that prevents race-condition bypass."""
+        async with self._submit_order_lock:
+            return await self._submit_order_unlocked(
+                order=order,
+                market_data=market_data,
+                portfolio=portfolio,
+                strategy_returns=strategy_returns,
+                portfolio_changes=portfolio_changes,
+            )
+
+    async def _submit_order_unlocked(self,
                           order: OrderRequest,
                           market_data: Dict,
                           portfolio: Dict,
@@ -337,6 +392,23 @@ class RiskAwareRouter:
                 exchange=None,
                 rejected_reason=str(e),
                 audit_log=audit_entry
+            )
+
+        emergency_state = self._active_emergency_state()
+        if emergency_state is not None:
+            decision, reason = emergency_state
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = f"{decision.value.upper()}: {reason}"
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=decision,
+                risk_state=None,
+                order_id=None,
+                exchange=None,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
             )
         
         requested_quantity = float(order.quantity)
@@ -484,6 +556,34 @@ class RiskAwareRouter:
                 exchange=None,
                 rejected_reason=f"Order size exceeds risk limit",
                 audit_log=audit_entry
+            )
+
+        post_trade_position_pct = self._post_trade_position_pct(
+            order=order,
+            portfolio=portfolio,
+            fallback_price=float(price),
+            capital=float(capital),
+        )
+        audit_entry["risk_check"]["post_trade_position_pct"] = float(post_trade_position_pct)
+        audit_entry["risk_check"]["max_single_position_pct"] = float(
+            self.risk_limits.max_single_position_pct
+        )
+        if post_trade_position_pct > float(self.risk_limits.max_single_position_pct):
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = (
+                "POSITION_LIMIT: "
+                f"{post_trade_position_pct:.4f} > {float(self.risk_limits.max_single_position_pct):.4f}"
+            )
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=RiskDecision.HALT,
+                risk_state=risk_state,
+                order_id=None,
+                exchange=None,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
             )
 
         # Capacity controls (capital/capacity realism)

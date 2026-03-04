@@ -281,6 +281,37 @@ class TestTradingEngine:
         # Try to place order
         result = engine.approve_order({'notional': 1000}, state)
         assert not result
+
+    def test_position_limit_enforced_in_approve_order(self):
+        """max_single_position_pct must block oversized single-name exposure."""
+        engine = self.new_engine()
+        decision, state = engine.pre_trade_check(
+            {'notional': 1000, 'side': 'buy'},
+            self.portfolio(),
+            {'s1': FIXED_RETURNS},
+            FIXED_PORTFOLIO_CHANGES * 0.1
+        )
+        assert decision == RiskDecision.ALLOW
+
+        blocked = engine.approve_order(
+            {
+                'notional': 30000,
+                'side': 'buy',
+                'current_position_notional': 0.0,
+            },
+            state,
+        )
+        assert blocked is False
+
+        allowed = engine.approve_order(
+            {
+                'notional': 20000,
+                'side': 'buy',
+                'current_position_notional': 0.0,
+            },
+            state,
+        )
+        assert allowed is True
     
     def test_manual_flatten(self):
         """Test manual flatten triggers correctly."""

@@ -5,6 +5,8 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
+import json
+from pathlib import Path
 import numpy as np
 import yaml
 
@@ -102,7 +104,11 @@ class TradingEngine:
         )
         self.latest_data_quality_report: Optional[DataQualityReport] = None
         self._portfolio_change_history: List[float] = [0.0] * 30
+        runtime_cfg = self.config.get('runtime', {})
+        self.state_path = Path(runtime_cfg.get('state_path', 'data/engine_state.json'))
+        self.state_version = 1
         self.running = False
+        self._load_persisted_state()
         
         logger.info(f"TradingEngine initialized in {self.mode} mode")
         logger.info("Toggle state: %s", self.toggle_manager.snapshot())
@@ -173,8 +179,12 @@ class TradingEngine:
             min_partial_fill_ratio=float(paper_cfg.get('min_partial_fill_ratio', 0.55)),
             adverse_selection_bps=float(paper_cfg.get('adverse_selection_bps', 8.0)),
             min_slippage_bps=float(paper_cfg.get('min_slippage_bps', 1.0)),
+            reality_stress_mode=bool(paper_cfg.get('reality_stress_mode', False)),
             stress_slippage_multiplier=float(
-                paper_cfg.get('stress_slippage_multiplier', 1.5)
+                paper_cfg.get('stress_slippage_multiplier', 2.5)
+            ),
+            stress_fill_ratio_multiplier=float(
+                paper_cfg.get('stress_fill_ratio_multiplier', 0.70)
             ),
             hard_reject_notional_usd=float(
                 paper_cfg.get('hard_reject_notional_usd', 250000.0)
@@ -471,6 +481,7 @@ class TradingEngine:
         if len(self._portfolio_change_history) > 1000:
             self._portfolio_change_history = self._portfolio_change_history[-1000:]
         self.orders[order.id] = order
+        self._persist_state()
 
     def _update_position_from_fill(self, order: Order) -> None:
         signed_qty = order.filled_quantity if order.side == OrderSide.BUY else -order.filled_quantity
@@ -512,16 +523,165 @@ class TradingEngine:
         """Generate unique order ID"""
         import uuid
         return str(uuid.uuid4())[:8]
+
+    @staticmethod
+    def _serialize_order(order: Order) -> Dict[str, Any]:
+        return {
+            'id': order.id,
+            'symbol': order.symbol,
+            'side': order.side.value,
+            'order_type': order.order_type.value,
+            'quantity': float(order.quantity),
+            'price': order.price,
+            'stop_price': order.stop_price,
+            'market': order.market.value,
+            'timestamp': order.timestamp.isoformat(),
+            'status': order.status,
+            'filled_quantity': float(order.filled_quantity),
+            'avg_fill_price': float(order.avg_fill_price),
+        }
+
+    @staticmethod
+    def _serialize_position(position: Position) -> Dict[str, Any]:
+        return {
+            'symbol': position.symbol,
+            'quantity': float(position.quantity),
+            'avg_entry_price': float(position.avg_entry_price),
+            'market': position.market.value,
+            'unrealized_pnl': float(position.unrealized_pnl),
+            'realized_pnl': float(position.realized_pnl),
+            'timestamp': position.timestamp.isoformat(),
+        }
+
+    @staticmethod
+    def _deserialize_order(payload: Dict[str, Any]) -> Order:
+        return Order(
+            id=str(payload['id']),
+            symbol=str(payload['symbol']),
+            side=OrderSide(str(payload['side'])),
+            order_type=OrderType(str(payload['order_type'])),
+            quantity=float(payload['quantity']),
+            price=payload.get('price'),
+            stop_price=payload.get('stop_price'),
+            market=MarketType(str(payload.get('market', MarketType.CRYPTO.value))),
+            timestamp=datetime.fromisoformat(str(payload['timestamp'])),
+            status=str(payload.get('status', 'pending')),
+            filled_quantity=float(payload.get('filled_quantity', 0.0)),
+            avg_fill_price=float(payload.get('avg_fill_price', 0.0)),
+        )
+
+    @staticmethod
+    def _deserialize_position(payload: Dict[str, Any]) -> Position:
+        return Position(
+            symbol=str(payload['symbol']),
+            quantity=float(payload['quantity']),
+            avg_entry_price=float(payload['avg_entry_price']),
+            market=MarketType(str(payload.get('market', MarketType.CRYPTO.value))),
+            unrealized_pnl=float(payload.get('unrealized_pnl', 0.0)),
+            realized_pnl=float(payload.get('realized_pnl', 0.0)),
+            timestamp=datetime.fromisoformat(str(payload['timestamp'])),
+        )
+
+    def _persist_state(self) -> None:
+        """Persist engine state for crash recovery."""
+        state_payload = {
+            'version': self.state_version,
+            'saved_at': datetime.utcnow().isoformat(),
+            'mode': self.mode,
+            'positions': [
+                self._serialize_position(position)
+                for position in sorted(self.positions.values(), key=lambda p: p.symbol)
+            ],
+            'orders': [
+                self._serialize_order(order)
+                for order in sorted(self.orders.values(), key=lambda o: o.id)
+            ],
+            'portfolio_change_history': list(self._portfolio_change_history[-1000:]),
+        }
+        try:
+            self.state_path.parent.mkdir(parents=True, exist_ok=True)
+            temp_path = self.state_path.with_suffix(self.state_path.suffix + '.tmp')
+            temp_path.write_text(
+                json.dumps(state_payload, sort_keys=True, indent=2),
+                encoding='utf-8',
+            )
+            temp_path.replace(self.state_path)
+        except Exception as exc:
+            logger.error("State persistence failed (%s): %s", self.state_path, exc)
+
+    def _load_persisted_state(self) -> None:
+        """Load persisted state (if available) for restart recovery."""
+        if not self.state_path.exists():
+            return
+        try:
+            payload = json.loads(self.state_path.read_text(encoding='utf-8'))
+            positions_payload = payload.get('positions', [])
+            orders_payload = payload.get('orders', [])
+            self.positions = {
+                p.symbol: p for p in (self._deserialize_position(row) for row in positions_payload)
+            }
+            self.orders = {
+                o.id: o for o in (self._deserialize_order(row) for row in orders_payload)
+            }
+            history = [float(x) for x in payload.get('portfolio_change_history', [0.0] * 30)]
+            self._portfolio_change_history = history[-1000:] if history else [0.0] * 30
+            logger.info(
+                "Recovered persisted engine state: %s positions, %s orders",
+                len(self.positions),
+                len(self.orders),
+            )
+        except Exception as exc:
+            logger.warning("State recovery failed (%s): %s", self.state_path, exc)
+
+    def _cancel_pending_orders(self) -> int:
+        cancelled = 0
+        cancel_states = {'pending', 'submitted', 'accepted', 'open'}
+        for order in self.orders.values():
+            if order.status in cancel_states:
+                order.status = 'cancelled'
+                cancelled += 1
+        return cancelled
+
+    def _flatten_positions_for_shutdown(self) -> int:
+        flattened = 0
+        for symbol, position in list(self.positions.items()):
+            if abs(position.quantity) < 1e-12:
+                del self.positions[symbol]
+                continue
+
+            mark_price = self.market_data.get(symbol).close if symbol in self.market_data else position.avg_entry_price
+            close_side = OrderSide.SELL if position.quantity > 0 else OrderSide.BUY
+            close_order = Order(
+                id=f"{self._generate_order_id()}_shutdown",
+                symbol=symbol,
+                side=close_side,
+                order_type=OrderType.MARKET,
+                quantity=abs(position.quantity),
+                price=float(mark_price),
+                market=position.market,
+                status='filled',
+                filled_quantity=abs(position.quantity),
+                avg_fill_price=float(mark_price),
+            )
+            self.orders[close_order.id] = close_order
+            del self.positions[symbol]
+            flattened += 1
+        return flattened
     
     async def stop(self):
-        """Stop the trading engine"""
+        """Stop the trading engine with cancel/flatten/persist guarantees."""
         logger.info("Stopping trading engine...")
         self.running = False
+        cancelled_orders = self._cancel_pending_orders()
+        flattened_positions = self._flatten_positions_for_shutdown()
+        logger.info(
+            "Graceful shutdown actions: cancelled=%s flattened=%s",
+            cancelled_orders,
+            flattened_positions,
+        )
         if self.router is not None:
             await self.router.stop_market_data()
-        # Close all positions
-        # Cancel pending orders
-        # Save state
+        self._persist_state()
 
     def set_market_enabled(self, market: str, enabled: bool):
         """Enable/disable a market domain at runtime."""
