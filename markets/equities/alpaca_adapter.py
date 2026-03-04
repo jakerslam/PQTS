@@ -150,6 +150,7 @@ class AlpacaAdapter:
         order_type: str = "market",
         limit_price: float = None,
         stop_price: float = None,
+        client_order_id: Optional[str] = None,
         router_token=None,
     ) -> dict:
         """Place an order"""
@@ -167,6 +168,8 @@ class AlpacaAdapter:
             order_data["limit_price"] = str(limit_price)
         if stop_price:
             order_data["stop_price"] = str(stop_price)
+        if client_order_id:
+            order_data["client_order_id"] = str(client_order_id)
 
         return await self._request("POST", "/v2/orders", json_data=order_data)
 
@@ -175,8 +178,9 @@ class AlpacaAdapter:
         params = {"status": status}
         return await self._request("GET", "/v2/orders", params=params)
 
-    async def cancel_order(self, order_id: str) -> None:
+    async def cancel_order(self, order_id: str, router_token=None) -> None:
         """Cancel an order"""
+        self._assert_router_token(router_token)
         await self._request("DELETE", f"/v2/orders/{order_id}")
 
     def stream_descriptors(self) -> Dict[str, Dict[str, str | float]]:

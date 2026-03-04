@@ -120,8 +120,38 @@ def test_live_router_requires_client_order_id_when_enabled(tmp_path):
 
 
 class _DummyLiveAdapter:
+    def __init__(self):
+        self.cancel_calls = 0
+
     async def place_order(self, **_kwargs: Any) -> Dict[str, Any]:
         return {"status": "accepted"}
+
+    async def cancel_order(self, **_kwargs: Any) -> Dict[str, Any]:
+        self.cancel_calls += 1
+        return {"status": "cancelled"}
+
+
+class _DummyMarketDataAdapter:
+    def __init__(self):
+        self.ticker_calls = 0
+        self.orderbook_calls = 0
+
+    async def get_ticker(self, _symbol: str) -> Dict[str, Any]:
+        self.ticker_calls += 1
+        return {
+            "bidPrice": "59990",
+            "askPrice": "60010",
+            "lastPrice": "60000",
+            "quoteVolume": "1000000",
+        }
+
+    async def get_orderbook(self, _symbol: str, limit: int = 5) -> Dict[str, Any]:
+        _ = limit
+        self.orderbook_calls += 1
+        return {
+            "bids": [("59990", "1.0"), ("59980", "2.0")],
+            "asks": [("60010", "1.0"), ("60020", "2.0")],
+        }
 
 
 def test_live_router_blocks_rate_limited_venue_orders(tmp_path):
@@ -169,3 +199,78 @@ def test_live_router_blocks_rate_limited_venue_orders(tmp_path):
     assert "RATE_LIMIT_EXCEEDED" in str(result_2.rejected_reason)
     stats = router.get_stats()
     assert stats["live_ops_controls"]["rate_limit_rejects"] == 1
+
+
+def test_market_data_endpoint_rate_limits_gate_adapter_calls(tmp_path):
+    router = _router(
+        tmp_path,
+        rate_limits={
+            "binance": {
+                "market_ticker": {"limit": 1, "window_seconds": 60.0},
+                "market_order_book": {"limit": 1, "window_seconds": 60.0},
+            }
+        },
+    )
+    adapter = _DummyMarketDataAdapter()
+    router.market_venues["binance"] = VenueClient(
+        market="crypto",
+        venue="binance",
+        symbols=["BTCUSDT"],
+        adapter=adapter,
+        connected=True,
+        is_stub=False,
+    )
+
+    first = asyncio.run(router.fetch_market_snapshot())
+    second = asyncio.run(router.fetch_market_snapshot())
+
+    assert first["binance"]["BTCUSDT"]["price"] == 60000.0
+    assert adapter.ticker_calls == 1
+    assert adapter.orderbook_calls == 1
+    assert second["binance"]["BTCUSDT"]["price"] != 60000.0
+
+    stats = router.get_stats()
+    denials = stats["live_ops_controls"]["rate_limit_denials_by_endpoint"]
+    assert denials["binance:market_ticker"] >= 1
+
+
+def test_cancel_live_order_uses_rate_limit_controls(tmp_path):
+    router = _router(
+        tmp_path,
+        rate_limits={
+            "binance": {
+                "order_cancel": {"limit": 1, "window_seconds": 60.0},
+            }
+        },
+    )
+    adapter = _DummyLiveAdapter()
+    router.market_venues["binance"] = VenueClient(
+        market="crypto",
+        venue="binance",
+        symbols=["BTCUSDT"],
+        adapter=adapter,
+        connected=True,
+        is_stub=False,
+    )
+
+    first = asyncio.run(
+        router.cancel_live_order(
+            exchange="binance",
+            symbol="BTCUSDT",
+            venue_order_id="123",
+        )
+    )
+    second = asyncio.run(
+        router.cancel_live_order(
+            exchange="binance",
+            symbol="BTCUSDT",
+            venue_order_id="124",
+        )
+    )
+
+    assert first is True
+    assert second is False
+    assert adapter.cancel_calls == 1
+    stats = router.get_stats()
+    assert stats["live_ops_controls"]["rate_limit_rejects"] == 1
+    assert stats["live_ops_controls"]["rate_limit_denials_by_endpoint"]["binance:order_cancel"] >= 1

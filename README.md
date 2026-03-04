@@ -257,6 +257,12 @@ execution:
       order_create:
         limit: 10
         window_seconds: 1.0
+      order_cancel:
+        limit: 10
+        window_seconds: 1.0
+      market_ticker:
+        limit: 50
+        window_seconds: 1.0
 ```
 
 ## ⚠️ Risk Disclaimer

@@ -21,9 +21,23 @@ def test_parse_aliases_reads_colon_pairs():
 def test_parser_accepts_halt_flags():
     parser = MODULE.build_parser()
     args = parser.parse_args(
-        ["--halt-on-mismatch", "--cycles", "2", "--risk-profile", "professional"]
+        [
+            "--halt-on-mismatch",
+            "--auto-resume",
+            "--resume-consecutive-clean-cycles",
+            "4",
+            "--resume-cooldown-seconds",
+            "30",
+            "--cycles",
+            "2",
+            "--risk-profile",
+            "professional",
+        ]
     )
 
     assert args.halt_on_mismatch is True
+    assert args.auto_resume is True
+    assert args.resume_consecutive_clean_cycles == 4
+    assert args.resume_cooldown_seconds == 30.0
     assert args.cycles == 2
     assert args.risk_profile == "professional"

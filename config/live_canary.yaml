@@ -46,9 +46,24 @@ execution:
       order_create:
         limit: 10
         window_seconds: 1.0
+      order_cancel:
+        limit: 10
+        window_seconds: 1.0
+      market_ticker:
+        limit: 50
+        window_seconds: 1.0
+      market_order_book:
+        limit: 20
+        window_seconds: 1.0
     coinbase:
       order_create:
         limit: 5
+        window_seconds: 1.0
+      order_cancel:
+        limit: 5
+        window_seconds: 1.0
+      market_ticker:
+        limit: 20
         window_seconds: 1.0
 
 runtime:

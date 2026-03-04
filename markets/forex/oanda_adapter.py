@@ -138,6 +138,7 @@ class OandaAdapter:
         price: float = None,
         stop_loss: float = None,
         take_profit: float = None,
+        client_order_id: Optional[str] = None,
         router_token=None,
     ) -> dict:
         """Place an order"""
@@ -153,6 +154,8 @@ class OandaAdapter:
             order_data["order"]["stopLossOnFill"] = {"price": str(stop_loss)}
         if take_profit:
             order_data["order"]["takeProfitOnFill"] = {"price": str(take_profit)}
+        if client_order_id:
+            order_data["order"]["clientExtensions"] = {"id": str(client_order_id)}
 
         return await self._request(
             "POST", f"/v3/accounts/{self.account_id}/orders", json_data=order_data
@@ -163,8 +166,9 @@ class OandaAdapter:
         response = await self._request("GET", f"/v3/accounts/{self.account_id}/openTrades")
         return response.get("trades", [])
 
-    async def close_trade(self, trade_id: str, units: float = None) -> dict:
+    async def close_trade(self, trade_id: str, units: float = None, router_token=None) -> dict:
         """Close a trade"""
+        self._assert_router_token(router_token)
         data = {}
         if units:
             data["units"] = str(units)

@@ -33,6 +33,9 @@ class ReconciliationConfig:
     tolerance: float = 1e-6
     max_mismatched_symbols: int = 0
     halt_on_mismatch: bool = True
+    auto_resume_enabled: bool = False
+    resume_consecutive_clean_cycles: int = 3
+    resume_cooldown_seconds: float = 60.0
     symbol_aliases: Dict[str, str] = field(default_factory=dict)
 
 
@@ -54,6 +57,8 @@ class ReconciliationDaemon:
         self.incident_log_path = Path(incident_log_path)
         self.incident_log_path.parent.mkdir(parents=True, exist_ok=True)
         self.venue_positions_provider = venue_positions_provider
+        self._consecutive_clean_cycles = 0
+        self._last_auto_halt_at: Optional[datetime] = None
 
     def _canonical_symbol(self, symbol: str) -> str:
         token = str(symbol).strip()
@@ -184,6 +189,7 @@ class ReconciliationDaemon:
             handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
     async def reconcile_once(self) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc)
         internal = self._internal_positions_from_tca()
         venue_positions = await self._collect_venue_positions()
         aggregate_venue = self._aggregate_venue_positions(venue_positions)
@@ -197,6 +203,13 @@ class ReconciliationDaemon:
         mismatch_rows = self._serialize_diffs(mismatches)
         auto_halt = False
         halt_reason = ""
+        auto_resume = False
+        resume_reason = ""
+
+        if mismatches:
+            self._consecutive_clean_cycles = 0
+        else:
+            self._consecutive_clean_cycles += 1
 
         if bool(self.config.halt_on_mismatch) and len(mismatches) > int(
             self.config.max_mismatched_symbols
@@ -207,6 +220,27 @@ class ReconciliationDaemon:
             )
             self.router.force_halt(halt_reason)
             auto_halt = True
+            self._last_auto_halt_at = now
+
+        cooldown_ok = True
+        if self._last_auto_halt_at is not None:
+            elapsed = (now - self._last_auto_halt_at).total_seconds()
+            cooldown_ok = elapsed >= float(self.config.resume_cooldown_seconds)
+        if (
+            bool(self.config.auto_resume_enabled)
+            and bool(self.router.risk_engine.is_halted)
+            and not bool(self.router.risk_engine.is_flattening)
+            and not auto_halt
+            and self._consecutive_clean_cycles
+            >= max(int(self.config.resume_consecutive_clean_cycles), 1)
+            and cooldown_ok
+        ):
+            self.router.risk_engine.reset()
+            auto_resume = True
+            resume_reason = (
+                "AUTO_RESUME_CLEAN_CYCLES: "
+                f"{self._consecutive_clean_cycles} clean checks after halt"
+            )
 
         payload = {
             "timestamp": _utc_now_iso(),
@@ -215,6 +249,8 @@ class ReconciliationDaemon:
                 "mismatches": len(mismatches),
                 "halted": bool(self.router.risk_engine.is_halted),
                 "auto_halt_triggered": auto_halt,
+                "auto_resume_triggered": auto_resume,
+                "consecutive_clean_cycles": int(self._consecutive_clean_cycles),
             },
             "policy": asdict(self.config),
             "internal_positions": internal,
@@ -222,8 +258,9 @@ class ReconciliationDaemon:
             "aggregate_venue_positions": aggregate_venue,
             "mismatches": mismatch_rows,
             "halt_reason": halt_reason,
+            "resume_reason": resume_reason,
         }
-        if mismatches:
+        if mismatches or auto_resume:
             self._append_incident(payload)
         return payload
 
@@ -238,7 +275,11 @@ class ReconciliationDaemon:
         for _ in range(max(int(cycles), 0)):
             row = await self.reconcile_once()
             out.append(row)
-            if bool(stop_on_halt) and bool(row["summary"]["auto_halt_triggered"]):
+            if (
+                bool(stop_on_halt)
+                and bool(row["summary"]["auto_halt_triggered"])
+                and not bool(self.config.auto_resume_enabled)
+            ):
                 break
             if float(sleep_seconds) > 0:
                 await asyncio.sleep(float(sleep_seconds))

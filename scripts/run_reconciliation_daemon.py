@@ -115,6 +115,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out-dir", default="data/reports")
     parser.add_argument("--tolerance", type=float, default=1e-6)
     parser.add_argument("--max-mismatched-symbols", type=int, default=0)
+    parser.add_argument("--auto-resume", action="store_true")
+    parser.add_argument("--resume-consecutive-clean-cycles", type=int, default=3)
+    parser.add_argument("--resume-cooldown-seconds", type=float, default=60.0)
     halt_group = parser.add_mutually_exclusive_group()
     halt_group.add_argument("--halt-on-mismatch", dest="halt_on_mismatch", action="store_true")
     halt_group.add_argument(
@@ -163,6 +166,9 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
             tolerance=float(args.tolerance),
             max_mismatched_symbols=int(args.max_mismatched_symbols),
             halt_on_mismatch=bool(args.halt_on_mismatch),
+            auto_resume_enabled=bool(args.auto_resume),
+            resume_consecutive_clean_cycles=max(int(args.resume_consecutive_clean_cycles), 1),
+            resume_cooldown_seconds=max(float(args.resume_cooldown_seconds), 0.0),
             symbol_aliases=_parse_aliases(args.symbol_aliases),
         ),
         incident_log_path=str(args.incident_log),

@@ -162,6 +162,7 @@ class CoinbaseAdapter:
         size: float = None,
         price: float = None,
         funds: float = None,
+        client_order_id: Optional[str] = None,
         router_token=None,
     ) -> dict:
         """Place an order"""
@@ -177,6 +178,8 @@ class CoinbaseAdapter:
         else:
             order_data["size"] = str(size)
             order_data["price"] = str(price)
+        if client_order_id:
+            order_data["client_oid"] = str(client_order_id)
 
         return await self._request("POST", "/orders", json_data=order_data)
 
@@ -185,8 +188,9 @@ class CoinbaseAdapter:
         params = {"status": status}
         return await self._request("GET", "/orders", params=params)
 
-    async def cancel_order(self, order_id: str) -> dict:
+    async def cancel_order(self, order_id: str, router_token=None) -> dict:
         """Cancel an order"""
+        self._assert_router_token(router_token)
         return await self._request("DELETE", f"/orders/{order_id}")
 
     def stream_descriptors(self) -> Dict[str, Dict[str, str | float]]:

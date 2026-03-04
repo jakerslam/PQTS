@@ -297,6 +297,7 @@ class RiskAwareRouter:
         )
         self._live_rate_limit_rejects = 0
         self._live_idempotency_rejects = 0
+        self._rate_limit_denials: Dict[str, int] = {}
         self._last_live_order_error: Optional[str] = None
         self._last_live_order_controls: Dict[str, Any] = {}
         # Order admission gate to prevent race-condition bypass across state changes.
@@ -479,6 +480,21 @@ class RiskAwareRouter:
             return float(max(float(levels[0][1]), 0.0))
         except (TypeError, ValueError, IndexError):
             return 0.0
+
+    def _check_rate_limit(self, *, venue: str, endpoint: str) -> Dict[str, Any]:
+        venue_name = str(venue).strip().lower()
+        endpoint_name = str(endpoint).strip().lower()
+        decision = self.rate_limit_tracker.request(venue_name, endpoint_name)
+        key = f"{venue_name}:{endpoint_name}"
+        if not decision.allowed:
+            self._rate_limit_denials[key] = int(self._rate_limit_denials.get(key, 0)) + 1
+        return {
+            "venue": venue_name,
+            "endpoint": endpoint_name,
+            "allowed": bool(decision.allowed),
+            "remaining": int(decision.remaining),
+            "retry_after_seconds": float(decision.retry_after_seconds),
+        }
 
     async def submit_order(
         self,
@@ -1656,7 +1672,16 @@ class RiskAwareRouter:
 
         try:
             if venue.market == "crypto" and venue.venue.lower() == "binance":
+                ticker_rl = self._check_rate_limit(venue=venue.venue, endpoint="market_ticker")
+                if not ticker_rl["allowed"]:
+                    return None
                 ticker = await venue.adapter.get_ticker(symbol)
+                orderbook_rl = self._check_rate_limit(
+                    venue=venue.venue,
+                    endpoint="market_order_book",
+                )
+                if not orderbook_rl["allowed"]:
+                    return None
                 orderbook = await venue.adapter.get_orderbook(symbol, limit=5)
                 bid = float(ticker.get("bidPrice", 0) or 0)
                 ask = float(ticker.get("askPrice", 0) or 0)
@@ -1675,6 +1700,9 @@ class RiskAwareRouter:
                 }
 
             if venue.market == "crypto" and venue.venue.lower() == "coinbase":
+                ticker_rl = self._check_rate_limit(venue=venue.venue, endpoint="market_ticker")
+                if not ticker_rl["allowed"]:
+                    return None
                 ticker = await venue.adapter.get_product_ticker(symbol)
                 bid = float(ticker.get("bid", 0) or 0)
                 ask = float(ticker.get("ask", 0) or 0)
@@ -1688,6 +1716,9 @@ class RiskAwareRouter:
                 }
 
             if venue.market == "equities" and venue.venue.lower() == "alpaca":
+                quote_rl = self._check_rate_limit(venue=venue.venue, endpoint="market_quote")
+                if not quote_rl["allowed"]:
+                    return None
                 quote = await venue.adapter.get_latest_quote(symbol)
                 bid = float(quote.get("bp", 0) or quote.get("bid_price", 0) or 0)
                 ask = float(quote.get("ap", 0) or quote.get("ask_price", 0) or 0)
@@ -1701,6 +1732,9 @@ class RiskAwareRouter:
                 }
 
             if venue.market == "forex" and venue.venue.lower() == "oanda":
+                pricing_rl = self._check_rate_limit(venue=venue.venue, endpoint="market_pricing")
+                if not pricing_rl["allowed"]:
+                    return None
                 pricing = await venue.adapter.get_pricing([symbol])
                 if not pricing:
                     return None
@@ -1757,21 +1791,13 @@ class RiskAwareRouter:
         try:
             venue_name = venue.venue.lower()
             endpoint = "order_create"
-            rate_decision = self.rate_limit_tracker.request(venue_name, endpoint)
-            self._last_live_order_controls = {
-                "rate_limit": {
-                    "venue": venue_name,
-                    "endpoint": endpoint,
-                    "allowed": bool(rate_decision.allowed),
-                    "remaining": int(rate_decision.remaining),
-                    "retry_after_seconds": float(rate_decision.retry_after_seconds),
-                }
-            }
-            if not rate_decision.allowed:
+            rate_limit = self._check_rate_limit(venue=venue_name, endpoint=endpoint)
+            self._last_live_order_controls = {"rate_limit": rate_limit}
+            if not rate_limit["allowed"]:
                 self._live_rate_limit_rejects += 1
                 self._last_live_order_error = (
                     "RATE_LIMIT_EXCEEDED: "
-                    f"{venue_name}/{endpoint} retry_after={rate_decision.retry_after_seconds:.3f}s"
+                    f"{venue_name}/{endpoint} retry_after={rate_limit['retry_after_seconds']:.3f}s"
                 )
                 logger.warning(self._last_live_order_error)
                 return None
@@ -1783,6 +1809,7 @@ class RiskAwareRouter:
                     order_type=route.order_type.value,
                     quantity=float(order.quantity),
                     price=route.price,
+                    client_order_id=order.client_order_id,
                     router_token=self._router_token,
                 )
 
@@ -1793,6 +1820,7 @@ class RiskAwareRouter:
                     order_type=route.order_type.value,
                     size=float(order.quantity),
                     price=route.price,
+                    client_order_id=order.client_order_id,
                     router_token=self._router_token,
                 )
 
@@ -1803,6 +1831,7 @@ class RiskAwareRouter:
                     side=order.side,
                     order_type=route.order_type.value,
                     limit_price=route.price,
+                    client_order_id=order.client_order_id,
                     router_token=self._router_token,
                 )
 
@@ -1813,6 +1842,7 @@ class RiskAwareRouter:
                     units=units,
                     order_type=route.order_type.value.upper(),
                     price=route.price,
+                    client_order_id=order.client_order_id,
                     router_token=self._router_token,
                 )
         except Exception as exc:
@@ -1822,6 +1852,63 @@ class RiskAwareRouter:
 
         self._last_live_order_error = f"LIVE_EXECUTION_UNSUPPORTED_VENUE: {route.exchange}"
         return None
+
+    async def cancel_live_order(self, *, exchange: str, symbol: str, venue_order_id: str) -> bool:
+        """Cancel/close a live venue order or trade with endpoint rate-limit gating."""
+        venue = self.market_venues.get(str(exchange))
+        if venue is None or venue.adapter is None or not venue.connected:
+            return False
+
+        venue_name = venue.venue.lower()
+        rate_limit = self._check_rate_limit(venue=venue_name, endpoint="order_cancel")
+        self._last_live_order_controls = {"rate_limit": rate_limit}
+        if not rate_limit["allowed"]:
+            self._live_rate_limit_rejects += 1
+            self._last_live_order_error = (
+                "RATE_LIMIT_EXCEEDED: "
+                f"{venue_name}/order_cancel retry_after={rate_limit['retry_after_seconds']:.3f}s"
+            )
+            return False
+
+        try:
+            if venue.market == "crypto" and venue_name == "binance":
+                order_id_token: Any
+                try:
+                    order_id_token = int(str(venue_order_id))
+                except (TypeError, ValueError):
+                    order_id_token = str(venue_order_id)
+                await venue.adapter.cancel_order(
+                    symbol=str(symbol),
+                    order_id=order_id_token,
+                    router_token=self._router_token,
+                )
+                return True
+
+            if venue.market == "crypto" and venue_name == "coinbase":
+                await venue.adapter.cancel_order(
+                    order_id=str(venue_order_id),
+                    router_token=self._router_token,
+                )
+                return True
+
+            if venue.market == "equities" and venue_name == "alpaca":
+                await venue.adapter.cancel_order(
+                    order_id=str(venue_order_id),
+                    router_token=self._router_token,
+                )
+                return True
+
+            if venue.market == "forex" and venue_name == "oanda":
+                await venue.adapter.close_trade(
+                    trade_id=str(venue_order_id),
+                    router_token=self._router_token,
+                )
+                return True
+        except Exception as exc:
+            logger.error("Live order cancel failed for %s: %s", exchange, exc)
+            return False
+
+        return False
 
     def get_stats(self) -> Dict:
         """Get order routing statistics."""
@@ -1843,6 +1930,7 @@ class RiskAwareRouter:
                 "require_live_client_order_id": bool(self.require_live_client_order_id),
                 "idempotency_rejects": int(self._live_idempotency_rejects),
                 "rate_limit_rejects": int(self._live_rate_limit_rejects),
+                "rate_limit_denials_by_endpoint": dict(self._rate_limit_denials),
             },
         }
 

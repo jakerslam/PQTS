@@ -149,6 +149,7 @@ class BinanceAdapter:
         order_type: str,
         quantity: float,
         price: Optional[float] = None,
+        client_order_id: Optional[str] = None,
         router_token=None,
     ) -> dict:
         """Place order"""
@@ -164,11 +165,14 @@ class BinanceAdapter:
         if price and order_type.upper() == "LIMIT":
             params["price"] = price
             params["timeInForce"] = "GTC"
+        if client_order_id:
+            params["newClientOrderId"] = str(client_order_id)
 
         return await self._request("POST", "/api/v3/order", params, signed=True)
 
-    async def cancel_order(self, symbol: str, order_id: int) -> dict:
+    async def cancel_order(self, symbol: str, order_id: int, router_token=None) -> dict:
         """Cancel order"""
+        self._assert_router_token(router_token)
         params = {"symbol": symbol, "orderId": order_id}
         return await self._request("DELETE", "/api/v3/order", params, signed=True)
 
