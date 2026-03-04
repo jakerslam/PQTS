@@ -1,5 +1,7 @@
 # PQTS Roadmap to $1M This Calendar Year
 
+Last updated: 2026-03-03 (America/Denver)
+
 ## 1) Feasibility Math: What $1M Profit Implies
 
 Target annual PnL: **$1,000,000 net of trading costs**.
