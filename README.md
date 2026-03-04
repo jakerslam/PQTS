@@ -55,6 +55,59 @@ The demo runs a deterministic paper-simulation slice, emits:
 - a Protheus handoff blob for agent-pilot workflows
 - an attribution event row in `data/analytics/attribution_events.jsonl`
 
+## 🧪 Simulation Suite + Telemetry
+
+Run multi-market, multi-strategy simulation suites and emit optimization telemetry:
+
+```bash
+make sim-suite
+# or:
+python scripts/run_simulation_suite.py \
+  --markets crypto,equities,forex \
+  --strategies market_making,funding_arbitrage,cross_exchange \
+  --cycles-per-scenario 60 \
+  --readiness-every 20
+```
+
+Artifacts:
+
+- suite report JSON: `data/reports/simulation_suite_<timestamp>.json`
+- optimization leaderboard CSV: `data/reports/simulation_leaderboard_<timestamp>.csv`
+- event telemetry log: `data/analytics/simulation_events.jsonl`
+
+The dashboard now renders this telemetry in a dedicated **Simulation Leaderboard** panel.
+
+Execution drift report:
+
+```bash
+python scripts/execution_drift_report.py --tca-db data/tca_records.csv --lookback-days 30
+```
+
+Shadow parity + operational SLO flow:
+
+```bash
+# 1) Collect market/order/fill parity telemetry
+python scripts/run_shadow_stream_worker.py --cycles 30 --sleep-seconds 1.0
+
+# 2) Reconcile internal vs venue state (auto-halt on mismatch)
+python scripts/run_reconciliation_daemon.py --cycles 12 --sleep-seconds 5.0 --halt-on-mismatch
+
+# 3) Evaluate SLO health + route alerts
+python scripts/slo_health_report.py
+
+# 4) Weekly error-budget review
+python scripts/weekly_error_budget_review.py --window-days 7
+```
+
+Additional artifacts:
+
+- `data/analytics/shadow_stream_events.jsonl`
+- `data/analytics/stream_health.json`
+- `data/analytics/reconciliation_incidents.jsonl`
+- `data/alerts/slo_alerts.jsonl`
+- `data/reports/slo_health_<timestamp>.json`
+- `data/reports/error_budget_review_<timestamp>.json`
+
 ## 🎛️ Dashboard
 
 Launch the real-time dashboard:
@@ -100,6 +153,8 @@ Access at `http://localhost:8501`
 
 - [System Overview](docs/OVERVIEW.md)
 - [Backtesting Guide](docs/BACKTESTING.md)
+- [Simulation Telemetry](docs/SIMULATION_TELEMETRY.md)
+- [World-Class 30/60/90 Plan](docs/WORLD_CLASS_30_60_90.md)
 - [Strategy Patterns](docs/ADVANCED_PATTERNS.md)
 - [Incident Runbook](docs/INCIDENT_RUNBOOK.md)
 - [Pricing And Packaging](docs/PRICING_AND_PACKAGING.md)
