@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -64,3 +65,30 @@ def test_engine_allows_placeholder_secrets_in_paper_mode(tmp_path):
 
     engine = TradingEngine(str(path))
     assert engine.mode == "paper_trading"
+
+
+def test_engine_live_mode_supports_file_json_secret_backend(tmp_path):
+    config = _live_config()
+    secrets_path = tmp_path / "live_secrets.json"
+    secrets_path.write_text(
+        json.dumps(
+            {
+                "BINANCE_API_KEY": "from_file_key",
+                "BINANCE_API_SECRET": "from_file_secret",
+            }
+        ),
+        encoding="utf-8",
+    )
+    config["runtime"] = {
+        "secrets": {
+            "backend": "file_json",
+            "file_json_path": str(secrets_path),
+        }
+    }
+    path = tmp_path / "live_file_backend.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    engine = TradingEngine(str(path))
+    exchange = engine.config["markets"]["crypto"]["exchanges"][0]
+    assert exchange["api_key"] == "from_file_key"
+    assert exchange["api_secret"] == "from_file_secret"

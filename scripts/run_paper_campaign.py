@@ -287,6 +287,10 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                 cycle + 1 == args.cycles
             )
             if should_snapshot:
+                revenue_payload = revenue_diagnostics.payload(
+                    lookback_days=int(args.lookback_days),
+                    limit=20,
+                )
                 eta_map = _current_eta_map(router)
                 updated_eta, calibration = router.run_weekly_tca_calibration(
                     eta_by_symbol_venue=eta_map,
@@ -341,10 +345,6 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         max_slippage_mape_pct=float(args.max_mape_pct),
                         max_kill_switch_triggers=int(args.promotion_max_kill_switch_triggers),
                     ),
-                )
-                revenue_payload = revenue_diagnostics.payload(
-                    lookback_days=int(args.lookback_days),
-                    limit=20,
                 )
                 last_snapshot = {
                     "timestamp": datetime.now(timezone.utc).isoformat(),

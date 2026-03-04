@@ -18,6 +18,7 @@ from core.config_validation import validate_engine_config
 from core.market_data_quality import DataQualityReport, MarketDataQualityMonitor
 from core.multi_tenant import enforce_tenant_entitlements, resolve_tenant_entitlements
 from core.operator_tier import resolve_operator_tier
+from core.secret_manager import SecretResolutionMetadata, hydrate_config_secrets
 from core.secrets_policy import enforce_live_secrets
 from core.strategy_contracts import validate_strategy_contract
 from core.toggle_manager import MarketStrategyToggleManager, ToggleValidationError
@@ -105,7 +106,7 @@ class TradingEngine:
     """Main trading execution engine"""
 
     def __init__(self, config_path: str):
-        self.config = self._load_config(config_path)
+        self.config, self.secret_resolution = self._load_config(config_path)
         self._validate_config()
         self.mode = self.config.get("mode", "paper_trading")
         self.toggle_manager = MarketStrategyToggleManager(self.config)
@@ -160,14 +161,23 @@ class TradingEngine:
         _, profile = self._effective_risk_config()
         logger.info("Risk tolerance profile: %s", profile.name)
         logger.info(
+            "Secret resolution: backend=%s resolved=%s/%s unresolved=%s",
+            self.secret_resolution.backend,
+            self.secret_resolution.placeholders_resolved,
+            self.secret_resolution.placeholders_total,
+            self.secret_resolution.unresolved_keys,
+        )
+        logger.info(
             "Tenant entitlements: id=%s plan=%s",
             self.tenant_entitlements.tenant_id,
             self.tenant_entitlements.plan,
         )
 
-    def _load_config(self, path: str) -> dict:
+    def _load_config(self, path: str) -> tuple[dict, SecretResolutionMetadata]:
         with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
+            payload = yaml.safe_load(f) or {}
+        hydrated, metadata = hydrate_config_secrets(payload)
+        return hydrated, metadata
 
     def _validate_config(self) -> None:
         issues = validate_engine_config(self.config)

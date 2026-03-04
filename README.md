@@ -79,6 +79,18 @@ python scripts/run_exchange_certification.py --venues binance,coinbase,alpaca,oa
 python scripts/enforce_data_retention.py --root data --max-age-days 365 --max-total-files 10000
 ```
 
+World-class ops checklist (all 10 steps, one command):
+
+```bash
+python scripts/run_world_class_ops.py --config config/paper.yaml --quick
+```
+
+Live secret validation:
+
+```bash
+python scripts/validate_live_secrets.py --config config/live_canary.yaml --strict
+```
+
 ## 🧪 Simulation Suite + Telemetry
 
 Run multi-market, multi-strategy simulation suites and emit optimization telemetry:
@@ -201,6 +213,7 @@ Access at `http://localhost:8501`
 - [Backtesting Guide](docs/BACKTESTING.md)
 - [Simulation Telemetry](docs/SIMULATION_TELEMETRY.md)
 - [World-Class 30/60/90 Plan](docs/WORLD_CLASS_30_60_90.md)
+- [World-Class Next Steps Execution](docs/WORLD_CLASS_NEXT_STEPS_EXECUTION.md)
 - [Max Utility + Revenue Playbook](docs/MAX_UTILITY_REVENUE_PLAYBOOK.md)
 - [Strategy Patterns](docs/ADVANCED_PATTERNS.md)
 - [Incident Runbook](docs/INCIDENT_RUNBOOK.md)

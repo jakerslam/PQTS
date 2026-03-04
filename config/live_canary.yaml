@@ -1,0 +1,53 @@
+mode: live_trading
+
+markets:
+  crypto:
+    enabled: true
+    exchanges:
+      - name: binance
+        api_key: ${BINANCE_LIVE_API_KEY}
+        api_secret: ${BINANCE_LIVE_API_SECRET}
+        testnet: false
+        symbols: [BTCUSDT, ETHUSDT]
+      - name: coinbase
+        api_key: ${COINBASE_LIVE_API_KEY}
+        api_secret: ${COINBASE_LIVE_API_SECRET}
+        passphrase: ${COINBASE_LIVE_PASSPHRASE}
+        sandbox: false
+        symbols: [BTC-USD, ETH-USD]
+
+strategies:
+  market_making:
+    enabled: true
+    markets: [crypto]
+  funding_arbitrage:
+    enabled: true
+    markets: [crypto]
+
+risk:
+  initial_capital: 5000.0
+  risk_tolerance_profile: conservative
+  max_portfolio_risk_pct: 1.0
+  max_drawdown_pct: 5.0
+  max_leverage: 1.5
+  max_order_notional: 500.0
+  max_participation: 0.02
+  max_slippage_bps: 35.0
+
+runtime:
+  operator_tier: pro
+  tenant:
+    tenant_id: canary_internal
+    plan: pro
+    allow_live_trading: true
+  secrets:
+    backend: env
+  autopilot:
+    mode: hybrid
+    auto_apply_on_start: true
+    min_active_strategies: 1
+    max_active_strategies: 2
+  autopilot_policy_packs:
+    pro:
+      min_active_strategies: 1
+      max_active_strategies: 2

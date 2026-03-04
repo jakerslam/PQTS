@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,3 +30,12 @@ def test_parser_accepts_risk_profile_and_symbols():
     assert args.risk_profile == "professional"
     assert args.symbols == "BTCUSDT,ETHUSDT"
     assert args.cycles == 12
+
+
+def test_snapshot_computes_revenue_before_promotion_gate():
+    source = inspect.getsource(MODULE._run)
+    revenue_idx = source.find("revenue_payload = revenue_diagnostics.payload")
+    promotion_idx = source.find("promotion_gate = evaluate_promotion_gate")
+    assert revenue_idx != -1
+    assert promotion_idx != -1
+    assert revenue_idx < promotion_idx
