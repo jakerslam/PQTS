@@ -37,14 +37,39 @@ jobs:
             --sha "${GITHUB_SHA}" \
             --repo "${GITHUB_REPOSITORY}"
 
+  verify_dependency_lock:
+    name: Verify Dependency Lock
+    needs: verify_workflow_raw
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install lock tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-tools
+
+      - name: Verify lock file structure
+        run: python3 tools/verify_dependency_lock.py
+
+      - name: Verify hash-locked install
+        run: pip install --require-hashes -r requirements.lock
+
   test:
     name: Pytest
-    needs: verify_workflow_raw
+    needs: [verify_workflow_raw, verify_dependency_lock]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.13"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,15 +83,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+          pip install --require-hashes -r requirements.lock
 
       - name: Run pytest (gating)
         run: pytest tests -q
 
   lint:
     name: Lint
-    needs: verify_workflow_raw
+    needs: [verify_workflow_raw, verify_dependency_lock]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -75,28 +99,29 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
           cache: pip
 
       - name: Install lint tools
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black isort
+          pip install --require-hashes -r requirements.lock
 
-      - name: Black format check (non-gating)
-        continue-on-error: true
-        run: black --check .
+      - name: Ruff lint (gating)
+        run: ruff check core execution risk analytics --select E9,F63,F7,F82
 
-      - name: Isort import check (non-gating)
-        continue-on-error: true
-        run: isort --check-only .
+      - name: Black format check (gating)
+        run: black --check core execution risk analytics
+
+      - name: Isort import check (gating)
+        run: isort --check-only core execution risk analytics
 
       - name: Flake8 hard errors (gating)
-        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        run: flake8 core execution risk analytics --count --select=E9,F63,F7,F82 --show-source --statistics
 
   static_analysis:
     name: Bandit and Mypy (non-gating)
-    needs: verify_workflow_raw
+    needs: [verify_workflow_raw, verify_dependency_lock]
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -106,18 +131,22 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
           cache: pip
 
       - name: Install analysis tools
         run: |
           python -m pip install --upgrade pip
-          pip install mypy bandit
+          pip install --require-hashes -r requirements.lock
 
       - name: Run bandit (non-gating)
         continue-on-error: true
         run: bandit -r execution risk core backtesting strategies
 
-      - name: Run mypy (non-gating)
+      - name: Run mypy baseline (non-gating)
         continue-on-error: true
         run: mypy execution risk core --ignore-missing-imports
+
+      - name: Run mypy strict phase modules (non-gating)
+        continue-on-error: true
+        run: mypy analytics/paper_readiness.py execution/paper_campaign.py execution/paper_fill_model.py execution/tca_feedback.py

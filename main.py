@@ -5,10 +5,6 @@ import asyncio
 import sys
 import os
 import argparse
-from pathlib import Path
-
-# Add pqts to path
-sys.path.insert(0, str(Path(__file__).parent))
 
 from core.engine import TradingEngine
 from core.toggle_manager import ToggleValidationError
