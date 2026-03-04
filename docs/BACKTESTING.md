@@ -116,6 +116,27 @@ python3 scripts/paper_readiness_report.py \
 - Track record gate passes (`trading_days >= min_days` and `fills >= min_fills`)
 - Slippage gate passes (`p95_realized_slippage_bps <= max_p95` and `MAPE <= max_mape`)
 
+## Continuous Paper Campaign
+
+Run continuous probe orders through `RiskAwareRouter.submit_order()` to accumulate real paper fills and readiness snapshots:
+
+```bash
+python3 scripts/run_paper_campaign.py \
+  --config config/paper.yaml \
+  --symbols BTCUSDT,ETHUSDT,BTC-USD,ETH-USD \
+  --cycles 5000 \
+  --sleep-seconds 60 \
+  --notional-usd 200 \
+  --readiness-every 100 \
+  --out-dir data/reports
+```
+
+This writes rolling readiness snapshots:
+
+```text
+data/reports/paper_campaign_snapshot_<timestamp>.json
+```
+
 ## Performance Metrics
 
 - **Total Return**: Overall strategy return
