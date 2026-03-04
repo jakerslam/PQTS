@@ -28,6 +28,7 @@ import os
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 from datetime import datetime, timezone
 from dataclasses import dataclass
+import time
 
 # Import kill switches
 import sys
@@ -51,12 +52,14 @@ from execution.realistic_costs import (
 from execution.smart_router import (
     SmartOrderRouter, OrderRequest, OrderType, RouteDecision
 )
+from execution.reliability import ExecutionReliabilityMonitor
 from execution.tca_feedback import (
     ExecutionFill,
     TCADatabase,
     TCATradeRecord,
     weekly_calibrate_eta,
 )
+from risk.regime_overlay import RegimeExposureOverlay
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +236,16 @@ class RiskAwareRouter:
         self.eta_by_symbol_venue: Dict[Tuple[str, str], float] = {}
         self.market_venues: Dict[str, VenueClient] = {}
         self._markets_config: Dict[str, Any] = {}
+        self.regime_overlay = RegimeExposureOverlay(
+            broker_config.get("regime_overlay", {})
+        )
+        reliability_cfg = broker_config.get("reliability", {})
+        self.reliability_monitor = ExecutionReliabilityMonitor(
+            latency_slo_ms=float(reliability_cfg.get("latency_slo_ms", 250.0)),
+            rejection_slo=float(reliability_cfg.get("rejection_slo", 0.001)),
+            failure_slo=float(reliability_cfg.get("failure_slo", 0.01)),
+            cooldown_seconds=int(reliability_cfg.get("cooldown_seconds", 300)),
+        )
         
         # Audit logging (Step 5)
         self.audit_log: List[Dict] = []
@@ -325,6 +338,35 @@ class RiskAwareRouter:
                 audit_log=audit_entry
             )
         
+        requested_quantity = float(order.quantity)
+        throttled_qty, regime_decision = self.regime_overlay.throttle_quantity(
+            order.symbol,
+            requested_quantity,
+            market_data,
+        )
+        order.quantity = float(throttled_qty)
+        audit_entry["regime_overlay"] = {
+            "regime": regime_decision.regime,
+            "reason": regime_decision.reason,
+            "multiplier": regime_decision.multiplier,
+            "requested_quantity": requested_quantity,
+            "approved_quantity": float(order.quantity),
+        }
+        if order.quantity <= 0:
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = "REGIME_OVERLAY: quantity throttled to zero"
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=RiskDecision.HALT,
+                risk_state=None,
+                order_id=None,
+                exchange=None,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
+            )
+
         # Calculate notional
         price = order.price or market_data.get('last_price', 0)
         notional = order.quantity * price
@@ -466,11 +508,25 @@ class RiskAwareRouter:
         # =========================================================================
         
         route = await self.smart_router.route_order(order, market_data)
+        ranked_exchanges = list(route.ranked_exchanges or [route.exchange])
+        failover_target = self.reliability_monitor.choose_failover(
+            primary_venue=route.exchange,
+            candidates=ranked_exchanges,
+        )
+        if failover_target is not None and failover_target != route.exchange:
+            previous_exchange = route.exchange
+            route.exchange = failover_target
+            audit_entry["routing_failover"] = {
+                "from_exchange": previous_exchange,
+                "to_exchange": failover_target,
+            }
+
         audit_entry['routing'] = {
             'exchange': route.exchange,
             'order_type': route.order_type.value,
             'expected_cost': route.expected_cost,
-            'expected_slippage': route.expected_slippage
+            'expected_slippage': route.expected_slippage,
+            'ranked_exchanges': ranked_exchanges,
         }
 
         venue_caps = self.broker_config.get("max_venue_notional", {})
@@ -529,12 +585,24 @@ class RiskAwareRouter:
         # =========================================================================
         order_id = audit_entry["order_id"]
         live_order_response = None
+        execution_start = time.perf_counter()
         if self.broker_config.get("live_execution", False):
             live_order_response = await self._place_live_order(route=route, order=order)
             if live_order_response is None:
+                latency_ms = (time.perf_counter() - execution_start) * 1000.0
+                self.reliability_monitor.record(
+                    venue=route.exchange,
+                    latency_ms=latency_ms,
+                    rejected=True,
+                    failed=True,
+                )
                 self.reject_count += 1
                 audit_entry["rejected"] = True
                 audit_entry["reject_reason"] = f"LIVE_EXECUTION_FAILED: {route.exchange}"
+                audit_entry["execution_quality"] = {
+                    "latency_ms": latency_ms,
+                    "failed": True,
+                }
                 self.audit_log.append(audit_entry)
                 return OrderResult(
                     success=False,
@@ -563,6 +631,7 @@ class RiskAwareRouter:
             fill.executed_price,
             fill.venue,
         )
+        execution_latency_ms = (time.perf_counter() - execution_start) * 1000.0
 
         audit_entry["executed"] = True
         audit_entry["order_id"] = order_id
@@ -581,7 +650,7 @@ class RiskAwareRouter:
         # STEP 5: POST-TRADE LOGGING (TCA)
         # =========================================================================
         # Feed into TCA for cost model calibration
-        self._update_tca(
+        tca_payload = self._update_tca(
             order_id=order_id,
             audit_entry=audit_entry,
             order=order,
@@ -594,6 +663,27 @@ class RiskAwareRouter:
             depth_1pct_usd=depth_1pct_usd,
             vol_24h=float(market_data.get("vol_24h", self.cost_model.base_vol)),
         )
+        requested_qty = float(max(order.quantity, 1e-12))
+        fill_ratio = float(fill.executed_qty) / requested_qty
+        self.smart_router.record_execution_outcome(
+            exchange=route.exchange,
+            symbol=order.symbol,
+            expected_slippage_bps=float(tca_payload.get("predicted_slippage_bps", 0.0)),
+            realized_slippage_bps=float(tca_payload.get("realized_slippage_bps", 0.0)),
+            fill_ratio=fill_ratio,
+            latency_ms=execution_latency_ms,
+        )
+        self.reliability_monitor.record(
+            venue=route.exchange,
+            latency_ms=execution_latency_ms,
+            rejected=False,
+            failed=False,
+        )
+        audit_entry["execution_quality"] = {
+            "latency_ms": execution_latency_ms,
+            "fill_ratio": fill_ratio,
+            "reliability_degraded": self.reliability_monitor.is_degraded(route.exchange),
+        }
         
         return OrderResult(
             success=True,
@@ -619,11 +709,16 @@ class RiskAwareRouter:
         spread_bps: float,
         depth_1pct_usd: float,
         vol_24h: float,
-    ) -> None:
+    ) -> Dict[str, float]:
         """Persist predicted vs. realized slippage/costs for TCA calibration."""
         if notional <= 0 or reference_price <= 0:
             logger.warning("TCA skipped for %s due to invalid notional/price.", order_id)
-            return
+            return {
+                "predicted_slippage_bps": 0.0,
+                "realized_slippage_bps": 0.0,
+                "predicted_total_bps": 0.0,
+                "realized_total_bps": 0.0,
+            }
 
         if cost_breakdown is not None:
             predicted_slippage_bps = float(
@@ -684,6 +779,12 @@ class RiskAwareRouter:
             predicted_slippage_bps,
             realized_slippage_bps,
         )
+        return {
+            "predicted_slippage_bps": predicted_slippage_bps,
+            "realized_slippage_bps": realized_slippage_bps,
+            "predicted_total_bps": predicted_total_bps,
+            "realized_total_bps": realized_total_bps,
+        }
     
     def _create_token(self) -> '_RouterToken':
         """
@@ -1073,7 +1174,8 @@ class RiskAwareRouter:
             'kill_switch_active': self.risk_engine.risk_monitor.kill_switch_active,
             'kill_reason': self.risk_engine.risk_monitor.kill_reason,
             'capital': self._capital,
-            'audit_entries': len(self.audit_log)
+            'audit_entries': len(self.audit_log),
+            'reliability': self.reliability_monitor.summary(),
         }
 
     def run_weekly_tca_calibration(

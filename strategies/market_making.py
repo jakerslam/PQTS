@@ -6,6 +6,8 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
+from strategies.inventory_transfer import InventoryRiskTransferEngine
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -53,6 +55,12 @@ class MarketMakingStrategy:
         # Adverse selection protection
         self.toxicity_threshold = config.get('toxicity_threshold', 0.3)
         self.cancel_threshold = config.get('cancel_threshold', 0.7)
+        transfer_cfg = config.get('inventory_transfer', {})
+        self.inventory_transfer_engine = InventoryRiskTransferEngine(
+            threshold_ratio=float(transfer_cfg.get('threshold_ratio', 0.8)),
+            target_ratio=float(transfer_cfg.get('target_ratio', 0.3)),
+            hedge_ratio=float(transfer_cfg.get('hedge_ratio', 1.0)),
+        )
         
         # State tracking
         self.states: Dict[str, MarketMakerState] = {}
@@ -175,6 +183,21 @@ class MarketMakingStrategy:
                 'toxicity': toxicity
             }
         }
+
+        transfer = self.inventory_transfer_engine.suggest_transfer(
+            symbol=symbol,
+            inventory=float(state.inventory),
+            max_position=float(self.max_position),
+            mid_price=float(mid_price),
+        )
+        if transfer is not None:
+            quotes['risk_transfer'] = {
+                'symbol': transfer.symbol,
+                'side': transfer.side,
+                'quantity': transfer.quantity,
+                'expected_notional': transfer.expected_notional,
+                'reason': transfer.reason,
+            }
         
         return quotes
     

@@ -9,6 +9,7 @@ import numpy as np
 import yaml
 
 from core.toggle_manager import MarketStrategyToggleManager, ToggleValidationError
+from core.market_data_quality import DataQualityReport, MarketDataQualityMonitor
 from execution.risk_aware_router import RiskAwareRouter, OrderResult
 from execution.smart_router import OrderRequest as RouterOrderRequest
 from execution.smart_router import OrderType as RouterOrderType
@@ -92,6 +93,13 @@ class TradingEngine:
         self.portfolio_manager = None
         self.router: Optional[RiskAwareRouter] = None
         self.latest_router_snapshot: Dict[str, Any] = {}
+        quality_cfg = self.config.get('analytics', {}).get('market_data_quality', {})
+        self.market_data_quality_monitor = MarketDataQualityMonitor(
+            min_completeness=float(quality_cfg.get('min_completeness', 0.99)),
+            max_drift_ms=float(quality_cfg.get('max_drift_ms', 5000.0)),
+            min_feature_parity=float(quality_cfg.get('min_feature_parity', 0.95)),
+        )
+        self.latest_data_quality_report: Optional[DataQualityReport] = None
         self._portfolio_change_history: List[float] = [0.0] * 30
         self.running = False
         
@@ -164,6 +172,7 @@ class TradingEngine:
 
     def _build_router_broker_config(self) -> Dict[str, Any]:
         risk_cfg = self.config.get('risk', {})
+        execution_cfg = self.config.get('execution', {})
         broker_config = {
             'enabled': True,
             'live_execution': bool(self.config.get('mode') == 'live_trading'),
@@ -171,6 +180,16 @@ class TradingEngine:
             'max_venue_notional': risk_cfg.get('max_venue_notional', {}),
             'tca_db_path': self.config.get('analytics', {}).get('tca_db_path', 'data/tca_records.csv'),
             'exchanges': {},
+            'max_single_order_size': execution_cfg.get('max_single_order_size', 1.0),
+            'twap_interval_seconds': execution_cfg.get('twap_interval_seconds', 60),
+            'prefer_maker': execution_cfg.get('prefer_maker', True),
+            'default_monthly_volume_usd': execution_cfg.get('default_monthly_volume_usd', 0.0),
+            'monthly_volume_by_venue': execution_cfg.get('monthly_volume_by_venue', {}),
+            'fee_tiers': execution_cfg.get('fee_tiers', {}),
+            'default_maker_fee_bps': execution_cfg.get('default_maker_fee_bps', 10.0),
+            'default_taker_fee_bps': execution_cfg.get('default_taker_fee_bps', 12.0),
+            'reliability': execution_cfg.get('reliability', {}),
+            'regime_overlay': execution_cfg.get('regime_overlay', {}),
         }
         return broker_config
     
@@ -265,7 +284,30 @@ class TradingEngine:
                     ask=ask,
                 )
 
-        self.market_data = updated
+        expected_symbols = 0
+        for venue in self.market_adapters.values():
+            expected_symbols += len(venue.get('symbols', []))
+        expected_symbols = max(expected_symbols, len(updated))
+
+        timestamps = [row.timestamp for row in updated.values()]
+        report = self.market_data_quality_monitor.assess(
+            expected_symbols=expected_symbols,
+            observed_symbols=len(updated),
+            timestamps=timestamps,
+            backtest_features={},
+            live_features={},
+        )
+        self.latest_data_quality_report = report
+
+        if report.passed:
+            self.market_data = updated
+        else:
+            logger.warning(
+                "Market data quality gate failed: completeness=%.3f drift_ms=%.1f parity=%.3f",
+                report.completeness,
+                report.max_timestamp_drift_ms,
+                report.feature_parity,
+            )
     
     async def _run_strategies(self):
         """Execute trading strategies"""

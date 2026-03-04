@@ -3,9 +3,10 @@ import logging
 import sqlite3
 import pandas as pd
 import json
+import hashlib
 from typing import Any, Dict, List, Optional
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,17 @@ class ResearchDatabase:
                 slippage_mape REAL DEFAULT 0,
                 kill_switch_triggers INTEGER DEFAULT 0,
                 notes TEXT,
+                FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
+            )
+        ''')
+
+        # Immutable pilot-arm assignment for control/treatment analytics.
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pilot_assignments (
+                experiment_id TEXT PRIMARY KEY,
+                arm TEXT NOT NULL,
+                assigned_at TIMESTAMP NOT NULL,
+                assignment_hash TEXT NOT NULL,
                 FOREIGN KEY (experiment_id) REFERENCES experiments(experiment_id)
             )
         ''')
@@ -393,6 +405,79 @@ class ResearchDatabase:
         except sqlite3.Error as e:
             logger.error(f"Failed to update experiment status: {e}")
             return False
+
+    def assign_pilot_arm(
+        self,
+        experiment_id: str,
+        arm: Optional[str] = None,
+        namespace: str = "pqts_pilot",
+    ) -> str:
+        """
+        Assign immutable pilot A/B arm for an experiment.
+
+        If already assigned, returns existing assignment and ignores requested arm.
+        """
+        cursor = self.conn.cursor()
+        existing = cursor.execute(
+            "SELECT arm FROM pilot_assignments WHERE experiment_id = ?",
+            (experiment_id,),
+        ).fetchone()
+        if existing:
+            return str(existing["arm"])
+
+        if arm is None:
+            digest = hashlib.sha256(
+                f"{namespace}:{experiment_id}".encode("utf-8")
+            ).hexdigest()
+            arm = "control" if int(digest[:2], 16) % 2 == 0 else "treatment"
+            assignment_hash = digest
+        else:
+            normalized = str(arm).strip().lower()
+            if normalized not in {"control", "treatment"}:
+                raise ValueError("arm must be 'control' or 'treatment'")
+            arm = normalized
+            assignment_hash = hashlib.sha256(
+                f"{namespace}:{experiment_id}:{arm}".encode("utf-8")
+            ).hexdigest()
+
+        cursor.execute(
+            '''
+            INSERT INTO pilot_assignments (experiment_id, arm, assigned_at, assignment_hash)
+            VALUES (?, ?, ?, ?)
+            ''',
+            (experiment_id, arm, datetime.now().isoformat(), assignment_hash),
+        )
+        self.conn.commit()
+        return str(arm)
+
+    def get_pilot_assignment(self, experiment_id: str) -> Optional[Dict[str, str]]:
+        cursor = self.conn.cursor()
+        row = cursor.execute(
+            '''
+            SELECT experiment_id, arm, assigned_at, assignment_hash
+            FROM pilot_assignments
+            WHERE experiment_id = ?
+            ''',
+            (experiment_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "experiment_id": str(row["experiment_id"]),
+            "arm": str(row["arm"]),
+            "assigned_at": str(row["assigned_at"]),
+            "assignment_hash": str(row["assignment_hash"]),
+        }
+
+    def list_pilot_assignments(self) -> pd.DataFrame:
+        return pd.read_sql_query(
+            '''
+            SELECT experiment_id, arm, assigned_at, assignment_hash
+            FROM pilot_assignments
+            ORDER BY assigned_at DESC
+            ''',
+            self.conn,
+        )
 
     def log_stage_metric(self, experiment_id: str, stage: str, metrics: Dict, timestamp: Optional[datetime] = None) -> bool:
         ts = (timestamp or datetime.now()).isoformat()

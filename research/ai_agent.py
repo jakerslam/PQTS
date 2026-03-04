@@ -70,6 +70,7 @@ from research.regime_detector import MarketRegime, RegimeDetector
 from research.report_builder import ResearchAnalyticsReportBuilder
 from research.r_analytics_bridge import RAnalyticsBridge
 from research.walk_forward import WalkForwardTester, WalkForwardWindow
+from portfolio.strategy_allocator import StrategyBudgetInput, StrategyCapitalAllocator
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +188,13 @@ class AIResearchAgent:
         self.max_annual_turnover_notional = float(
             capacity_cfg.get("max_annual_turnover_notional", max(self.deployable_capital, 0.0))
         )
+        allocation_cfg = config.get("allocation", {})
+        self.strategy_allocator = StrategyCapitalAllocator(
+            max_weight=float(allocation_cfg.get("max_weight", 0.35)),
+            min_weight=float(allocation_cfg.get("min_weight", 0.0)),
+            capacity_haircut=float(allocation_cfg.get("capacity_haircut", 0.05)),
+        )
+        self.last_allocation_weights: Dict[str, float] = {}
 
         # Stage gates
         self.stage_gates = {
@@ -417,6 +425,7 @@ class AIResearchAgent:
             if self.max_annual_turnover_notional > 0
             else float("inf")
         )
+        annual_return_estimate = float(pnl_series.mean()) * periods_per_year
 
         return {
             "sharpe": sharpe,
@@ -425,6 +434,7 @@ class AIResearchAgent:
             "win_rate": win_rate,
             "total_trades": total_trades,
             "turnover_annualized": annualized_turnover,
+            "annual_return_estimate": annual_return_estimate,
             "cost_drag_bps": float(turnover.sum() * cost_per_turnover * 10000.0),
             "capacity_ratio": float(capacity_ratio),
             "returns_series": pnl_series,
@@ -649,16 +659,29 @@ class AIResearchAgent:
 
     def _promote_to_paper(self, validated: List[Dict]) -> List[str]:
         promoted: List[str] = []
-        for result in validated[: self.top_performers]:
+        candidates: List[Dict[str, Any]] = []
+        cost_per_turnover = (
+            self.commission_bps + self.slippage_bps + self.borrow_funding_bps
+        ) / 10000.0
+
+        for result in validated:
             variant = result["variant"]
+            metrics = result["metrics"]
+            annual_return_estimate = float(
+                metrics.get("annual_return_estimate", metrics.get("total_return", 0.0))
+            )
+            annual_turnover = float(metrics.get("turnover_annualized", 0.0))
+            net_expected_return = annual_return_estimate - (annual_turnover * cost_per_turnover)
+
             gates = {
                 "validator": bool(result["validator_passed"]),
-                "drawdown": float(result["metrics"]["max_drawdown"]) <= self.max_drawdown,
+                "drawdown": float(metrics["max_drawdown"]) <= self.max_drawdown,
                 "wf_sharpe": float(result["walk_forward_sharpe"]) >= self.min_sharpe_for_promotion,
                 "wf_consistency": float(result["walk_forward_consistency"]) >= self.min_walk_forward_consistency,
                 "deflated_sharpe": float(result["deflated_sharpe"]) >= self.min_deflated_sharpe,
                 "pbo": float(result["pbo_estimate"]) <= self.max_pbo,
-                "capacity": float(result["metrics"]["capacity_ratio"]) <= 1.0,
+                "capacity": float(metrics["capacity_ratio"]) <= 1.0,
+                "economics": net_expected_return > 0.0,
                 "r_validator": bool(
                     result.get(
                         "r_validator_passed",
@@ -666,10 +689,37 @@ class AIResearchAgent:
                     )
                 ),
             }
+            result["net_expected_return"] = net_expected_return
+            result["promotion_gates"] = gates
 
             if not all(gates.values()):
                 continue
+            candidates.append(result)
 
+        selected = candidates[: self.top_performers]
+        allocation_inputs = [
+            StrategyBudgetInput(
+                strategy_id=row["variant"].strategy_id,
+                expected_return=float(row.get("net_expected_return", 0.0)),
+                annual_vol=max(
+                    float(row["metrics"].get("annual_return_estimate", 0.0))
+                    / max(float(row["metrics"].get("sharpe", 0.0)), 0.05),
+                    0.01,
+                ),
+                annual_turnover=float(row["metrics"].get("turnover_annualized", 0.0)),
+                cost_per_turnover=cost_per_turnover,
+                capacity_ratio=float(row["metrics"].get("capacity_ratio", 0.0)),
+            )
+            for row in selected
+        ]
+        allocation_weights = self.strategy_allocator.allocate(allocation_inputs)
+        self.last_allocation_weights = dict(allocation_weights)
+
+        for result in selected:
+            variant = result["variant"]
+            gates = result.get("promotion_gates", {})
+            arm = self.db.assign_pilot_arm(variant.strategy_id)
+            target_weight = float(allocation_weights.get(variant.strategy_id, 0.0))
             self.db.update_experiment_status(
                 variant.strategy_id,
                 "paper",
@@ -687,6 +737,9 @@ class AIResearchAgent:
                     "notes": {
                         "gates": gates,
                         "r_analytics": result.get("r_analytics", {}),
+                        "arm": arm,
+                        "target_weight": target_weight,
+                        "net_expected_return": float(result.get("net_expected_return", 0.0)),
                     },
                 },
             )
@@ -694,7 +747,12 @@ class AIResearchAgent:
             if variant.strategy_id not in self.paper_trading:
                 self.paper_trading.append(variant.strategy_id)
             promoted.append(variant.strategy_id)
-            logger.info("Promoted %s to paper trading", variant.strategy_id)
+            logger.info(
+                "Promoted %s to paper trading (arm=%s weight=%.3f)",
+                variant.strategy_id,
+                arm,
+                target_weight,
+            )
 
         return promoted
 
@@ -780,6 +838,7 @@ class AIResearchAgent:
                 "walk_forward_passed": len(validated),
                 "promoted_to_paper": len(promoted),
                 "promoted_ids": promoted,
+                "allocation_weights": self.last_allocation_weights,
             },
             "objective": objective_assessment,
             "performance": {
@@ -798,6 +857,7 @@ class AIResearchAgent:
                     "deflated_sharpe": float(row["deflated_sharpe"]),
                     "pbo_estimate": float(row["pbo_estimate"]),
                     "capacity_ratio": float(row["metrics"]["capacity_ratio"]),
+                    "net_expected_return": float(row.get("net_expected_return", 0.0)),
                     "features": row["variant"].features,
                 }
                 for row in top_ranked
@@ -827,6 +887,7 @@ class AIResearchAgent:
                 "deflated_sharpe": float(row.get("deflated_sharpe", 0.0)) >= self.min_deflated_sharpe,
                 "pbo": float(row.get("pbo_estimate", 1.0)) <= self.max_pbo,
                 "capacity": float(row.get("metrics", {}).get("capacity_ratio", 0.0)) <= 1.0,
+                "economics": float(row.get("net_expected_return", 0.0)) > 0.0,
                 "r_validator": bool(
                     row.get(
                         "r_validator_passed",
@@ -850,6 +911,9 @@ class AIResearchAgent:
             elif not gate_checks["capacity"]:
                 decision_action = "hold"
                 decision_reason = "capacity_limit_exceeded"
+            elif not gate_checks["economics"]:
+                decision_action = "hold"
+                decision_reason = "net_expected_return_non_positive"
             else:
                 decision_action = "hold"
                 decision_reason = "ranked_below_promotion_cutoff"

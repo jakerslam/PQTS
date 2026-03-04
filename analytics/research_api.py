@@ -122,6 +122,18 @@ class ResearchDashboardAPI:
 
         return operators
 
+    def _pilot_assignment_by_experiment(self) -> Dict[str, str]:
+        assignments = self.db.list_pilot_assignments()
+        if assignments.empty:
+            return {}
+        mapping: Dict[str, str] = {}
+        for _, row in assignments.iterrows():
+            arm = _normalize_arm(row.get("arm"))
+            if arm is None:
+                continue
+            mapping[str(row.get("experiment_id"))] = arm
+        return mapping
+
     @staticmethod
     def _extract_arm(notes_payload: Dict[str, Any]) -> Optional[str]:
         for key in ("arm", "ab_arm", "pilot_arm", "operator", "decision_operator"):
@@ -362,6 +374,7 @@ class ResearchDashboardAPI:
             frame = frame[frame["stage"] == stage]
 
         default_operators = self._latest_operator_by_experiment()
+        default_operators.update(self._pilot_assignment_by_experiment())
         frame["arm"] = frame.apply(
             lambda row: self._arm_for_metric_row(
                 experiment_id=str(row["experiment_id"]),

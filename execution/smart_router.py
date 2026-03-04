@@ -3,8 +3,10 @@ import logging
 import asyncio
 from collections.abc import Mapping
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+
+from execution.fee_optimizer import FeeRebateOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,7 @@ class RouteDecision:
     split_orders: List[OrderRequest]
     expected_cost: float
     expected_slippage: float
+    ranked_exchanges: List[str] = field(default_factory=list)
 
 class SmartOrderRouter:
     """
@@ -52,9 +55,20 @@ class SmartOrderRouter:
         self.max_single_order_size = config.get('max_single_order_size', 1.0)  # BTC
         self.twap_interval_seconds = config.get('twap_interval_seconds', 60)
         self.prefer_maker = config.get('prefer_maker', True)
+        self.default_monthly_volume_usd = float(config.get('default_monthly_volume_usd', 0.0))
         
         # Exchange configs
         self.exchanges = config.get('exchanges', {})
+        self.monthly_volume_by_venue = {
+            str(k): float(v)
+            for k, v in config.get('monthly_volume_by_venue', {}).items()
+        }
+        self.venue_quality: Dict[str, Dict[str, float]] = {}
+        self.fee_optimizer = FeeRebateOptimizer(
+            tiers_by_venue=config.get('fee_tiers', {}),
+            default_maker_fee_bps=float(config.get('default_maker_fee_bps', 10.0)),
+            default_taker_fee_bps=float(config.get('default_taker_fee_bps', 12.0)),
+        )
         
         logger.info(f"SmartOrderRouter initialized")
     
@@ -62,11 +76,15 @@ class SmartOrderRouter:
                          market_data: Dict) -> RouteDecision:
         """Determine optimal routing for order"""
         
-        # Select best exchange
-        exchange = self._select_exchange(request.symbol, market_data)
+        ranked_exchanges = self._rank_exchanges(
+            symbol=request.symbol,
+            market_data=market_data,
+            prefer_maker=self.prefer_maker,
+        )
+        exchange = ranked_exchanges[0] if ranked_exchanges else "binance"
         
         # Determine order type
-        order_type = self._select_order_type(request, market_data)
+        order_type = self._select_order_type(request, market_data, exchange=exchange)
         
         # Split large orders
         split_orders = self._split_order(request, market_data)
@@ -85,7 +103,8 @@ class SmartOrderRouter:
             price=price,
             split_orders=split_orders,
             expected_cost=expected_cost,
-            expected_slippage=expected_slippage
+            expected_slippage=expected_slippage,
+            ranked_exchanges=ranked_exchanges,
         )
 
     def _iter_exchange_views(self, market_data: Dict) -> List[Tuple[str, Dict]]:
@@ -106,40 +125,50 @@ class SmartOrderRouter:
                 views.append((exchange, dict(payload)))
         return views
     
-    def _select_exchange(self, symbol: str, market_data: Dict) -> str:
-        """Select best exchange for symbol"""
-        best_exchange = None
-        best_score = -1
-        
+    def _venue_quality_score(self, venue: str) -> float:
+        stats = self.venue_quality.get(str(venue), {})
+        realized_vs_expected = float(stats.get("slippage_ratio", 1.0))
+        fill_ratio = float(stats.get("fill_ratio", 1.0))
+        latency_ms = float(stats.get("latency_ms", 0.0))
+        # Penalize venues with worse slippage, lower fills, higher latency.
+        return (
+            (1.0 / max(realized_vs_expected, 0.25)) * 0.5
+            + max(min(fill_ratio, 1.0), 0.0) * 0.3
+            + (1.0 / (1.0 + max(latency_ms, 0.0) / 500.0)) * 0.2
+        )
+
+    def _rank_exchanges(self, symbol: str, market_data: Dict, prefer_maker: bool) -> List[str]:
+        scored: List[Tuple[str, float]] = []
         for exchange, data in self._iter_exchange_views(market_data):
             if symbol not in data:
                 continue
-            
+
             symbol_data = data[symbol]
-            
-            # Score based on:
-            # 1. Liquidity (bid/ask spread)
-            spread = symbol_data.get('spread', 0.01)
+            spread = float(symbol_data.get('spread', 0.01) or 0.01)
             spread_score = 1 / (1 + spread * 100)
-            
-            # 2. Volume
-            volume = symbol_data.get('volume_24h', 0)
-            volume_score = min(volume / 1000000, 1.0)  # Normalize to 1M
-            
-            # 3. Fees
-            maker_fee = self.exchanges.get(exchange, {}).get('maker_fee', 0.001)
-            fee_score = 1 / (1 + maker_fee * 1000)
-            
-            # Combined score
-            score = spread_score * 0.4 + volume_score * 0.4 + fee_score * 0.2
-            
-            if score > best_score:
-                best_score = score
-                best_exchange = exchange
-        
-        return best_exchange or 'binance'
+            volume = float(symbol_data.get('volume_24h', 0) or 0)
+            volume_score = min(volume / 1_000_000, 1.0)
+            monthly_volume = float(
+                self.monthly_volume_by_venue.get(exchange, self.default_monthly_volume_usd)
+            )
+            fee_bps = self.fee_optimizer.effective_fee_bps(
+                exchange,
+                is_maker=bool(prefer_maker),
+                monthly_volume_usd=monthly_volume,
+            )
+            fee_score = 1 / (1 + max(fee_bps, -5.0) / 10.0)
+            quality_score = self._venue_quality_score(exchange)
+            score = spread_score * 0.30 + volume_score * 0.30 + fee_score * 0.20 + quality_score * 0.20
+            scored.append((exchange, score))
+
+        scored.sort(key=lambda item: item[1], reverse=True)
+        return [venue for venue, _ in scored]
+
+    def _select_exchange(self, symbol: str, market_data: Dict) -> str:
+        ranked = self._rank_exchanges(symbol=symbol, market_data=market_data, prefer_maker=self.prefer_maker)
+        return ranked[0] if ranked else 'binance'
     
-    def _select_order_type(self, request: OrderRequest, market_data: Dict) -> OrderType:
+    def _select_order_type(self, request: OrderRequest, market_data: Dict, exchange: str) -> OrderType:
         """Select optimal order type"""
         
         # Large orders: use TWAP
@@ -158,8 +187,16 @@ class SmartOrderRouter:
         # Urgent execution: market order
         if request.time_in_force == 'IOC':
             return OrderType.MARKET
-        
-        return OrderType.LIMIT
+
+        spread_bps = self._get_spread_for_venue(exchange, request.symbol, market_data) * 10000.0
+        monthly_volume = float(self.monthly_volume_by_venue.get(exchange, self.default_monthly_volume_usd))
+        style = self.fee_optimizer.recommend_order_style(
+            venue=exchange,
+            spread_bps=spread_bps,
+            urgency=request.time_in_force,
+            monthly_volume_usd=monthly_volume,
+        )
+        return OrderType.LIMIT if style == "maker" else OrderType.MARKET
     
     def _split_order(self, request: OrderRequest, market_data: Dict) -> List[OrderRequest]:
         """Split large orders for optimal execution"""
@@ -190,12 +227,17 @@ class SmartOrderRouter:
         """Estimate trading costs"""
         
         exchange_config = self.exchanges.get(exchange, {})
-        
-        if order_type == OrderType.LIMIT:
-            fee = exchange_config.get('maker_fee', 0.001)
+        monthly_volume = float(self.monthly_volume_by_venue.get(exchange, self.default_monthly_volume_usd))
+        use_maker = order_type in {OrderType.LIMIT, OrderType.TWAP, OrderType.ICEBERG, OrderType.VWAP}
+        fee_bps = self.fee_optimizer.effective_fee_bps(
+            exchange,
+            is_maker=use_maker,
+            monthly_volume_usd=monthly_volume,
+        )
+
+        if use_maker:
             slippage = 0.0001  # Minimal for maker
         else:
-            fee = exchange_config.get('taker_fee', 0.001)
             slippage = 0.001  # Higher for taker
         
         # Adjust for order size
@@ -203,7 +245,7 @@ class SmartOrderRouter:
         slippage *= (1 + size_factor)
         
         notional = request.quantity * (request.price or self._get_current_price(request.symbol, market_data))
-        expected_cost = notional * fee
+        expected_cost = notional * (fee_bps / 10000.0)
         expected_slippage = notional * slippage
         
         return expected_cost, expected_slippage
@@ -234,6 +276,42 @@ class SmartOrderRouter:
             if symbol in exchange_data:
                 return exchange_data[symbol].get('price')
         return None
+
+    def _get_spread_for_venue(self, venue: str, symbol: str, market_data: Dict) -> float:
+        payload = market_data.get(venue, {})
+        if isinstance(payload, Mapping):
+            quote = payload.get(symbol, {})
+            if isinstance(quote, Mapping):
+                return float(quote.get("spread", 0.0) or 0.0)
+        return 0.0
+
+    def record_execution_outcome(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        expected_slippage_bps: float,
+        realized_slippage_bps: float,
+        fill_ratio: float,
+        latency_ms: float,
+    ) -> None:
+        _ = symbol  # retained for future symbol-conditioned venue stats
+        venue_key = str(exchange)
+        stats = self.venue_quality.get(
+            venue_key,
+            {
+                "slippage_ratio": 1.0,
+                "fill_ratio": 1.0,
+                "latency_ms": 0.0,
+            },
+        )
+        alpha = 0.2
+        baseline = max(float(expected_slippage_bps), 1e-6)
+        ratio = float(realized_slippage_bps) / baseline
+        stats["slippage_ratio"] = (1 - alpha) * float(stats["slippage_ratio"]) + alpha * ratio
+        stats["fill_ratio"] = (1 - alpha) * float(stats["fill_ratio"]) + alpha * float(fill_ratio)
+        stats["latency_ms"] = (1 - alpha) * float(stats["latency_ms"]) + alpha * float(latency_ms)
+        self.venue_quality[venue_key] = stats
     
     async def execute_route(self, decision: RouteDecision) -> bool:
         """Execute the routing decision"""
