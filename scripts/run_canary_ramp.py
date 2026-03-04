@@ -50,6 +50,13 @@ def _latest(path: Path, pattern: str) -> Path:
     return rows[-1]
 
 
+def _latest_optional(path: Path, pattern: str) -> Path | None:
+    rows = sorted(path.glob(pattern))
+    if not rows:
+        return None
+    return rows[-1]
+
+
 def _parse_dt(value: str) -> datetime:
     token = str(value).replace("Z", "+00:00")
     dt = datetime.fromisoformat(token)
@@ -72,12 +79,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--reports-dir", default="data/reports")
     parser.add_argument("--campaign-snapshot", default="")
     parser.add_argument("--slo-health", default="")
+    parser.add_argument("--execution-drift", default="")
     parser.add_argument("--state-path", default="data/analytics/canary_ramp_state.json")
     parser.add_argument("--out-dir", default="data/reports")
     parser.add_argument("--steps", default="0.01,0.02,0.05,0.10")
     parser.add_argument("--min-days-per-step", type=int, default=14)
     parser.add_argument("--max-reject-rate", type=float, default=0.05)
     parser.add_argument("--max-slippage-mape-pct", type=float, default=25.0)
+    parser.add_argument("--max-tca-drift-mape-pct", type=float, default=35.0)
     parser.add_argument("--max-critical-alerts", type=int, default=0)
     parser.add_argument("--max-reconciliation-incidents", type=int, default=0)
     return parser
@@ -106,15 +115,22 @@ def main() -> int:
     slo_path = (
         Path(args.slo_health) if args.slo_health else _latest(reports_dir, "slo_health_*.json")
     )
+    drift_path = (
+        Path(args.execution_drift)
+        if args.execution_drift
+        else _latest_optional(reports_dir, "execution_drift_*.json")
+    )
 
     campaign = _load_json(campaign_path)
     slo = _load_json(slo_path)
+    drift = _load_json(drift_path) if drift_path is not None else {"summary": {"healthy": False}}
 
     policy = CanaryRampPolicy(
         steps=scale_canary_steps_for_profile(_parse_steps(args.steps), profile=risk_profile),
         min_days_per_step=int(args.min_days_per_step),
         max_reject_rate=float(args.max_reject_rate),
         max_slippage_mape_pct=float(args.max_slippage_mape_pct),
+        max_tca_drift_mape_pct=float(args.max_tca_drift_mape_pct),
         max_critical_alerts=int(args.max_critical_alerts),
         max_reconciliation_incidents=int(args.max_reconciliation_incidents),
     )
@@ -138,14 +154,23 @@ def main() -> int:
     slo_metrics = (
         slo_health.get("metrics", {}) if isinstance(slo_health.get("metrics"), dict) else {}
     )
+    slo_summary = (
+        slo_health.get("summary", {}) if isinstance(slo_health.get("summary"), dict) else {}
+    )
     reconciliation_incidents = int(slo_metrics.get("reconciliation_incidents", 0))
+    drift_summary = drift.get("summary", {}) if isinstance(drift.get("summary"), dict) else {}
+    tca_drift_mape_pct = float(drift_summary.get("mape_p95_pct", 0.0))
+    tca_drift_healthy = bool(drift_summary.get("healthy", False))
+    slo_healthy = bool(slo_summary.get("healthy", False))
 
     metrics = CanaryRampMetrics(
         days_in_step=days_in_step,
         reject_rate=float(stats.get("reject_rate", 0.0)),
         slippage_mape_pct=float(readiness.get("slippage_mape_pct", 0.0)),
+        tca_drift_mape_pct=tca_drift_mape_pct,
         critical_alerts=int(ops_summary.get("critical", 0)),
         reconciliation_incidents=reconciliation_incidents,
+        slo_healthy=bool(slo_healthy and tca_drift_healthy),
         kill_switch_triggered=bool(stats.get("kill_switch_active", False)),
     )
     decision = controller.evaluate_and_persist(metrics=metrics)
@@ -155,6 +180,8 @@ def main() -> int:
         "risk_profile": risk_profile_payload(risk_profile),
         "campaign_snapshot": str(campaign_path),
         "slo_health": str(slo_path),
+        "execution_drift": str(drift_path) if drift_path is not None else "",
+        "drift_summary": drift_summary,
         "decision": decision,
     }
 

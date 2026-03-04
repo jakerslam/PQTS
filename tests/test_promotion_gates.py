@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from analytics.promotion_gates import PromotionGateThresholds, evaluate_promotion_gate
 
 
@@ -14,6 +19,14 @@ def test_promotion_gate_promotes_when_all_conditions_pass():
         },
         campaign_stats={"reject_rate": 0.05},
         ops_summary={"critical": 0},
+        research_validation={
+            "purged_cv_sharpe": 1.2,
+            "walk_forward_sharpe": 1.1,
+            "deflated_sharpe": 0.9,
+            "purged_cv_passed": True,
+            "walk_forward_passed": True,
+            "deflated_sharpe_passed": True,
+        },
         thresholds=PromotionGateThresholds(
             min_days=30,
             max_days=90,
@@ -35,6 +48,14 @@ def test_promotion_gate_rejects_after_window_if_not_ready():
         },
         campaign_stats={"reject_rate": 0.02},
         ops_summary={"critical": 0},
+        research_validation={
+            "purged_cv_sharpe": 2.0,
+            "walk_forward_sharpe": 1.8,
+            "deflated_sharpe": 1.2,
+            "purged_cv_passed": True,
+            "walk_forward_passed": True,
+            "deflated_sharpe_passed": True,
+        },
         thresholds=PromotionGateThresholds(),
     )
     assert result["decision"] == "reject_or_research"
@@ -50,6 +71,14 @@ def test_promotion_gate_stays_in_paper_on_critical_alerts():
         },
         campaign_stats={"reject_rate": 0.10},
         ops_summary={"critical": 1},
+        research_validation={
+            "purged_cv_sharpe": 1.5,
+            "walk_forward_sharpe": 1.2,
+            "deflated_sharpe": 0.9,
+            "purged_cv_passed": True,
+            "walk_forward_passed": True,
+            "deflated_sharpe_passed": True,
+        },
         thresholds=PromotionGateThresholds(max_critical_alerts=0),
     )
     assert result["decision"] == "remain_in_paper"
@@ -66,6 +95,14 @@ def test_promotion_gate_blocks_negative_net_pnl_after_costs():
         },
         campaign_stats={"reject_rate": 0.03},
         ops_summary={"critical": 0},
+        research_validation={
+            "purged_cv_sharpe": 1.5,
+            "walk_forward_sharpe": 1.2,
+            "deflated_sharpe": 0.9,
+            "purged_cv_passed": True,
+            "walk_forward_passed": True,
+            "deflated_sharpe_passed": True,
+        },
         revenue_summary={"estimated_realized_pnl_usd": -50.0},
         thresholds=PromotionGateThresholds(
             min_net_pnl_after_costs_usd=0.0,
@@ -86,6 +123,14 @@ def test_promotion_gate_blocks_excess_slippage_mape():
         },
         campaign_stats={"reject_rate": 0.03},
         ops_summary={"critical": 0},
+        research_validation={
+            "purged_cv_sharpe": 1.5,
+            "walk_forward_sharpe": 1.2,
+            "deflated_sharpe": 0.9,
+            "purged_cv_passed": True,
+            "walk_forward_passed": True,
+            "deflated_sharpe_passed": True,
+        },
         revenue_summary={"estimated_realized_pnl_usd": 500.0},
         thresholds=PromotionGateThresholds(
             min_net_pnl_after_costs_usd=0.0,
@@ -94,3 +139,27 @@ def test_promotion_gate_blocks_excess_slippage_mape():
     )
     assert result["decision"] == "remain_in_paper"
     assert result["checks"]["slippage_mape_pct"] is False
+
+
+def test_promotion_gate_blocks_when_deflated_sharpe_fails():
+    result = evaluate_promotion_gate(
+        readiness={
+            "trading_days": 45,
+            "fills": 500,
+            "ready_for_canary": True,
+            "slippage_mape_pct": 10.0,
+        },
+        campaign_stats={"reject_rate": 0.02},
+        ops_summary={"critical": 0},
+        research_validation={
+            "purged_cv_sharpe": 1.5,
+            "walk_forward_sharpe": 1.2,
+            "deflated_sharpe": 0.4,
+            "purged_cv_passed": True,
+            "walk_forward_passed": True,
+            "deflated_sharpe_passed": False,
+        },
+        revenue_summary={"estimated_realized_pnl_usd": 250.0},
+    )
+    assert result["decision"] == "remain_in_paper"
+    assert result["checks"]["deflated_sharpe_passed"] is False

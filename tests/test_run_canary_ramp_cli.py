@@ -38,5 +38,6 @@ def test_load_json_reads_object(tmp_path):
 
 def test_parser_accepts_risk_profile_flag():
     parser = MODULE.build_parser()
-    args = parser.parse_args(["--risk-profile", "aggressive"])
+    args = parser.parse_args(["--risk-profile", "aggressive", "--max-tca-drift-mape-pct", "22.5"])
     assert args.risk_profile == "aggressive"
+    assert args.max_tca_drift_mape_pct == 22.5

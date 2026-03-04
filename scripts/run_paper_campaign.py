@@ -111,6 +111,7 @@ def _build_broker_config(config: Dict[str, Any], *, risk_cfg: Dict[str, Any]) ->
             30.0,
         ),
         "allocation_controls": execution_cfg.get("allocation_controls", {}),
+        "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
     }
 
 
@@ -132,6 +133,16 @@ def _write_snapshot(out_dir: Path, payload: Dict[str, Any]) -> Path:
     path = out_dir / f"paper_campaign_snapshot_{stamp}.json"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     return path
+
+
+def _load_research_validation(path: str) -> Dict[str, Any]:
+    token = str(path or "").strip()
+    if not token:
+        return {}
+    payload = json.loads(Path(token).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected object JSON at --research-validation: {path}")
+    return payload
 
 
 def _current_eta_map(router: RiskAwareRouter) -> Dict[tuple[str, str], float]:
@@ -187,6 +198,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--promotion-max-days", type=int, default=90)
     parser.add_argument("--promotion-min-net-pnl-usd", type=float, default=0.0)
     parser.add_argument("--promotion-max-kill-switch-triggers", type=int, default=0)
+    parser.add_argument("--research-validation", default="")
+    parser.add_argument("--promotion-min-purged-cv-sharpe", type=float, default=1.0)
+    parser.add_argument("--promotion-min-walk-forward-sharpe", type=float, default=1.0)
+    parser.add_argument("--promotion-min-deflated-sharpe", type=float, default=0.8)
     return parser
 
 
@@ -231,6 +246,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
 
     symbol_list = _parse_csv(args.symbols) if args.symbols else _default_symbols(config)
     cycle_symbols = iter_cycle_symbols(symbol_list)
+    research_validation = _load_research_validation(args.research_validation)
 
     positions: Dict[str, float] = {}
     prices: Dict[str, float] = {}
@@ -347,6 +363,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         "reject_rate": stats.reject_rate,
                     },
                     ops_summary=ops_health.get("summary", {}),
+                    research_validation=research_validation,
                     revenue_summary=(revenue_payload or {}).get("summary", {}),
                     thresholds=PromotionGateThresholds(
                         min_days=int(args.promotion_min_days),
@@ -357,6 +374,9 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         min_net_pnl_after_costs_usd=float(args.promotion_min_net_pnl_usd),
                         max_slippage_mape_pct=float(args.max_mape_pct),
                         max_kill_switch_triggers=int(args.promotion_max_kill_switch_triggers),
+                        min_purged_cv_sharpe=float(args.promotion_min_purged_cv_sharpe),
+                        min_walk_forward_sharpe=float(args.promotion_min_walk_forward_sharpe),
+                        min_deflated_sharpe=float(args.promotion_min_deflated_sharpe),
                     ),
                 )
                 last_snapshot = {
@@ -381,6 +401,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                     "ops_health": ops_health,
                     "promotion_gate": promotion_gate,
                     "revenue": revenue_payload,
+                    "research_validation": research_validation,
                 }
                 path = _write_snapshot(out_dir, last_snapshot)
                 print(

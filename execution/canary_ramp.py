@@ -15,8 +15,10 @@ class CanaryRampPolicy:
     min_days_per_step: int = 14
     max_reject_rate: float = 0.05
     max_slippage_mape_pct: float = 25.0
+    max_tca_drift_mape_pct: float = 35.0
     max_critical_alerts: int = 0
     max_reconciliation_incidents: int = 0
+    require_slo_healthy: bool = True
 
     @staticmethod
     def default() -> "CanaryRampPolicy":
@@ -37,8 +39,10 @@ class CanaryRampMetrics:
     days_in_step: int
     reject_rate: float
     slippage_mape_pct: float
+    tca_drift_mape_pct: float
     critical_alerts: int
     reconciliation_incidents: int
+    slo_healthy: bool
     kill_switch_triggered: bool
 
 
@@ -92,10 +96,13 @@ class CanaryRampController:
             "reject_rate": float(metrics.reject_rate) <= float(policy.max_reject_rate),
             "slippage_mape_pct": float(metrics.slippage_mape_pct)
             <= float(policy.max_slippage_mape_pct),
+            "tca_drift_mape_pct": float(metrics.tca_drift_mape_pct)
+            <= float(policy.max_tca_drift_mape_pct),
             "critical_alerts": int(metrics.critical_alerts) <= int(policy.max_critical_alerts),
             "reconciliation_incidents": int(metrics.reconciliation_incidents)
             <= int(policy.max_reconciliation_incidents),
             "kill_switch": not bool(metrics.kill_switch_triggered),
+            "slo_healthy": bool(metrics.slo_healthy) if bool(policy.require_slo_healthy) else True,
         }
 
         action = "hold"
@@ -107,7 +114,9 @@ class CanaryRampController:
         moderate_breach = (
             (not checks["reject_rate"])
             or (not checks["slippage_mape_pct"])
+            or (not checks["tca_drift_mape_pct"])
             or (not checks["reconciliation_incidents"])
+            or (not checks["slo_healthy"])
         )
 
         if severe_breach:
