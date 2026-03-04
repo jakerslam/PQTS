@@ -43,6 +43,7 @@ def _args() -> Namespace:
         skip_campaign=False,
         require_ready=False,
         require_no_critical_alerts=False,
+        switches=["capacity_curves=off"],
     )
 
 
@@ -60,6 +61,7 @@ def test_build_campaign_cmd_contains_expected_flags():
     assert "--notional-usd 150.0" in joined
     assert "--paper-stress-multiplier 3.0" in joined
     assert "--risk-profile balanced" in joined
+    assert "--switch capacity_curves=off" in joined
 
 
 def test_build_readiness_cmd_contains_expected_flags():

@@ -56,6 +56,7 @@ def test_run_suite_emits_report_leaderboard_and_telemetry(tmp_path):
     )
 
     assert payload["scenario_count"] == 1
+    assert isinstance(payload.get("mechanism_switches"), dict)
     assert Path(payload["report_path"]).exists()
     assert Path(payload["leaderboard_path"]).exists()
 

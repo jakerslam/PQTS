@@ -4,6 +4,37 @@
 version: "1.0"
 purpose: "Automated quantitative research team for continuous strategy discovery"
 
+# Runtime knobs consumed directly by `research/ai_agent.py`
+db_path: data/research.db
+search_budget: 80
+top_performers: 10
+min_sharpe: 0.8
+max_drawdown: 0.20
+min_profit_factor: 1.1
+min_deflated_sharpe: 0.6
+max_pbo: 0.8
+min_walk_forward_consistency: 0.4
+
+capacity:
+  deployable_capital: 100000.0
+  max_annual_turnover_notional: 10000000.0
+
+costs:
+  commission_bps: 2.0
+  slippage_bps: 3.0
+  borrow_funding_bps: 1.0
+
+objective:
+  max_sharpe: 1.5
+  max_annual_vol: 0.25
+  annual_turnover: 6.0
+  cost_per_turnover: 0.0045
+
+analytics:
+  report_dir: data/research_reports
+  report_schema_version: "1.0.0"
+  artifact_registry_dir: data/research_artifacts
+
 objectives:
   primary:
     - maximize_risk_adjusted_returns

@@ -33,6 +33,8 @@ def test_parser_accepts_expected_flags():
             "1",
             "--risk-profile",
             "conservative",
+            "--switch",
+            "market_data_resilience=off",
         ]
     )
 
@@ -41,3 +43,4 @@ def test_parser_accepts_expected_flags():
     assert args.cycles_per_scenario == 40
     assert args.symbols_per_market == 1
     assert args.risk_profile == "conservative"
+    assert args.switches == ["market_data_resilience=off"]

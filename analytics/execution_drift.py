@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-from execution.tca_feedback import TCADatabase
+from execution.tca_feedback import SLIPPAGE_MAPE_DENOM_FLOOR_BPS, TCADatabase, slippage_mape_pct
 
 
 @dataclass(frozen=True)
@@ -42,11 +42,14 @@ def _summarize_group(
 
     p = predicted.to_numpy(dtype=float)
     r = realized.to_numpy(dtype=float)
-    denom = np.maximum(np.abs(r), 1e-6)
-    mape_pct = float(np.mean(np.abs(p - r) / denom) * 100.0)
+    mape_pct = slippage_mape_pct(
+        predicted_slippage_bps=p,
+        realized_slippage_bps=r,
+        denom_floor_bps=float(SLIPPAGE_MAPE_DENOM_FLOOR_BPS),
+    )
     predicted_avg = float(np.mean(p))
     realized_avg = float(np.mean(r))
-    ratio = float(realized_avg / max(predicted_avg, 1e-6))
+    ratio = float(realized_avg / max(abs(predicted_avg), float(SLIPPAGE_MAPE_DENOM_FLOOR_BPS)))
 
     alerts: List[str] = []
     if len(frame) < int(thresholds.min_samples):

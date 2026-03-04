@@ -74,6 +74,8 @@ def _build_campaign_cmd(args: argparse.Namespace) -> List[str]:
     risk_profile = str(getattr(args, "risk_profile", "") or "").strip()
     if risk_profile:
         cmd.extend(["--risk-profile", risk_profile])
+    for switch in list(getattr(args, "switches", []) or []):
+        cmd.extend(["--switch", str(switch)])
     if args.campaign_symbols:
         cmd.extend(["--symbols", args.campaign_symbols])
     return cmd
@@ -120,10 +122,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--campaign-sleep-seconds", type=float, default=60.0)
     parser.add_argument("--campaign-notional-usd", type=float, default=150.0)
     parser.add_argument("--campaign-readiness-every", type=int, default=60)
-    parser.add_argument("--paper-base-slippage-bps", type=float, default=8.0)
-    parser.add_argument("--paper-min-slippage-bps", type=float, default=1.0)
-    parser.add_argument("--paper-stress-multiplier", type=float, default=3.0)
-    parser.add_argument("--paper-stress-fill-ratio-multiplier", type=float, default=0.70)
+    parser.add_argument("--paper-base-slippage-bps", type=float, default=3.0)
+    parser.add_argument("--paper-min-slippage-bps", type=float, default=0.5)
+    parser.add_argument("--paper-stress-multiplier", type=float, default=1.25)
+    parser.add_argument("--paper-stress-fill-ratio-multiplier", type=float, default=0.90)
     parser.add_argument("--tca-db", default="data/tca_records.csv")
     parser.add_argument("--lookback-days", type=int, default=60)
     parser.add_argument("--min-days", type=int, default=30)
@@ -138,6 +140,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-campaign", action="store_true")
     parser.add_argument("--require-ready", action="store_true")
     parser.add_argument("--require-no-critical-alerts", action="store_true")
+    parser.add_argument(
+        "--switch",
+        dest="switches",
+        action="append",
+        default=[],
+        help="Mechanism switch override, e.g. --switch tca_calibration_feedback=off",
+    )
     return parser
 
 

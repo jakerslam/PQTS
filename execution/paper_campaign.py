@@ -87,6 +87,57 @@ def build_probe_order(
     )
 
 
+def select_probe_side(
+    *,
+    current_qty: float,
+    cycle: int,
+    allow_short: bool = False,
+) -> str:
+    qty = float(current_qty)
+    if qty > 1e-12:
+        return "sell"
+    if qty < -1e-12:
+        return "buy"
+    if bool(allow_short):
+        return "buy" if int(cycle) % 2 == 0 else "sell"
+    return "buy"
+
+
+def bounded_probe_notional(
+    *,
+    side: str,
+    requested_notional_usd: float,
+    current_qty: float,
+    price: float,
+    capital: float,
+    max_single_position_pct: float,
+    allow_short: bool = False,
+) -> float:
+    requested = float(max(requested_notional_usd, 0.0))
+    if requested <= 0.0:
+        return 0.0
+
+    qty = float(current_qty)
+    px = max(float(price), 1e-9)
+    cap_usd = max(float(capital), 0.0) * max(float(max_single_position_pct), 0.0)
+
+    side_token = str(side).lower()
+    if side_token == "buy":
+        long_notional = max(qty, 0.0) * px
+        headroom = max(cap_usd - long_notional, 0.0)
+        return float(min(requested, headroom))
+
+    if side_token == "sell":
+        if bool(allow_short):
+            short_notional = max(-qty, 0.0) * px
+            headroom = max(cap_usd - short_notional, 0.0)
+            return float(min(requested, headroom))
+        inventory_notional = max(qty, 0.0) * px
+        return float(min(requested, inventory_notional))
+
+    return 0.0
+
+
 def iter_cycle_symbols(symbols: Iterable[str]) -> list[str]:
     ordered = [str(s).strip() for s in symbols if str(s).strip()]
     if not ordered:

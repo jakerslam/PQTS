@@ -9,7 +9,7 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 
-from execution.tca_feedback import TCADatabase
+from execution.tca_feedback import TCADatabase, slippage_mape_pct
 
 
 @dataclass(frozen=True)
@@ -109,12 +109,9 @@ class PaperTrackRecordEvaluator:
         realized = pd.to_numeric(frame["realized_slippage_bps"], errors="coerce").fillna(0.0)
         predicted = pd.to_numeric(frame["predicted_slippage_bps"], errors="coerce").fillna(0.0)
 
-        denom = np.maximum(np.abs(realized.to_numpy(dtype=float)), 1e-6)
-        mape = float(
-            np.mean(
-                np.abs(predicted.to_numpy(dtype=float) - realized.to_numpy(dtype=float)) / denom
-            )
-            * 100.0
+        mape = slippage_mape_pct(
+            predicted_slippage_bps=predicted.to_numpy(dtype=float),
+            realized_slippage_bps=realized.to_numpy(dtype=float),
         )
 
         trading_days = int(frame["trade_day"].nunique())

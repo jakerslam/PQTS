@@ -42,7 +42,9 @@ def _record(
     )
 
 
-def _seed_db(db: TCADatabase, *, days: int, fills_per_day: int, predicted: float, realized: float) -> None:
+def _seed_db(
+    db: TCADatabase, *, days: int, fills_per_day: int, predicted: float, realized: float
+) -> None:
     now = datetime.now(timezone.utc)
     for d in range(days):
         for i in range(fills_per_day):
@@ -133,3 +135,18 @@ def test_router_exposes_paper_readiness_assessment(tmp_path):
     assert assessment["passed_track_record"] is True
     assert assessment["passed_slippage"] is True
     assert assessment["ready_for_canary"] is True
+
+
+def test_paper_readiness_uses_robust_slippage_mape_floor(tmp_path):
+    db = TCADatabase(str(tmp_path / "tca.csv"))
+    _seed_db(db, days=35, fills_per_day=10, predicted=3.0, realized=0.0)
+
+    result = PaperTrackRecordEvaluator(db).evaluate(
+        lookback_days=60,
+        min_days_required=30,
+        min_fills_required=200,
+        max_p95_slippage_bps=20.0,
+        max_mape_pct=500.0,
+    )
+
+    assert result.slippage_mape_pct == 300.0

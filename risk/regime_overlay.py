@@ -18,6 +18,7 @@ class RegimeExposureOverlay:
 
     def __init__(self, config: Dict | None = None):
         cfg = config or {}
+        self.enabled = bool(cfg.get("enabled", True))
         self.high_spread = float(cfg.get("high_spread", 0.0015))
         self.extreme_spread = float(cfg.get("extreme_spread", 0.004))
         self.low_volume = float(cfg.get("low_volume_24h", 300000.0))
@@ -27,6 +28,9 @@ class RegimeExposureOverlay:
         self.crisis_multiplier = float(cfg.get("crisis_multiplier", 0.25))
 
     def classify(self, symbol: str, market_data: Dict) -> RegimeDecision:
+        if not bool(self.enabled):
+            return RegimeDecision("disabled", 1.0, "regime_overlay_disabled")
+
         spread = 0.0
         volume_24h = float(market_data.get("vol_24h", 0.0) or 0.0)
 

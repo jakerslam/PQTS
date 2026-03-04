@@ -173,6 +173,12 @@ risk:
 # EXECUTION CONTROLS
 # ============================================
 execution:
+  reliability:
+    enable_failover: true
+  tca_calibration:
+    enabled: true
+  paper_fill_model:
+    reality_stress_mode: true
   market_data_resilience:
     enabled: true
     stale_after_seconds: 5.0
@@ -180,6 +186,16 @@ execution:
     backup_venues_by_venue:
       binance: ['coinbase']
       coinbase: ['binance']
+
+mechanism_switches:
+  routing_failover: true
+  capacity_curves: false
+  allocation_controls: false
+  regime_overlay: true
+  shorting_controls: false
+  market_data_resilience: true
+  tca_calibration_feedback: true
+  slippage_stress_model: true
 
 # ============================================
 # RISK MANAGEMENT

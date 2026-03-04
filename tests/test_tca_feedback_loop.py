@@ -13,7 +13,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from execution.risk_aware_router import RiskAwareRouter
 from execution.smart_router import OrderRequest, OrderType
-from execution.tca_feedback import TCACalibrator, TCADatabase, TCATradeRecord, weekly_calibrate_eta
+from execution.tca_feedback import (
+    MIN_CALIBRATED_ETA,
+    TCACalibrator,
+    TCADatabase,
+    TCATradeRecord,
+    slippage_mape_pct,
+    weekly_calibrate_eta,
+)
 from risk.kill_switches import RiskLimits
 
 
@@ -136,6 +143,34 @@ def test_weekly_calibration_updates_eta_by_symbol_venue(tmp_path):
     assert updated[("BTC-USD", "binance")] > 0.3
     assert analyses[0]["symbol"] == "BTC-USD"
     assert analyses[0]["exchange"] == "binance"
+
+
+def test_slippage_mape_uses_bps_floor_for_near_zero_realized():
+    mape = slippage_mape_pct(
+        predicted_slippage_bps=[1.0, 2.0],
+        realized_slippage_bps=[0.0, 0.0],
+    )
+    assert mape == 150.0
+
+
+def test_eta_calibration_can_move_below_legacy_floor(tmp_path):
+    db = TCADatabase(str(tmp_path / "tca.csv"))
+    for idx in range(8):
+        db.add_record(
+            _record(
+                trade_id=f"lo_{idx}",
+                symbol="BTC-USD",
+                exchange="binance",
+                predicted_slippage_bps=10.0,
+                realized_slippage_bps=0.1,
+            )
+        )
+
+    calibrator = TCACalibrator(db, min_samples=5, alert_threshold_pct=500.0)
+    new_eta, _analysis = calibrator.calibrate_eta("BTC-USD", "binance", current_eta=0.1)
+
+    assert new_eta < 0.05
+    assert new_eta >= MIN_CALIBRATED_ETA
 
 
 def test_router_records_predicted_vs_realized_slippage(tmp_path):

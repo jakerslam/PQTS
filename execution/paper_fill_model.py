@@ -124,7 +124,12 @@ class MicrostructurePaperFillProvider:
         )
         queue_notional = queue_qty * float(reference_price)
         order_notional = max(float(requested_qty) * float(reference_price), 1e-9)
-        queue_turnover = queue_notional / order_notional
+        # Queue pressure should scale with how much of the visible queue we try to consume.
+        # Small orders should not be penalized more than large ones.
+        if queue_notional <= 0.0:
+            queue_turnover = 0.0
+        else:
+            queue_turnover = order_notional / queue_notional
         queue_penalty = max(
             float(self.config.queue_penalty_floor),
             1.0 / (1.0 + max(queue_turnover, 0.0)),

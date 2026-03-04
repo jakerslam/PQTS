@@ -242,7 +242,15 @@ class RiskAwareRouter:
         self.smart_router = SmartOrderRouter(broker_config)
 
         # Cost model (Step 3)
-        self.cost_model = RealisticCostModel()
+        configured_commission_rate = broker_config.get("commission_rate")
+        if configured_commission_rate is None:
+            maker_fee_bps = float(broker_config.get("default_maker_fee_bps", 10.0))
+            configured_commission_rate = max(maker_fee_bps, 0.0) / 10000.0
+        self.cost_model = RealisticCostModel(
+            commission_rate=float(configured_commission_rate),
+            base_volatility=float(broker_config.get("base_volatility", 0.50)),
+            impact_constant=float(broker_config.get("impact_constant", 0.5)),
+        )
 
         # Broker adapter (Step 4 - would be real exchange adapter)
         self.broker_config = broker_config
@@ -267,6 +275,9 @@ class RiskAwareRouter:
             failure_slo=float(reliability_cfg.get("failure_slo", 0.01)),
             cooldown_seconds=int(reliability_cfg.get("cooldown_seconds", 300)),
         )
+        self.failover_enabled = bool(reliability_cfg.get("enable_failover", True))
+        tca_calibration_cfg = broker_config.get("tca_calibration", {}) or {}
+        self.tca_calibration_enabled = bool(tca_calibration_cfg.get("enabled", True))
         capacity_cfg = broker_config.get("capacity_curves", {})
         self.capacity_model = StrategyCapacityCurveModel(
             enabled=bool(capacity_cfg.get("enabled", False)),
@@ -1098,9 +1109,13 @@ class RiskAwareRouter:
 
         route = await self.smart_router.route_order(order, market_data)
         ranked_exchanges = list(route.ranked_exchanges or [route.exchange])
-        failover_target = self.reliability_monitor.choose_failover(
-            primary_venue=route.exchange,
-            candidates=ranked_exchanges,
+        failover_target = (
+            self.reliability_monitor.choose_failover(
+                primary_venue=route.exchange,
+                candidates=ranked_exchanges,
+            )
+            if bool(self.failover_enabled)
+            else None
         )
         if failover_target is not None and failover_target != route.exchange:
             previous_exchange = route.exchange
@@ -2185,6 +2200,9 @@ class RiskAwareRouter:
             "capital": self._capital,
             "audit_entries": len(self.audit_log),
             "reliability": self.reliability_monitor.summary(),
+            "routing_controls": {
+                "failover_enabled": bool(self.failover_enabled),
+            },
             "capacity_curves": {
                 "enabled": bool(self.capacity_model.enabled),
                 "storage_path": str(self.capacity_model.storage_path),
@@ -2217,6 +2235,16 @@ class RiskAwareRouter:
         lookback_days: int = 30,
     ) -> Tuple[Dict[Tuple[str, str], float], List[Dict]]:
         """Update eta parameters by symbol/venue from realized TCA outcomes."""
+        if not bool(self.tca_calibration_enabled):
+            frozen_eta = dict(eta_by_symbol_venue)
+            self.eta_by_symbol_venue = frozen_eta
+            return frozen_eta, [
+                {
+                    "status": "disabled",
+                    "reason": "tca_calibration_feedback_disabled",
+                }
+            ]
+
         updated, analyses = weekly_calibrate_eta(
             tca_db=self.tca_db,
             current_eta_by_market=eta_by_symbol_venue,

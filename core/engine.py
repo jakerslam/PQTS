@@ -16,6 +16,7 @@ from core.autopilot import HumanStrategyOverride, StrategyAutopilot
 from core.autopilot_policy import enforce_autopilot_policy, resolve_autopilot_policy_pack
 from core.config_validation import validate_engine_config
 from core.market_data_quality import DataQualityReport, MarketDataQualityMonitor
+from core.mechanism_switches import apply_mechanism_switches
 from core.multi_tenant import enforce_tenant_entitlements, resolve_tenant_entitlements
 from core.operator_tier import resolve_operator_tier
 from core.secret_manager import SecretResolutionMetadata, hydrate_config_secrets
@@ -177,7 +178,8 @@ class TradingEngine:
         with open(path, "r", encoding="utf-8") as f:
             payload = yaml.safe_load(f) or {}
         hydrated, metadata = hydrate_config_secrets(payload)
-        return hydrated, metadata
+        switched, _state = apply_mechanism_switches(hydrated)
+        return switched, metadata
 
     def _validate_config(self) -> None:
         issues = validate_engine_config(self.config)
@@ -335,6 +337,7 @@ class TradingEngine:
             ),
             "allocation_controls": execution_cfg.get("allocation_controls", {}),
             "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
+            "tca_calibration": execution_cfg.get("tca_calibration", {}),
             "risk_profile": risk_profile_payload(_profile),
             "tenant_plan": self.tenant_entitlements.plan,
             "tenant_id": self.tenant_entitlements.tenant_id,

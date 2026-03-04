@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -20,6 +20,34 @@ except ImportError:  # pragma: no cover - environment dependent
 
 
 logger = logging.getLogger(__name__)
+
+SLIPPAGE_MAPE_DENOM_FLOOR_BPS = 1.0
+MIN_CALIBRATED_ETA = 0.005
+MAX_CALIBRATED_ETA = 3.0
+
+
+def slippage_mape_pct(
+    *,
+    predicted_slippage_bps: np.ndarray | pd.Series | List[float],
+    realized_slippage_bps: np.ndarray | pd.Series | List[float],
+    denom_floor_bps: float = SLIPPAGE_MAPE_DENOM_FLOOR_BPS,
+) -> float:
+    """
+    Compute robust slippage MAPE in percent.
+
+    Denominator is floored in bps space so near-zero realized slippage does not
+    inflate errors into unusable calibration alerts.
+    """
+    predicted = np.asarray(predicted_slippage_bps, dtype=float)
+    realized = np.asarray(realized_slippage_bps, dtype=float)
+    if predicted.size == 0 or realized.size == 0:
+        return 0.0
+
+    size = min(predicted.size, realized.size)
+    predicted = predicted[:size]
+    realized = realized[:size]
+    denom = np.maximum(np.abs(realized), max(float(denom_floor_bps), 1e-9))
+    return float(np.mean(np.abs(predicted - realized) / denom) * 100.0)
 
 
 @dataclass(frozen=True)
@@ -66,7 +94,7 @@ class TCATradeRecord:
         return float(self.expected_alpha_bps) - float(self.realized_total_bps)
 
 
-def _ensure_datetime(value) -> datetime:
+def _ensure_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
         return value
     return pd.to_datetime(value).to_pydatetime()
@@ -228,7 +256,7 @@ class TCACalibrator:
         self.min_samples = min_samples
         self.alert_threshold_pct = alert_threshold_pct
 
-    def analyze_symbol_venue(self, symbol: str, exchange: str, days: int = 30) -> Dict:
+    def analyze_symbol_venue(self, symbol: str, exchange: str, days: int = 30) -> Dict[str, Any]:
         frame = self.tca_db.get_by_symbol_venue(symbol, exchange, days=days)
         if len(frame) < self.min_samples:
             return {
@@ -240,11 +268,16 @@ class TCACalibrator:
                 "alerts": [],
             }
 
-        errors = frame["predicted_slippage_bps"] - frame["realized_slippage_bps"]
-        realized = frame["realized_slippage_bps"].replace(0, 1e-6)
-        mape = (errors.abs() / realized.abs()).mean() * 100.0
+        predicted = pd.to_numeric(frame["predicted_slippage_bps"], errors="coerce").fillna(0.0)
+        realized = pd.to_numeric(frame["realized_slippage_bps"], errors="coerce").fillna(0.0)
+        errors = predicted - realized
+        mape = slippage_mape_pct(
+            predicted_slippage_bps=predicted,
+            realized_slippage_bps=realized,
+        )
 
-        analysis = {
+        alerts: List[str] = []
+        analysis: Dict[str, Any] = {
             "symbol": symbol,
             "exchange": exchange,
             "status": "ok",
@@ -255,20 +288,18 @@ class TCACalibrator:
                 "mean_error": errors.mean(),
                 "mape": mape,
             },
-            "alerts": [],
+            "alerts": alerts,
         }
 
         if mape > self.alert_threshold_pct:
             analysis["status"] = "alert"
-            analysis["alerts"].append(
-                f"MAPE {mape:.2f}% exceeds threshold {self.alert_threshold_pct:.2f}%"
-            )
+            alerts.append(f"MAPE {mape:.2f}% exceeds threshold {self.alert_threshold_pct:.2f}%")
 
         return analysis
 
     def calibrate_eta(
         self, symbol: str, exchange: str, current_eta: float, days: int = 30
-    ) -> Tuple[float, Dict]:
+    ) -> Tuple[float, Dict[str, Any]]:
         frame = self.tca_db.get_by_symbol_venue(symbol, exchange, days=days)
         if len(frame) < self.min_samples:
             return current_eta, {
@@ -280,12 +311,14 @@ class TCACalibrator:
                 "eta_after": current_eta,
             }
 
-        predicted_avg = float(frame["predicted_slippage_bps"].mean())
-        realized_avg = float(frame["realized_slippage_bps"].mean())
+        predicted_avg = float(
+            pd.to_numeric(frame["predicted_slippage_bps"], errors="coerce").mean()
+        )
+        realized_avg = float(pd.to_numeric(frame["realized_slippage_bps"], errors="coerce").mean())
 
-        baseline = max(predicted_avg, 0.01)
-        ratio = realized_avg / baseline
-        new_eta = float(np.clip(current_eta * ratio, 0.05, 3.0))
+        baseline = max(abs(predicted_avg), float(SLIPPAGE_MAPE_DENOM_FLOOR_BPS))
+        ratio = max(realized_avg, 0.0) / baseline
+        new_eta = float(np.clip(current_eta * ratio, MIN_CALIBRATED_ETA, MAX_CALIBRATED_ETA))
 
         analysis = self.analyze_symbol_venue(symbol, exchange, days=days)
         analysis.update(
@@ -303,9 +336,9 @@ class TCACalibrator:
         self,
         current_eta_by_market: Dict[Tuple[str, str], float],
         days: int = 30,
-    ) -> Tuple[Dict[Tuple[str, str], float], List[Dict]]:
+    ) -> Tuple[Dict[Tuple[str, str], float], List[Dict[str, Any]]]:
         updated = current_eta_by_market.copy()
-        analyses: List[Dict] = []
+        analyses: List[Dict[str, Any]] = []
 
         for (symbol, exchange), eta in sorted(current_eta_by_market.items()):
             new_eta, analysis = self.calibrate_eta(symbol, exchange, eta, days=days)
@@ -321,7 +354,7 @@ def weekly_calibrate_eta(
     min_samples: int = 50,
     alert_threshold_pct: float = 20.0,
     days: int = 30,
-) -> Tuple[Dict[Tuple[str, str], float], List[Dict]]:
+) -> Tuple[Dict[Tuple[str, str], float], List[Dict[str, Any]]]:
     """Callable weekly calibration entrypoint for schedulers/jobs."""
 
     calibrator = TCACalibrator(

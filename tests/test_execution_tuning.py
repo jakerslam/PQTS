@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from core.engine import TradingEngine
 from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFillModelConfig
 from execution.risk_aware_router import RiskAwareRouter
-from execution.smart_router import OrderRequest, OrderType, SmartOrderRouter
+from execution.smart_router import OrderRequest, OrderType, RouteDecision, SmartOrderRouter
 from execution.tca_feedback import ExecutionFill
 from risk.kill_switches import RiskLimits
 
@@ -136,6 +136,47 @@ def test_paper_fill_provider_applies_queue_position_penalty():
     assert high_queue.executed_price > low_queue.executed_price
 
 
+def test_paper_fill_provider_small_order_faces_less_queue_slippage():
+    provider = MicrostructurePaperFillProvider(
+        config=PaperFillModelConfig(
+            partial_fill_notional_usd=1000.0,
+            min_partial_fill_ratio=0.10,
+            queue_penalty_floor=0.10,
+            queue_slippage_bps_per_turnover=0.50,
+            adverse_selection_bps=8.0,
+            min_slippage_bps=1.0,
+            reality_stress_mode=False,
+        )
+    )
+
+    small = asyncio.run(
+        provider.get_fill(
+            order_id="ord_small_vs_large",
+            symbol="BTC-USD",
+            venue="binance",
+            side="buy",
+            requested_qty=0.1,
+            reference_price=1000.0,
+            queue_ahead_qty=10.0,
+        )
+    )
+    large = asyncio.run(
+        provider.get_fill(
+            order_id="ord_small_vs_large",
+            symbol="BTC-USD",
+            venue="binance",
+            side="buy",
+            requested_qty=1.0,
+            reference_price=1000.0,
+            queue_ahead_qty=10.0,
+        )
+    )
+
+    small_slip_bps = ((small.executed_price / 1000.0) - 1.0) * 10000.0
+    large_slip_bps = ((large.executed_price / 1000.0) - 1.0) * 10000.0
+    assert small_slip_bps < large_slip_bps
+
+
 def test_router_rejects_order_when_fill_provider_returns_no_fill(tmp_path):
     fill_provider = MicrostructurePaperFillProvider(
         config=PaperFillModelConfig(hard_reject_notional_usd=100.0)
@@ -186,6 +227,22 @@ def test_router_rejects_order_when_fill_provider_returns_no_fill(tmp_path):
 
     assert result.success is False
     assert "NO_FILL" in (result.rejected_reason or "")
+
+
+def test_router_cost_model_uses_broker_maker_fee_bps(tmp_path):
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+        ),
+        broker_config={
+            "enabled": True,
+            "default_maker_fee_bps": 2.5,
+        },
+        tca_db_path=str(tmp_path / "maker_fee_cost_model.csv"),
+    )
+    assert router.cost_model.commission == pytest.approx(0.00025)
 
 
 def test_router_passes_queue_context_to_fill_provider(tmp_path):
@@ -320,6 +377,106 @@ def test_router_blocks_degraded_venue_when_no_failover(tmp_path):
 
     assert result.success is False
     assert "DEGRADED_VENUE_NO_FAILOVER" in (result.rejected_reason or "")
+
+
+def test_router_can_disable_failover_switch(tmp_path):
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+        ),
+        broker_config={
+            "enabled": True,
+            "reliability": {"enable_failover": False},
+        },
+        tca_db_path=str(tmp_path / "failover_disabled.csv"),
+    )
+    router.set_capital(100000.0, source="unit_test")
+
+    async def _forced_route(*_args, **_kwargs):
+        return RouteDecision(
+            exchange="binance",
+            order_type=OrderType.LIMIT,
+            price=50000.0,
+            split_orders=[],
+            expected_cost=1.0,
+            expected_slippage=1.0,
+            ranked_exchanges=["binance", "coinbase"],
+        )
+
+    router.smart_router.route_order = _forced_route  # type: ignore[assignment]
+
+    for _ in range(30):
+        router.reliability_monitor.record(
+            venue="binance",
+            latency_ms=1000.0,
+            rejected=True,
+            failed=True,
+        )
+        router.reliability_monitor.record(
+            venue="coinbase",
+            latency_ms=25.0,
+            rejected=False,
+            failed=False,
+        )
+
+    order = OrderRequest(
+        symbol="BTC-USD",
+        side="buy",
+        quantity=0.2,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+    )
+    market_data = {
+        "binance": {"BTC-USD": {"price": 50000.0, "spread": 0.0002, "volume_24h": 2_000_000}},
+        "coinbase": {"BTC-USD": {"price": 50001.0, "spread": 0.0003, "volume_24h": 2_000_000}},
+        "order_book": {
+            "bids": [(49990.0, 2.0), (49980.0, 4.0)],
+            "asks": [(50010.0, 1.5), (50020.0, 3.0)],
+        },
+    }
+    strategy_returns, portfolio_changes = _strategy_inputs()
+
+    result = asyncio.run(
+        router.submit_order(
+            order=order,
+            market_data=market_data,
+            portfolio=_portfolio_snapshot(),
+            strategy_returns=strategy_returns,
+            portfolio_changes=portfolio_changes,
+        )
+    )
+
+    assert result.success is False
+    assert "DEGRADED_VENUE_NO_FAILOVER" in (result.rejected_reason or "")
+
+
+def test_router_can_disable_tca_calibration_feedback(tmp_path):
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+        ),
+        broker_config={
+            "enabled": True,
+            "tca_calibration": {"enabled": False},
+        },
+        tca_db_path=str(tmp_path / "no_calibration.csv"),
+    )
+    router.set_capital(100000.0, source="unit_test")
+
+    updated, analyses = router.run_weekly_tca_calibration(
+        eta_by_symbol_venue={("BTC-USD", "binance"): 0.5},
+        min_samples=2,
+        alert_threshold_pct=10.0,
+        lookback_days=7,
+    )
+
+    assert updated == {("BTC-USD", "binance"): 0.5}
+    assert analyses[0]["status"] == "disabled"
+    assert analyses[0]["reason"] == "tca_calibration_feedback_disabled"
 
 
 def test_smart_router_tracks_monthly_volume_and_slippage_guard():

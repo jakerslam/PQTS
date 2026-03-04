@@ -101,3 +101,25 @@ def test_write_execution_drift_report_persists_json(tmp_path):
     parsed = json.loads(report.read_text(encoding="utf-8"))
     assert parsed["summary"]["pairs"] == 1
     assert parsed["pairs"][0]["symbol"] == "ETH-USD"
+
+
+def test_execution_drift_mape_uses_bps_denominator_floor(tmp_path):
+    db = TCADatabase(str(tmp_path / "tca.csv"))
+    for idx in range(40):
+        db.add_record(
+            _record(
+                idx=idx,
+                symbol="BTC-USD",
+                exchange="binance",
+                predicted=2.0,
+                realized=0.0,
+            )
+        )
+
+    payload = analyze_execution_drift(
+        tca_db=db,
+        lookback_days=30,
+        thresholds=DriftThresholds(min_samples=10, max_mape_pct=500.0),
+    )
+
+    assert payload["pairs"][0]["slippage_mape_pct"] == 200.0

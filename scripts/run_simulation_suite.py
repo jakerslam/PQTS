@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from core.mechanism_switches import parse_switch_overrides  # noqa: E402
 from execution.simulation_suite import SimulationSuiteRunner  # noqa: E402
 
 
@@ -54,14 +55,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--promotion-min-days", type=int, default=30)
     parser.add_argument("--promotion-max-days", type=int, default=90)
 
-    parser.add_argument("--paper-base-slippage-bps", type=float, default=8.0)
-    parser.add_argument("--paper-min-slippage-bps", type=float, default=1.0)
-    parser.add_argument("--paper-stress-multiplier", type=float, default=3.0)
-    parser.add_argument("--paper-stress-fill-ratio-multiplier", type=float, default=0.70)
+    parser.add_argument("--paper-base-slippage-bps", type=float, default=3.0)
+    parser.add_argument("--paper-min-slippage-bps", type=float, default=0.5)
+    parser.add_argument("--paper-stress-multiplier", type=float, default=1.25)
+    parser.add_argument("--paper-stress-fill-ratio-multiplier", type=float, default=0.90)
+    parser.add_argument(
+        "--switch",
+        dest="switches",
+        action="append",
+        default=[],
+        help="Mechanism switch override, e.g. --switch market_data_resilience=off",
+    )
     return parser
 
 
 async def _run(args: argparse.Namespace) -> dict:
+    switch_overrides = parse_switch_overrides(args.switches)
     runner = SimulationSuiteRunner(
         config_path=args.config,
         out_dir=args.out_dir,
@@ -82,6 +91,7 @@ async def _run(args: argparse.Namespace) -> dict:
         paper_stress_multiplier=args.paper_stress_multiplier,
         paper_stress_fill_ratio_multiplier=args.paper_stress_fill_ratio_multiplier,
         risk_profile=(args.risk_profile or None),
+        switch_overrides=switch_overrides,
     )
     payload = await runner.run_suite(
         markets=_parse_csv(args.markets),

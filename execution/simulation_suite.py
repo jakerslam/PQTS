@@ -16,6 +16,7 @@ import yaml
 from analytics.ops_health import OpsThresholds, evaluate_operational_health
 from analytics.promotion_gates import PromotionGateThresholds, evaluate_promotion_gate
 from analytics.simulation_telemetry import SimulationTelemetryStore
+from core.mechanism_switches import apply_mechanism_switches
 from execution.paper_campaign import (
     CampaignStats,
     build_portfolio_snapshot,
@@ -64,14 +65,19 @@ class SimulationSuiteRunner:
         max_calibration_alerts: int = 0,
         promotion_min_days: int = 30,
         promotion_max_days: int = 90,
-        paper_base_slippage_bps: float = 8.0,
-        paper_min_slippage_bps: float = 1.0,
-        paper_stress_multiplier: float = 3.0,
-        paper_stress_fill_ratio_multiplier: float = 0.70,
+        paper_base_slippage_bps: float = 3.0,
+        paper_min_slippage_bps: float = 0.5,
+        paper_stress_multiplier: float = 1.25,
+        paper_stress_fill_ratio_multiplier: float = 0.90,
         risk_profile: str | None = None,
+        switch_overrides: Dict[str, bool] | None = None,
     ):
         self.config_path = str(config_path)
-        self.config = self._load_yaml(self.config_path)
+        base_config = self._load_yaml(self.config_path)
+        self.config, self.mechanism_switches = apply_mechanism_switches(
+            base_config,
+            overrides=switch_overrides,
+        )
         self._risk_cfg, self._risk_profile = resolve_effective_risk_config(
             self.config,
             override_profile=risk_profile,
@@ -94,12 +100,15 @@ class SimulationSuiteRunner:
         self.promotion_min_days = int(promotion_min_days)
         self.promotion_max_days = int(promotion_max_days)
 
+        stress_enabled = bool(self.mechanism_switches.get("slippage_stress_model", True))
         self.paper_fill_config = PaperFillModelConfig(
             adverse_selection_bps=float(paper_base_slippage_bps),
             min_slippage_bps=float(paper_min_slippage_bps),
-            reality_stress_mode=True,
-            stress_slippage_multiplier=float(paper_stress_multiplier),
-            stress_fill_ratio_multiplier=float(paper_stress_fill_ratio_multiplier),
+            reality_stress_mode=bool(stress_enabled),
+            stress_slippage_multiplier=float(paper_stress_multiplier) if stress_enabled else 1.0,
+            stress_fill_ratio_multiplier=(
+                float(paper_stress_fill_ratio_multiplier) if stress_enabled else 1.0
+            ),
         )
 
     @staticmethod
@@ -169,11 +178,12 @@ class SimulationSuiteRunner:
             "default_monthly_volume_usd": execution_cfg.get("default_monthly_volume_usd", 0.0),
             "monthly_volume_by_venue": execution_cfg.get("monthly_volume_by_venue", {}),
             "fee_tiers": execution_cfg.get("fee_tiers", {}),
-            "default_maker_fee_bps": execution_cfg.get("default_maker_fee_bps", 10.0),
-            "default_taker_fee_bps": execution_cfg.get("default_taker_fee_bps", 12.0),
+            "default_maker_fee_bps": execution_cfg.get("default_maker_fee_bps", 2.0),
+            "default_taker_fee_bps": execution_cfg.get("default_taker_fee_bps", 4.0),
             "reliability": execution_cfg.get("reliability", {}),
             "regime_overlay": execution_cfg.get("regime_overlay", {}),
             "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
+            "tca_calibration": execution_cfg.get("tca_calibration", {}),
             "risk_profile": risk_profile_payload(self._risk_profile),
         }
 
@@ -300,6 +310,7 @@ class SimulationSuiteRunner:
             "config_path": self.config_path,
             "risk_profile": risk_profile_payload(self._risk_profile),
             "scenario_count": len(results),
+            "mechanism_switches": dict(self.mechanism_switches),
             "results": results,
             "leaderboard_path": str(leaderboard_path),
             "telemetry_log_path": str(self.telemetry.log_path),

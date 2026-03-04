@@ -1415,6 +1415,13 @@ class AIResearchAgent:
                 extras={
                     "fitness": float(row.get("fitness", 0.0)),
                     "r_analytics": row.get("r_analytics", {}),
+                    "net_expected_return": float(row.get("net_expected_return", 0.0)),
+                    "annual_return_estimate": float(
+                        row.get("metrics", {}).get("annual_return_estimate", 0.0)
+                    ),
+                    "turnover_annualized": float(
+                        row.get("metrics", {}).get("turnover_annualized", 0.0)
+                    ),
                 },
             )
             run_id = self.db.register_experiment_run(

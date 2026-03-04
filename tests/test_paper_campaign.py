@@ -10,9 +10,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from execution.paper_campaign import (
+    bounded_probe_notional,
     build_portfolio_snapshot,
     build_probe_order,
     iter_cycle_symbols,
+    select_probe_side,
     select_symbol_price,
 )
 from execution.smart_router import OrderType
@@ -62,3 +64,35 @@ def test_build_probe_order_uses_notional_and_order_type():
 def test_iter_cycle_symbols_rejects_empty():
     with pytest.raises(ValueError):
         iter_cycle_symbols([])
+
+
+def test_select_probe_side_prefers_flattening_existing_inventory():
+    assert select_probe_side(current_qty=1.25, cycle=3, allow_short=False) == "sell"
+    assert select_probe_side(current_qty=-0.75, cycle=2, allow_short=False) == "buy"
+    assert select_probe_side(current_qty=0.0, cycle=2, allow_short=False) == "buy"
+
+
+def test_bounded_probe_notional_respects_long_only_inventory_and_cap():
+    # Can only sell what we own in long-only mode.
+    sell_notional = bounded_probe_notional(
+        side="sell",
+        requested_notional_usd=200.0,
+        current_qty=0.002,
+        price=50000.0,
+        capital=10000.0,
+        max_single_position_pct=0.25,
+        allow_short=False,
+    )
+    assert sell_notional == pytest.approx(100.0)
+
+    # Buy sizing is capped by position headroom.
+    buy_notional = bounded_probe_notional(
+        side="buy",
+        requested_notional_usd=500.0,
+        current_qty=0.045,
+        price=50000.0,
+        capital=10000.0,
+        max_single_position_pct=0.25,
+        allow_short=False,
+    )
+    assert buy_notional == pytest.approx(250.0)
