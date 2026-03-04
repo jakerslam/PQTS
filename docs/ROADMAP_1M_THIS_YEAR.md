@@ -1,6 +1,6 @@
 # PQTS Roadmap to $1M This Calendar Year
 
-Last updated: 2026-03-03 (America/Denver)
+Last updated: 2026-03-04 (America/Denver)
 
 ## 1) Feasibility Math: What $1M Profit Implies
 
@@ -29,6 +29,7 @@ Where:
 - With capital below ~$3M, only the aggressive scenario reaches $1M and requires strong execution quality and low cost leakage.
 - With ~$4.5M, the realistic scenario is sufficient if realized Sharpe >= 1.25 and annual cost drag stays near 2.7%.
 - With ~$10M, even conservative assumptions can reach the target.
+- A "10x per month" objective implies >11,000,000% annualized return, which violates realistic Sharpe/vol/cost bounds and is blocked by objective constraints in the research agent.
 
 ## 2) Strategy Focus (Fit to Current Engine)
 
