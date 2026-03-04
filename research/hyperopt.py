@@ -5,15 +5,23 @@ Bayesian optimization for strategy parameters with
 overfitting penalty (Grok's recommendation).
 """
 
+import sys
+import os
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import optuna
 import numpy as np
 import pandas as pd
 from typing import Dict, Callable, Optional, Any
 import logging
-from pqts.backtesting.purged_cv import PurgedKFold, BacktestValidator
+try:
+    from backtesting.purged_cv import PurgedKFold, BacktestValidator
+except ImportError:
+    # Fallback if running from pqts directory
+    from pqts.backtesting.purged_cv import PurgedKFold, BacktestValidator
 
 logger = logging.getLogger(__name__)
-
 
 class StrategyOptimizer:
     """
