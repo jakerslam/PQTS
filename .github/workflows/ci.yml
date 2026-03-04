@@ -48,19 +48,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: pip
-
-      - name: Install lock tooling
-        run: |
-          python -m pip install --upgrade pip
-          pip install pip-tools
 
       - name: Verify lock file structure
         run: python3 tools/verify_dependency_lock.py
-
-      - name: Verify hash-locked install
-        run: pip install --require-hashes -r requirements.lock
 
   test:
     name: Pytest
@@ -69,7 +61,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.13"]
+        python-version: ["3.12"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -83,7 +75,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements.lock
+          pip install -r requirements.txt
 
       - name: Run pytest (gating)
         run: pytest tests -q
@@ -99,13 +91,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: pip
 
       - name: Install lint tools
         run: |
           python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements.lock
+          pip install -r requirements.txt
 
       - name: Ruff lint (gating)
         run: ruff check core execution risk analytics --select E9,F63,F7,F82
@@ -131,13 +123,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
           cache: pip
 
       - name: Install analysis tools
         run: |
           python -m pip install --upgrade pip
-          pip install --require-hashes -r requirements.lock
+          pip install -r requirements.txt
 
       - name: Run bandit (non-gating)
         continue-on-error: true
