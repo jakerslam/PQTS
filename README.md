@@ -23,7 +23,12 @@
 # Clone and setup
 git clone https://github.com/jakerslam/pqts.git
 cd pqts
-pip install -r requirements.txt
+
+# Recommended: bootstrap local venv + dependencies
+make setup
+source .venv/bin/activate
+# Optional strict lock install:
+# make setup-lock
 
 # Copy environment template
 cp .env.example .env
@@ -39,6 +44,8 @@ python main.py config/paper.yaml
 ## ⚡ One-Command Demo
 
 ```bash
+make demo
+# or:
 python demo.py --market crypto --strat ml-ensemble --source x_launch_thread
 ```
 
