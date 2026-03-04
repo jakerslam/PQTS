@@ -520,6 +520,22 @@ class RiskAwareRouter:
                 "from_exchange": previous_exchange,
                 "to_exchange": failover_target,
             }
+        elif self.reliability_monitor.is_degraded(route.exchange):
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = (
+                f"DEGRADED_VENUE_NO_FAILOVER: {route.exchange}"
+            )
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=RiskDecision.HALT,
+                risk_state=risk_state,
+                order_id=None,
+                exchange=route.exchange,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
+            )
 
         audit_entry['routing'] = {
             'exchange': route.exchange,
@@ -632,6 +648,30 @@ class RiskAwareRouter:
             fill.venue,
         )
         execution_latency_ms = (time.perf_counter() - execution_start) * 1000.0
+        if fill.executed_qty <= 0 or fill.executed_price <= 0:
+            self.reliability_monitor.record(
+                venue=route.exchange,
+                latency_ms=execution_latency_ms,
+                rejected=True,
+                failed=True,
+            )
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = f"NO_FILL: {route.exchange}"
+            audit_entry["execution_quality"] = {
+                "latency_ms": execution_latency_ms,
+                "failed": True,
+            }
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=RiskDecision.HALT,
+                risk_state=risk_state,
+                order_id=None,
+                exchange=route.exchange,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
+            )
 
         audit_entry["executed"] = True
         audit_entry["order_id"] = order_id
@@ -665,6 +705,12 @@ class RiskAwareRouter:
         )
         requested_qty = float(max(order.quantity, 1e-12))
         fill_ratio = float(fill.executed_qty) / requested_qty
+        realized_notional = float(fill.executed_price) * float(fill.executed_qty)
+        self.smart_router.record_executed_notional(
+            route.exchange,
+            realized_notional,
+            timestamp=fill.timestamp,
+        )
         self.smart_router.record_execution_outcome(
             exchange=route.exchange,
             symbol=order.symbol,

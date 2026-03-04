@@ -1,6 +1,7 @@
 # Smart Order Router
 import logging
 import asyncio
+from datetime import datetime, timezone
 from collections.abc import Mapping
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
@@ -59,11 +60,14 @@ class SmartOrderRouter:
         
         # Exchange configs
         self.exchanges = config.get('exchanges', {})
-        self.monthly_volume_by_venue = {
+        self.base_monthly_volume_by_venue = {
             str(k): float(v)
             for k, v in config.get('monthly_volume_by_venue', {}).items()
         }
+        self.monthly_volume_by_venue = dict(self.base_monthly_volume_by_venue)
         self.venue_quality: Dict[str, Dict[str, float]] = {}
+        self._volume_month = datetime.now(timezone.utc).strftime("%Y-%m")
+        self.slippage_guard_ratio = float(config.get("slippage_guard_ratio", 1.5))
         self.fee_optimizer = FeeRebateOptimizer(
             tiers_by_venue=config.get('fee_tiers', {}),
             default_maker_fee_bps=float(config.get('default_maker_fee_bps', 10.0)),
@@ -170,6 +174,13 @@ class SmartOrderRouter:
     
     def _select_order_type(self, request: OrderRequest, market_data: Dict, exchange: str) -> OrderType:
         """Select optimal order type"""
+        venue_quality = self.venue_quality.get(str(exchange), {})
+        if (
+            float(venue_quality.get("slippage_ratio", 1.0)) >= self.slippage_guard_ratio
+            and request.time_in_force != "IOC"
+        ):
+            # When realized slippage drifts above expectation, bias toward maker.
+            return OrderType.LIMIT
         
         # Large orders: use TWAP
         if request.quantity > self.max_single_order_size:
@@ -312,6 +323,29 @@ class SmartOrderRouter:
         stats["fill_ratio"] = (1 - alpha) * float(stats["fill_ratio"]) + alpha * float(fill_ratio)
         stats["latency_ms"] = (1 - alpha) * float(stats["latency_ms"]) + alpha * float(latency_ms)
         self.venue_quality[venue_key] = stats
+
+    def _roll_month_if_needed(self, timestamp: Optional[datetime] = None) -> None:
+        ts = timestamp or datetime.now(timezone.utc)
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        month_key = ts.strftime("%Y-%m")
+        if month_key != self._volume_month:
+            self.monthly_volume_by_venue = dict(self.base_monthly_volume_by_venue)
+            self._volume_month = month_key
+
+    def record_executed_notional(
+        self,
+        exchange: str,
+        notional: float,
+        timestamp: Optional[datetime] = None,
+    ) -> None:
+        self._roll_month_if_needed(timestamp)
+        venue = str(exchange)
+        updated = float(self.monthly_volume_by_venue.get(venue, 0.0)) + max(float(notional), 0.0)
+        self.monthly_volume_by_venue[venue] = updated
+
+    def get_monthly_volume(self, exchange: str) -> float:
+        return float(self.monthly_volume_by_venue.get(str(exchange), 0.0))
     
     async def execute_route(self, decision: RouteDecision) -> bool:
         """Execute the routing decision"""

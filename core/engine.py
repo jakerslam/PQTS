@@ -10,6 +10,7 @@ import yaml
 
 from core.toggle_manager import MarketStrategyToggleManager, ToggleValidationError
 from core.market_data_quality import DataQualityReport, MarketDataQualityMonitor
+from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFillModelConfig
 from execution.risk_aware_router import RiskAwareRouter, OrderResult
 from execution.smart_router import OrderRequest as RouterOrderRequest
 from execution.smart_router import OrderType as RouterOrderType
@@ -140,7 +141,12 @@ class TradingEngine:
     def _build_router(self) -> RiskAwareRouter:
         risk_limits = self._build_router_risk_limits()
         broker_config = self._build_router_broker_config()
-        router = RiskAwareRouter(risk_config=risk_limits, broker_config=broker_config)
+        fill_provider = self._build_fill_provider()
+        router = RiskAwareRouter(
+            risk_config=risk_limits,
+            broker_config=broker_config,
+            fill_provider=fill_provider,
+        )
         initial_capital = self.config.get('risk', {}).get('initial_capital')
         if initial_capital is None:
             raise ValueError(
@@ -148,6 +154,29 @@ class TradingEngine:
             )
         router.set_capital(float(initial_capital), source='engine_config')
         return router
+
+    def _build_fill_provider(self):
+        if self.config.get('mode') == 'live_trading':
+            return None
+
+        execution_cfg = self.config.get('execution', {})
+        paper_cfg = execution_cfg.get('paper_fill_model', {})
+        if not bool(paper_cfg.get('enabled', True)):
+            return None
+
+        model_cfg = PaperFillModelConfig(
+            base_latency_ms=float(paper_cfg.get('base_latency_ms', 35.0)),
+            latency_jitter_ms=float(paper_cfg.get('latency_jitter_ms', 45.0)),
+            partial_fill_notional_usd=float(
+                paper_cfg.get('partial_fill_notional_usd', 25000.0)
+            ),
+            min_partial_fill_ratio=float(paper_cfg.get('min_partial_fill_ratio', 0.55)),
+            adverse_selection_bps=float(paper_cfg.get('adverse_selection_bps', 2.5)),
+            hard_reject_notional_usd=float(
+                paper_cfg.get('hard_reject_notional_usd', 250000.0)
+            ),
+        )
+        return MicrostructurePaperFillProvider(config=model_cfg)
 
     @staticmethod
     def _pct(value: float, default: float) -> float:
