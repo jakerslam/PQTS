@@ -1,6 +1,6 @@
 # PQTS - Protheus Quant Trading System
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-Paper%20Trading-yellow.svg)]()
 
@@ -24,6 +24,8 @@
 git clone https://github.com/protheuslabs/pqts.git
 cd pqts
 pip install -r requirements.txt
+# Or strict install with hashes:
+pip install --require-hashes -r requirements.lock
 
 # Copy environment template
 cp .env.example .env
@@ -82,6 +84,10 @@ Access at `http://localhost:8501`
 - [System Overview](docs/OVERVIEW.md)
 - [Backtesting Guide](docs/BACKTESTING.md)
 - [Strategy Patterns](docs/ADVANCED_PATTERNS.md)
+- [Incident Runbook](docs/INCIDENT_RUNBOOK.md)
+- [Pricing And Packaging](docs/PRICING_AND_PACKAGING.md)
+- [GTM 90-Day Plan](docs/GTM_90_DAY_PLAN.md)
+- [Self-Serve Signup Spec](docs/SELF_SERVE_SIGNUP_SPEC.md)
 
 ## 🛠️ Configuration
 
