@@ -9,78 +9,111 @@
 ## 🚀 Features
 
 - **Multi-Market Support**: Trade crypto, stocks, and forex from one platform
-- **Strategy Channels**: Scalping, arbitrage, trend following, mean reversion, ML
+- **10 Strategy Channels**: Scalping, arbitrage, trend following, mean reversion, ML, volume profile, regime detection, order flow, liquidity sweeps, multi-timeframe
 - **Universal Indicators**: Technical analysis that works across all markets
-- **Risk Management**: Institutional-grade position sizing and drawdown controls
+- **Risk Management**: Institutional-grade position sizing (Kelly criterion) and drawdown controls
 - **Machine Learning**: Ensemble models with online learning
-- **Analytics Dashboard**: Real-time P&L and performance metrics
-- **Paper Trading**: Test strategies risk-free before going live
+- **Backtesting Framework**: Event-driven backtesting with realistic execution
+- **Real-time Dashboard**: Live P&L and performance metrics
+- **Paper Trading**: Test risk-free before going live
 
-## 📊 Strategy Performance
-
-| Strategy | Timeframe | Win Rate | Sharpe | Description |
-|----------|-----------|----------|--------|-------------|
-| Scalping | 1m, 5m | ~55% | 1.2-1.5 | High-frequency micro profits |
-| Arbitrage | Real-time | ~80% | 2.0+ | Cross-exchange price differences |
-| Trend Following | 1h, 4h | ~45% | 1.0-1.3 | Momentum-based entries |
-| Mean Reversion | 15m, 1h | ~60% | 1.1-1.4 | Oversold bounces |
-| ML Ensemble | Variable | ~52% | 1.3-1.6 | AI-driven predictions |
-
-## 🛠️ Quick Start
+## 📊 Quick Start
 
 ```bash
-# Clone repository
+# Clone and setup
 git clone https://github.com/protheuslabs/pqts.git
 cd pqts
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Configure API keys
+# Copy environment template
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env with your API keys
+
+# Start dashboard
+python dashboard/start.py
 
 # Run paper trading
 python main.py config/paper.yaml
 ```
 
-## 📈 Dashboard
+## 🎛️ Dashboard
 
+Launch the real-time dashboard:
+```bash
+python -m streamlit run dashboard/app.py
 ```
-============================================================
-  PROTHEUS QUANT TRADING SYSTEM - DASHBOARD
-============================================================
-  Total Return:     +12.45%
-  Sharpe Ratio:     1.34
-  Max Drawdown:     -3.21%
-  Win Rate:         54.3%
-  Profit Factor:    1.42
-  Total Trades:     156
-  Equity:           $11,245.00
-============================================================
-```
+
+Access at `http://localhost:8501`
+
+## 📈 Strategy Performance
+
+| Strategy | Timeframe | Edge |
+|----------|-----------|------|
+| Scalping | 1m, 5m | Microstructure, order flow |
+| Arbitrage | Real-time | Cross-exchange, funding rates |
+| Trend Following | 1h, 4h | Momentum + multi-timeframe |
+| Mean Reversion | 15m, 1h | RSI, Bollinger, Volume Profile |
+| ML Ensemble | Variable | Random Forest, XGBoost, LSTM |
+| Volume Profile | 1h, 4h | POC, Value Area, HVN |
+| Order Flow | Tick | Delta, whale detection |
+| Liquidity Sweep | 15m, 1h | Stop hunts, false breakouts |
 
 ## 🧠 Architecture
 
 ```
-Markets → Strategies → Engine → Risk Manager → Execution → Analytics
-   ↓           ↓          ↓          ↓            ↓           ↓
-Binance   Scalping    Orders   Position    Portfolio   Dashboard
-Coinbase  Arbitrage   P&L      Sizing      Updates     Reports
-Alpaca    Trend       Status   Limits      Fills       Metrics
-OANDA     ML          History  Correlation Positions   Alerts
+┌─────────────────────────────────────────────────────────┐
+│                    PQTS v1.1.0                           │
+├─────────────────────────────────────────────────────────┤
+│  Markets: Binance, Coinbase, Alpaca (paper/live)          │
+│  Strategies: 10 channels, 20+ sub-strategies            │
+│  Indicators: 15+ universal technical indicators         │
+│  Risk: Kelly sizing, VaR, correlation limits            │
+│  ML: Ensemble with online learning                      │
+│  Execution: Smart routing, TWAP, maker/taker            │
+├─────────────────────────────────────────────────────────┤
+│  Backtesting: Event-driven, realistic costs             │
+│  Dashboard: Real-time Streamlit interface               │
+│  Analytics: Sharpe, drawdown, win rate tracking         │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## 📚 Documentation
 
 - [System Overview](docs/OVERVIEW.md)
-- [API Reference](docs/api/)
-- [Strategy Guide](docs/strategies/)
-- [Deployment](docs/deployment/)
+- [Backtesting Guide](docs/BACKTESTING.md)
+- [Strategy Patterns](docs/ADVANCED_PATTERNS.md)
+
+## 🛠️ Configuration
+
+### Paper Trading
+```yaml
+mode: paper_trading
+markets:
+  crypto:
+    enabled: true
+    exchanges:
+      - name: binance
+        api_key: ${BINANCE_TESTNET_API_KEY}
+        api_secret: ${BINANCE_TESTNET_API_SECRET}
+        testnet: true
+```
+
+### Live Trading
+```yaml
+mode: live
+markets:
+  crypto:
+    enabled: true
+    exchanges:
+      - name: binance
+        testnet: false
+        api_key: ${BINANCE_API_KEY}
+        api_secret: ${BINANCE_API_SECRET}
+```
 
 ## ⚠️ Risk Disclaimer
 
-Trading involves substantial risk of loss. Past performance does not guarantee future results. Always start with paper trading.
+Trading involves substantial risk. Past performance doesn't guarantee future results. Always start with paper trading.
 
 ## 📄 License
 
