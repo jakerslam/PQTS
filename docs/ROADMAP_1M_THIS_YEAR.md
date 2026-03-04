@@ -1,6 +1,7 @@
 # PQTS Roadmap to $1M This Calendar Year
 
 Last updated: 2026-03-04 (America/Denver)
+Feasibility snapshot as of: 2026-03-04
 
 ## 1) Feasibility Math: What $1M Profit Implies
 
