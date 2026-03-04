@@ -30,7 +30,7 @@ body {
 
 .summary-row {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 20px;
     padding: 20px;
 }
@@ -122,16 +122,11 @@ tr:hover td {
 }
 
 @media (max-width: 1200px) {
-    .summary-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
     .main-content {
         grid-template-columns: 1fr;
     }
 }
 
 @media (max-width: 600px) {
-    .summary-row {
-        grid-template-columns: 1fr;
-    }
+    .summary-row { grid-template-columns: 1fr; }
 }
