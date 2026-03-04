@@ -21,10 +21,22 @@ def test_parser_accepts_fail_checks_and_thresholds():
             "binance,coinbase",
             "--fail-checks",
             "auth,reconnect",
+            "--timeout-checks",
+            "submit_order",
+            "--samples-per-check",
+            "3",
             "--max-auth-latency-ms",
             "1000",
+            "--max-reject-rate",
+            "0.1",
+            "--output",
+            "data/reports/cert.json",
         ]
     )
     assert args.venues == "binance,coinbase"
     assert args.fail_checks == "auth,reconnect"
+    assert args.timeout_checks == "submit_order"
+    assert args.samples_per_check == 3
     assert args.max_auth_latency_ms == 1000
+    assert args.max_reject_rate == 0.1
+    assert args.output == "data/reports/cert.json"

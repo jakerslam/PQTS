@@ -1,0 +1,58 @@
+name: Nightly Live Sandbox Gate
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nightly_sandbox_gate:
+    name: Sandbox Certification + Reconciliation Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run exchange certification (nightly gate)
+        run: |
+          python3 scripts/run_exchange_certification.py \
+            --venues binance,coinbase,alpaca,oanda \
+            --samples-per-check 5 \
+            --max-reject-rate 0.05 \
+            --max-timeout-rate 0.02 \
+            --max-error-rate 0.01 \
+            --output data/reports/nightly_exchange_certification.json
+
+      - name: Run reconciliation daemon sample
+        run: |
+          python3 scripts/run_reconciliation_daemon.py \
+            --config config/paper.yaml \
+            --cycles 3 \
+            --sleep-seconds 0.0 \
+            --no-halt-on-mismatch \
+            --out-dir data/reports
+
+      - name: Enforce nightly sandbox thresholds
+        run: |
+          python3 scripts/nightly_live_sandbox_gate.py \
+            --cert-report data/reports/nightly_exchange_certification.json \
+            --reconciliation-incidents data/analytics/reconciliation_incidents.jsonl \
+            --reconciliation-lookback-hours 24 \
+            --max-reject-rate 0.05 \
+            --max-timeout-rate 0.02 \
+            --max-reconciliation-mismatches 0 \
+            --output data/reports/nightly_live_sandbox_gate.json

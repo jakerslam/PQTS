@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from execution.exchange_certification import (
     CertificationThresholds,
+    ProbeCheckResult,
     run_adapter_certification,
     summarize_certification,
 )
@@ -49,6 +50,23 @@ class _ProbeFail:
         return True
 
 
+class _ProbeTimeout:
+    async def auth_check(self) -> ProbeCheckResult:
+        return ProbeCheckResult(ok=False, status="timeout")
+
+    async def submit_order_check(self) -> bool:
+        return True
+
+    async def cancel_order_check(self) -> bool:
+        return True
+
+    async def partial_fill_check(self) -> bool:
+        return True
+
+    async def reconnect_check(self) -> bool:
+        return True
+
+
 def test_run_adapter_certification_passes_when_all_checks_pass():
     result = asyncio.run(
         run_adapter_certification(
@@ -59,7 +77,11 @@ def test_run_adapter_certification_passes_when_all_checks_pass():
                 max_submit_latency_ms=5000,
                 max_cancel_latency_ms=5000,
                 max_reconnect_latency_ms=5000,
+                max_reject_rate=0.5,
+                max_timeout_rate=0.5,
+                max_error_rate=0.5,
             ),
+            samples_per_check=2,
         )
     )
 
@@ -72,7 +94,8 @@ def test_run_adapter_certification_fails_on_submit_check():
         run_adapter_certification(
             venue="coinbase",
             probe=_ProbeFail(),
-            thresholds=CertificationThresholds(),
+            thresholds=CertificationThresholds(max_reject_rate=0.0),
+            samples_per_check=3,
         )
     )
 
@@ -89,3 +112,17 @@ def test_summarize_certification_outputs_rollup():
     assert summary["venues_passed"] == 1
     assert summary["venues_failed"] == 1
     assert summary["all_passed"] is False
+    assert "totals" in summary
+
+
+def test_run_adapter_certification_fails_on_timeout_rate():
+    result = asyncio.run(
+        run_adapter_certification(
+            venue="oanda",
+            probe=_ProbeTimeout(),
+            thresholds=CertificationThresholds(max_timeout_rate=0.0),
+            samples_per_check=1,
+        )
+    )
+    assert result.passed is False
+    assert "timeout_rate_exceeded" in result.failures
