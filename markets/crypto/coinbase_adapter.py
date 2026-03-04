@@ -42,9 +42,9 @@ class CoinbaseAdapter:
 
     @staticmethod
     def _require_router_token(router_token) -> None:
-        from execution.risk_aware_router import _RouterToken
+        from execution.risk_aware_router import _is_valid_router_token
 
-        if type(router_token) is not _RouterToken:
+        if not _is_valid_router_token(router_token):
             raise RuntimeError(
                 "CoinbaseAdapter requires a valid _RouterToken issued by RiskAwareRouter."
             )

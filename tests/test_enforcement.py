@@ -223,6 +223,21 @@ class TestRouterTokenProtection:
         with pytest.raises(RuntimeError):
             OandaAdapter("k", "acct", router_token=object())
 
+    def test_forged_router_token_is_rejected(self):
+        forged = object.__new__(_RouterToken)
+        object.__setattr__(forged, "router_id", 12345)
+        object.__setattr__(forged, "created_at", "forged")
+        object.__setattr__(forged, "_proof", object())
+
+        with pytest.raises(RuntimeError):
+            BinanceAdapter("k", "s", router_token=forged)
+        with pytest.raises(RuntimeError):
+            CoinbaseAdapter("k", "s", "p", router_token=forged)
+        with pytest.raises(RuntimeError):
+            AlpacaAdapter("k", "s", router_token=forged)
+        with pytest.raises(RuntimeError):
+            OandaAdapter("k", "acct", router_token=forged)
+
     def test_adapter_place_order_requires_valid_token(self, monkeypatch):
         router = _build_router()
         token = router._create_token()

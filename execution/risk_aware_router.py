@@ -24,6 +24,7 @@ Integration:
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -68,7 +69,7 @@ class _RouterToken:
     its private _create_token() factory and verified with exact type checks.
     """
 
-    __slots__ = ("router_id", "created_at")
+    __slots__ = ("router_id", "created_at", "_proof")
 
     def __new__(cls, *args, **kwargs):
         raise RuntimeError(
@@ -78,11 +79,44 @@ class _RouterToken:
 
 
 def _mint_router_token(router_id: int) -> "_RouterToken":
-    """Internal mint helper. Keep module-private and callable only by router factory."""
-    token = object.__new__(_RouterToken)
-    object.__setattr__(token, "router_id", router_id)
-    object.__setattr__(token, "created_at", datetime.now(timezone.utc).isoformat())
-    return token
+    """Deprecated helper kept for backward compatibility."""
+    return _create_router_token(router_id)
+
+
+def _build_token_factory():
+    """
+    Build closure-backed token mint/verify functions.
+
+    The proof marker is not exposed as a module global, which makes forged
+    tokens created with object.__new__(_RouterToken) fail verification.
+    """
+    proof = object()
+
+    def mint(router_id: int) -> "_RouterToken":
+        token = object.__new__(_RouterToken)
+        object.__setattr__(token, "router_id", router_id)
+        object.__setattr__(token, "created_at", datetime.now(timezone.utc).isoformat())
+        object.__setattr__(token, "_proof", proof)
+        return token
+
+    def verify(token: Any, *, router_id: Optional[int] = None) -> bool:
+        if type(token) is not _RouterToken:
+            return False
+        if getattr(token, "_proof", None) is not proof:
+            return False
+        if router_id is not None and getattr(token, "router_id", None) != router_id:
+            return False
+        return True
+
+    return mint, verify
+
+
+_create_router_token, _verify_router_token = _build_token_factory()
+
+
+def _is_valid_router_token(token: Any, *, router_id: Optional[int] = None) -> bool:
+    """Module-private token verification used by all adapters."""
+    return _verify_router_token(token, router_id=router_id)
 
 
 @dataclass
@@ -95,6 +129,18 @@ class OrderResult:
     exchange: Optional[str]
     rejected_reason: Optional[str]
     audit_log: Dict
+
+
+@dataclass
+class VenueClient:
+    """Adapter registry entry."""
+
+    market: str
+    venue: str
+    symbols: List[str]
+    adapter: Optional[Any]
+    connected: bool
+    is_stub: bool
 
 
 class FillProvider(Protocol):
@@ -185,6 +231,8 @@ class RiskAwareRouter:
             tca_db_path or broker_config.get("tca_db_path", "data/tca_records.csv")
         )
         self.eta_by_symbol_venue: Dict[Tuple[str, str], float] = {}
+        self.market_venues: Dict[str, VenueClient] = {}
+        self._markets_config: Dict[str, Any] = {}
         
         # Audit logging (Step 5)
         self.audit_log: List[Dict] = []
@@ -394,6 +442,24 @@ class RiskAwareRouter:
                 rejected_reason=f"Order size exceeds risk limit",
                 audit_log=audit_entry
             )
+
+        # Capacity controls (capital/capacity realism)
+        symbol_caps = self.broker_config.get("max_symbol_notional", {})
+        symbol_cap = symbol_caps.get(order.symbol)
+        if symbol_cap is not None and notional > float(symbol_cap):
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = f"SYMBOL_CAP: {notional:.2f} > {float(symbol_cap):.2f}"
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=RiskDecision.HALT,
+                risk_state=risk_state,
+                order_id=None,
+                exchange=None,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
+            )
         
         # =========================================================================
         # STEP 2: SMART ROUTING
@@ -406,6 +472,23 @@ class RiskAwareRouter:
             'expected_cost': route.expected_cost,
             'expected_slippage': route.expected_slippage
         }
+
+        venue_caps = self.broker_config.get("max_venue_notional", {})
+        venue_cap = venue_caps.get(route.exchange)
+        if venue_cap is not None and notional > float(venue_cap):
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = f"VENUE_CAP: {notional:.2f} > {float(venue_cap):.2f}"
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=RiskDecision.HALT,
+                risk_state=risk_state,
+                order_id=None,
+                exchange=route.exchange,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
+            )
         
         # =========================================================================
         # STEP 3: COST ESTIMATION (via RealisticCostModel)
@@ -445,6 +528,24 @@ class RiskAwareRouter:
         # STEP 4: ORDER EXECUTION
         # =========================================================================
         order_id = audit_entry["order_id"]
+        live_order_response = None
+        if self.broker_config.get("live_execution", False):
+            live_order_response = await self._place_live_order(route=route, order=order)
+            if live_order_response is None:
+                self.reject_count += 1
+                audit_entry["rejected"] = True
+                audit_entry["reject_reason"] = f"LIVE_EXECUTION_FAILED: {route.exchange}"
+                self.audit_log.append(audit_entry)
+                return OrderResult(
+                    success=False,
+                    decision=RiskDecision.HALT,
+                    risk_state=risk_state,
+                    order_id=None,
+                    exchange=route.exchange,
+                    rejected_reason=audit_entry["reject_reason"],
+                    audit_log=audit_entry,
+                )
+
         fill = await self.fill_provider.get_fill(
             order_id=order_id,
             symbol=order.symbol,
@@ -472,6 +573,8 @@ class RiskAwareRouter:
             "venue": fill.venue,
             "symbol": fill.symbol,
         }
+        if live_order_response is not None:
+            audit_entry["live_order_response"] = live_order_response
         self.audit_log.append(audit_entry)
         
         # =========================================================================
@@ -589,7 +692,377 @@ class RiskAwareRouter:
         Only RiskAwareRouter can create tokens. Adapters must verify
         received token using: type(token) is _RouterToken
         """
-        return _mint_router_token(id(self))
+        return _create_router_token(id(self))
+
+    def configure_market_adapters(self, markets_config: Dict[str, Any]) -> None:
+        """
+        Build adapter registry for enabled markets.
+
+        Engine code must not import adapter modules directly; this router
+        owns all adapter construction and access.
+        """
+        self.market_venues.clear()
+        self._markets_config = markets_config or {}
+
+        crypto_cfg = self._markets_config.get("crypto", {})
+        if crypto_cfg.get("enabled", False):
+            for venue in crypto_cfg.get("exchanges", []):
+                self._register_venue(
+                    market="crypto",
+                    venue_name=venue.get("name", "crypto_stub"),
+                    symbols=venue.get("symbols", []),
+                    raw_config=venue,
+                )
+
+        equities_cfg = self._markets_config.get("equities", {})
+        if equities_cfg.get("enabled", False):
+            for venue in equities_cfg.get("brokers", []):
+                self._register_venue(
+                    market="equities",
+                    venue_name=venue.get("name", "equities_stub"),
+                    symbols=venue.get("symbols", []),
+                    raw_config=venue,
+                )
+
+        forex_cfg = self._markets_config.get("forex", {})
+        if forex_cfg.get("enabled", False):
+            for venue in forex_cfg.get("brokers", []):
+                self._register_venue(
+                    market="forex",
+                    venue_name=venue.get("name", "forex_stub"),
+                    symbols=venue.get("pairs", []),
+                    raw_config=venue,
+                )
+
+        logger.info("Configured %s market venues", len(self.market_venues))
+
+    def _resolve_secret(self, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if text.startswith("${") and text.endswith("}"):
+            key = text[2:-1].strip()
+            return os.getenv(key)
+        return text
+
+    def _register_venue(
+        self,
+        *,
+        market: str,
+        venue_name: str,
+        symbols: List[str],
+        raw_config: Dict[str, Any],
+    ) -> None:
+        adapter = self._build_adapter(market=market, venue_name=venue_name, cfg=raw_config)
+        self.market_venues[venue_name] = VenueClient(
+            market=market,
+            venue=venue_name,
+            symbols=list(symbols),
+            adapter=adapter,
+            connected=False,
+            is_stub=(adapter is None),
+        )
+
+    def _build_adapter(self, *, market: str, venue_name: str, cfg: Dict[str, Any]) -> Optional[Any]:
+        """
+        Construct venue adapters with router token enforcement.
+
+        Missing credentials keep the venue in deterministic stub mode.
+        """
+        venue = venue_name.lower()
+        try:
+            if market == "crypto" and venue == "binance":
+                from markets.crypto.binance_adapter import BinanceAdapter
+
+                api_key = self._resolve_secret(cfg.get("api_key"))
+                api_secret = self._resolve_secret(cfg.get("api_secret"))
+                if not api_key or not api_secret:
+                    return None
+                return BinanceAdapter(
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    router_token=self._router_token,
+                    testnet=bool(cfg.get("testnet", True)),
+                )
+
+            if market == "crypto" and venue == "coinbase":
+                from markets.crypto.coinbase_adapter import CoinbaseAdapter
+
+                api_key = self._resolve_secret(cfg.get("api_key"))
+                api_secret = self._resolve_secret(cfg.get("api_secret"))
+                passphrase = self._resolve_secret(cfg.get("passphrase"))
+                if not api_key or not api_secret or not passphrase:
+                    return None
+                return CoinbaseAdapter(
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    passphrase=passphrase,
+                    router_token=self._router_token,
+                    sandbox=bool(cfg.get("sandbox", True)),
+                )
+
+            if market == "equities" and venue == "alpaca":
+                from markets.equities.alpaca_adapter import AlpacaAdapter
+
+                api_key = self._resolve_secret(cfg.get("api_key"))
+                api_secret = self._resolve_secret(cfg.get("api_secret"))
+                if not api_key or not api_secret:
+                    return None
+                return AlpacaAdapter(
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    router_token=self._router_token,
+                    paper=bool(cfg.get("paper", True)),
+                )
+
+            if market == "forex" and venue == "oanda":
+                from markets.forex.oanda_adapter import OandaAdapter
+
+                api_key = self._resolve_secret(cfg.get("api_key"))
+                account_id = self._resolve_secret(cfg.get("account_id"))
+                if not api_key or not account_id:
+                    return None
+                return OandaAdapter(
+                    api_key=api_key,
+                    account_id=account_id,
+                    router_token=self._router_token,
+                    practice=bool(cfg.get("practice", True)),
+                )
+        except Exception as exc:
+            logger.warning("Adapter construction failed for %s/%s: %s", market, venue_name, exc)
+            return None
+
+        return None
+
+    async def start_market_data(self) -> None:
+        """Connect all live adapters; keep failed ones as stubs."""
+        for venue in self.market_venues.values():
+            if venue.adapter is None:
+                venue.is_stub = True
+                continue
+            try:
+                await venue.adapter.connect()
+                venue.connected = True
+                venue.is_stub = False
+                logger.info("Connected venue adapter: %s", venue.venue)
+            except Exception as exc:
+                venue.connected = False
+                venue.is_stub = True
+                logger.warning("Adapter connect failed for %s (stub mode): %s", venue.venue, exc)
+
+    async def stop_market_data(self) -> None:
+        """Disconnect venue adapters."""
+        for venue in self.market_venues.values():
+            if venue.adapter is None or not venue.connected:
+                continue
+            try:
+                await venue.adapter.disconnect()
+            except Exception:
+                pass
+            venue.connected = False
+
+    def get_market_registry(self) -> Dict[str, Dict[str, Any]]:
+        """Expose configured venue metadata for engine-level observability."""
+        registry: Dict[str, Dict[str, Any]] = {}
+        for venue_name, venue in self.market_venues.items():
+            registry[venue_name] = {
+                "market": venue.market,
+                "venue": venue_name,
+                "symbols": list(venue.symbols),
+                "connected": venue.connected,
+                "stub": venue.is_stub,
+            }
+        return registry
+
+    async def fetch_market_snapshot(self) -> Dict[str, Any]:
+        """
+        Fetch a unified market snapshot keyed by venue for smart routing.
+
+        Returns a dict containing:
+            - venue -> symbol quote maps
+            - order_book
+            - last_price
+            - vol_24h
+        """
+        snapshot: Dict[str, Any] = {}
+        aggregated_prices: List[float] = []
+        aggregated_volumes: List[float] = []
+        fallback_order_book = None
+
+        for venue_name, venue in self.market_venues.items():
+            venue_quotes: Dict[str, Dict[str, float]] = {}
+            for symbol in venue.symbols:
+                quote = await self._fetch_symbol_quote(venue, symbol)
+                if quote is None:
+                    quote = self._synthetic_quote(symbol=symbol, venue=venue_name)
+
+                venue_quotes[symbol] = {
+                    "price": quote["price"],
+                    "spread": quote["spread"],
+                    "volume_24h": quote["volume_24h"],
+                }
+                aggregated_prices.append(quote["price"])
+                aggregated_volumes.append(quote["volume_24h"])
+                if fallback_order_book is None:
+                    fallback_order_book = quote["order_book"]
+
+            if venue_quotes:
+                snapshot[venue_name] = venue_quotes
+
+        if not aggregated_prices:
+            default_quote = self._synthetic_quote(symbol="DEFAULT", venue="stub")
+            aggregated_prices = [default_quote["price"]]
+            aggregated_volumes = [default_quote["volume_24h"]]
+            fallback_order_book = default_quote["order_book"]
+
+        snapshot["last_price"] = float(sum(aggregated_prices) / len(aggregated_prices))
+        snapshot["vol_24h"] = float(sum(aggregated_volumes) / len(aggregated_volumes))
+        snapshot["order_book"] = fallback_order_book
+        return snapshot
+
+    async def _fetch_symbol_quote(self, venue: VenueClient, symbol: str) -> Optional[Dict[str, Any]]:
+        if venue.adapter is None or not venue.connected:
+            return None
+
+        try:
+            if venue.market == "crypto" and venue.venue.lower() == "binance":
+                ticker = await venue.adapter.get_ticker(symbol)
+                orderbook = await venue.adapter.get_orderbook(symbol, limit=5)
+                bid = float(ticker.get("bidPrice", 0) or 0)
+                ask = float(ticker.get("askPrice", 0) or 0)
+                price = float(ticker.get("lastPrice", 0) or 0)
+                spread = abs(ask - bid) / price if price and ask and bid else 0.001
+                return {
+                    "price": price or (ask + bid) / 2,
+                    "spread": spread,
+                    "volume_24h": float(ticker.get("quoteVolume", 0) or ticker.get("volume", 0) or 0),
+                    "order_book": {
+                        "bids": [(float(p), float(s)) for p, s in orderbook.get("bids", [])[:5]],
+                        "asks": [(float(p), float(s)) for p, s in orderbook.get("asks", [])[:5]],
+                    },
+                }
+
+            if venue.market == "crypto" and venue.venue.lower() == "coinbase":
+                ticker = await venue.adapter.get_product_ticker(symbol)
+                bid = float(ticker.get("bid", 0) or 0)
+                ask = float(ticker.get("ask", 0) or 0)
+                price = float(ticker.get("price", 0) or 0)
+                spread = abs(ask - bid) / price if price and ask and bid else 0.001
+                return {
+                    "price": price or (ask + bid) / 2,
+                    "spread": spread,
+                    "volume_24h": float(ticker.get("volume", 0) or 0),
+                    "order_book": self._synthetic_order_book(price or (ask + bid) / 2),
+                }
+
+            if venue.market == "equities" and venue.venue.lower() == "alpaca":
+                quote = await venue.adapter.get_latest_quote(symbol)
+                bid = float(quote.get("bp", 0) or quote.get("bid_price", 0) or 0)
+                ask = float(quote.get("ap", 0) or quote.get("ask_price", 0) or 0)
+                price = (bid + ask) / 2 if bid and ask else max(bid, ask)
+                spread = abs(ask - bid) / price if price and ask and bid else 0.001
+                return {
+                    "price": price,
+                    "spread": spread,
+                    "volume_24h": float(quote.get("v", 0) or quote.get("volume", 0) or 0),
+                    "order_book": self._synthetic_order_book(price),
+                }
+
+            if venue.market == "forex" and venue.venue.lower() == "oanda":
+                pricing = await venue.adapter.get_pricing([symbol])
+                if not pricing:
+                    return None
+                row = pricing[0]
+                bid = float(row.get("bids", [{}])[0].get("price", 0) or 0)
+                ask = float(row.get("asks", [{}])[0].get("price", 0) or 0)
+                price = (bid + ask) / 2 if bid and ask else max(bid, ask)
+                spread = abs(ask - bid) / price if price and ask and bid else 0.0002
+                return {
+                    "price": price,
+                    "spread": spread,
+                    "volume_24h": float(row.get("tradeable", 1)) * 1_000_000,
+                    "order_book": self._synthetic_order_book(price),
+                }
+        except Exception as exc:
+            logger.warning("Quote fetch failed for %s %s: %s", venue.venue, symbol, exc)
+            return None
+
+        return None
+
+    def _synthetic_order_book(self, mid_price: float) -> Dict[str, List[Tuple[float, float]]]:
+        mid = max(float(mid_price), 1e-6)
+        spread = mid * 0.0005
+        return {
+            "bids": [(mid - spread, 100.0), (mid - 2 * spread, 150.0)],
+            "asks": [(mid + spread, 100.0), (mid + 2 * spread, 150.0)],
+        }
+
+    def _synthetic_quote(self, *, symbol: str, venue: str) -> Dict[str, Any]:
+        key = abs(hash((symbol, venue)))
+        base = 50.0 + (key % 5000) / 25.0
+        spread_bps = 5 + (key % 15)
+        spread = spread_bps / 10000.0
+        volume = 500_000.0 + (key % 10_000) * 50.0
+        order_book = self._synthetic_order_book(base)
+        return {
+            "price": base,
+            "spread": spread,
+            "volume_24h": volume,
+            "order_book": order_book,
+        }
+
+    async def _place_live_order(self, *, route: RouteDecision, order: OrderRequest) -> Optional[Dict[str, Any]]:
+        """Send a live order through the configured venue adapter."""
+        venue = self.market_venues.get(route.exchange)
+        if venue is None or venue.adapter is None or not venue.connected:
+            return None
+
+        try:
+            venue_name = venue.venue.lower()
+            if venue.market == "crypto" and venue_name == "binance":
+                return await venue.adapter.place_order(
+                    symbol=order.symbol,
+                    side=order.side,
+                    order_type=route.order_type.value,
+                    quantity=float(order.quantity),
+                    price=route.price,
+                    router_token=self._router_token,
+                )
+
+            if venue.market == "crypto" and venue_name == "coinbase":
+                return await venue.adapter.place_order(
+                    product_id=order.symbol,
+                    side=order.side,
+                    order_type=route.order_type.value,
+                    size=float(order.quantity),
+                    price=route.price,
+                    router_token=self._router_token,
+                )
+
+            if venue.market == "equities" and venue_name == "alpaca":
+                return await venue.adapter.place_order(
+                    symbol=order.symbol,
+                    qty=float(order.quantity),
+                    side=order.side,
+                    order_type=route.order_type.value,
+                    limit_price=route.price,
+                    router_token=self._router_token,
+                )
+
+            if venue.market == "forex" and venue_name == "oanda":
+                units = float(order.quantity if order.side == "buy" else -order.quantity)
+                return await venue.adapter.place_order(
+                    instrument=order.symbol,
+                    units=units,
+                    order_type=route.order_type.value.upper(),
+                    price=route.price,
+                    router_token=self._router_token,
+                )
+        except Exception as exc:
+            logger.error("Live order send failed for %s: %s", route.exchange, exc)
+            return None
+
+        return None
     
     def get_stats(self) -> Dict:
         """Get order routing statistics."""
@@ -633,78 +1106,3 @@ class RiskAwareRouter:
         """Reset risk engine (requires manual review)."""
         self.risk_engine.reset()
         logger.info("Risk engine reset - trading resumed")
-
-
-# ============================================================================
-# PRODUCTION EXAMPLE
-# ============================================================================
-
-async def main():
-    """
-    Example production usage.
-    
-    This shows the ONLY way to place orders in production.
-    """
-    import asyncio
-    
-    # Initialize router with risk limits
-    router = RiskAwareRouter(
-        risk_config=RiskLimits(
-            max_daily_loss_pct=0.02,
-            max_drawdown_pct=0.15,
-            max_gross_leverage=2.0
-        ),
-        broker_config={'enabled': True}
-    )
-    
-    # Set capital (NO HARDCODING)
-    router.set_capital(100000.0, source="broker_account_api")
-    
-    # Example order
-    order = OrderRequest(
-        symbol="BTC-USD",
-        side="buy",
-        quantity=0.1,
-        order_type=OrderType.LIMIT,
-        price=50000.0
-    )
-    
-    # Market data
-    market_data = {
-        'last_price': 50000.0,
-        'order_book': {
-            'bids': [(49990, 1.0), (49980, 2.0)],
-            'asks': [(50010, 0.5), (50020, 1.5)]
-        }
-    }
-    
-    # Portfolio state
-    portfolio = {
-        'positions': {'BTC': 0.5},
-        'prices': {'BTC': 50000},
-        'total_pnl': 1000.0,
-        'leverage': 0.5,
-        'open_orders': []
-    }
-    
-    # Strategy returns
-    strategy_returns = {
-        'strat1': np.random.randn(30) * 0.02,
-        'strat2': np.random.randn(30) * 0.01
-    }
-    
-    # Portfolio changes
-    portfolio_changes = np.random.randn(30) * 1000
-    
-    # PLACE ORDER - only way to do it
-    result = await router.submit_order(
-        order, market_data, portfolio, strategy_returns, portfolio_changes
-    )
-    
-    print(f"Order result: {result}")
-    print(f"Stats: {router.get_stats()}")
-
-
-if __name__ == "__main__":
-    import numpy as np
-    asyncio.run(main())

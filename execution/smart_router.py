@@ -1,7 +1,8 @@
 # Smart Order Router
 import logging
 import asyncio
-from typing import Dict, List, Optional
+from collections.abc import Mapping
+from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
@@ -86,13 +87,31 @@ class SmartOrderRouter:
             expected_cost=expected_cost,
             expected_slippage=expected_slippage
         )
+
+    def _iter_exchange_views(self, market_data: Dict) -> List[Tuple[str, Dict]]:
+        """
+        Yield normalized exchange -> symbol quote maps.
+
+        Market snapshots can include scalar metadata keys such as
+        `last_price`/`vol_24h` plus nested order book payloads. These are
+        ignored here to keep routing deterministic and robust.
+        """
+        views: List[Tuple[str, Dict]] = []
+        for exchange, payload in market_data.items():
+            if not isinstance(payload, Mapping):
+                continue
+            if exchange == "order_book":
+                continue
+            if any(isinstance(v, Mapping) and "price" in v for v in payload.values()):
+                views.append((exchange, dict(payload)))
+        return views
     
     def _select_exchange(self, symbol: str, market_data: Dict) -> str:
         """Select best exchange for symbol"""
         best_exchange = None
         best_score = -1
         
-        for exchange, data in market_data.items():
+        for exchange, data in self._iter_exchange_views(market_data):
             if symbol not in data:
                 continue
             
@@ -211,7 +230,7 @@ class SmartOrderRouter:
     
     def _get_current_price(self, symbol: str, market_data: Dict) -> Optional[float]:
         """Get current market price"""
-        for exchange_data in market_data.values():
+        for _, exchange_data in self._iter_exchange_views(market_data):
             if symbol in exchange_data:
                 return exchange_data[symbol].get('price')
         return None
