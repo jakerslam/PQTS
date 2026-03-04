@@ -137,6 +137,27 @@ This writes rolling readiness snapshots:
 data/reports/paper_campaign_snapshot_<timestamp>.json
 ```
 
+## Daily Ops Wrapper
+
+Run campaign + readiness as one daily operation:
+
+```bash
+python3 scripts/daily_paper_ops.py \
+  --config config/paper.yaml \
+  --campaign-symbols BTCUSDT,ETHUSDT,BTC-USD,ETH-USD \
+  --campaign-cycles 1440 \
+  --campaign-sleep-seconds 60 \
+  --campaign-notional-usd 150 \
+  --campaign-readiness-every 60 \
+  --out-dir data/reports
+```
+
+Example cron schedule (daily at 00:05 local time):
+
+```cron
+5 0 * * * cd /Users/jay/.openclaw/workspace/pqts && /usr/bin/python3 scripts/daily_paper_ops.py >> logs/daily_paper_ops.log 2>&1
+```
+
 ## Performance Metrics
 
 - **Total Return**: Overall strategy return
