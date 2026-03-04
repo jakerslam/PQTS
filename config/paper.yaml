@@ -1,0 +1,79 @@
+# Paper Trading Configuration
+mode: paper_trading
+
+markets:
+  crypto:
+    enabled: true
+    exchanges:
+      - name: binance
+        api_key: ${BINANCE_TESTNET_API_KEY}
+        api_secret: ${BINANCE_TESTNET_API_SECRET}
+        testnet: true
+        symbols:
+          - BTCUSDT
+          - ETHUSDT
+          - SOLUSDT
+          - ADAUSDT
+          - DOTUSDT
+  
+  equities:
+    enabled: false
+    brokers:
+      - name: alpaca
+        api_key: ${ALPACA_PAPER_API_KEY}
+        api_secret: ${ALPACA_PAPER_API_SECRET}
+        paper: true
+  
+  forex:
+    enabled: false
+    brokers:
+      - name: oanda
+        api_key: ${OANDA_API_KEY}
+        account_id: ${OANDA_ACCOUNT_ID}
+
+strategies:
+  scalping:
+    enabled: true
+    max_positions: 3
+    timeframes: ['1m', '5m']
+    min_spread: 0.001
+    max_hold_time: 300
+    risk_reward_ratio: 1.5
+  
+  arbitrage:
+    enabled: true
+    min_spread_pct: 0.1
+    max_execution_time_ms: 500
+  
+  trend_following:
+    enabled: true
+    timeframes: ['1h', '4h', '1d']
+    max_positions: 5
+  
+  mean_reversion:
+    enabled: true
+    lookback: 20
+    max_positions: 3
+  
+  ml:
+    enabled: true
+    model_type: ensemble
+    confidence_threshold: 0.6
+    retrain_interval_hours: 24
+    prediction_horizon: 1h
+
+risk:
+  max_portfolio_risk_pct: 2.0
+  max_position_risk_pct: 1.0
+  max_drawdown_pct: 10.0
+  max_correlation: 0.7
+  max_positions: 15
+  max_leverage: 2.0
+
+analytics:
+  data_dir: data/analytics
+  report_interval_hours: 24
+
+logging:
+  level: INFO
+  file: logs/pqts.log
