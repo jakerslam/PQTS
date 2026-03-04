@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List
 
 import numpy as np
@@ -18,6 +18,13 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from analytics.ops_health import OpsThresholds, evaluate_operational_health  # noqa: E402
+from analytics.promotion_gates import (  # noqa: E402
+    PromotionGateThresholds,
+    evaluate_promotion_gate,
+)
+from analytics.revenue_diagnostics import RevenueDiagnostics  # noqa: E402
+from core.operator_tier import resolve_operator_tier, validate_operator_tier_overrides  # noqa: E402
 from execution.paper_campaign import (  # noqa: E402
     CampaignStats,
     build_portfolio_snapshot,
@@ -32,10 +39,9 @@ from execution.paper_fill_model import (  # noqa: E402
 from execution.risk_aware_router import RiskAwareRouter  # noqa: E402
 from execution.smart_router import OrderType  # noqa: E402
 from risk.kill_switches import RiskLimits  # noqa: E402
-from analytics.ops_health import OpsThresholds, evaluate_operational_health  # noqa: E402
-from analytics.promotion_gates import (  # noqa: E402
-    PromotionGateThresholds,
-    evaluate_promotion_gate,
+from risk.risk_tolerance import (  # noqa: E402
+    resolve_effective_risk_config,
+    risk_profile_payload,
 )
 
 
@@ -56,8 +62,7 @@ def _pct(value: Any, default: float) -> float:
     return token / 100.0 if token > 1.0 else token
 
 
-def _build_risk_limits(config: Dict[str, Any]) -> RiskLimits:
-    risk_cfg = config.get("risk", {})
+def _build_risk_limits(risk_cfg: Dict[str, Any]) -> RiskLimits:
     return RiskLimits(
         max_daily_loss_pct=_pct(
             risk_cfg.get("max_daily_loss_pct", risk_cfg.get("max_portfolio_risk_pct", 2.0)),
@@ -71,8 +76,7 @@ def _build_risk_limits(config: Dict[str, Any]) -> RiskLimits:
     )
 
 
-def _build_broker_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    risk_cfg = config.get("risk", {})
+def _build_broker_config(config: Dict[str, Any], *, risk_cfg: Dict[str, Any]) -> Dict[str, Any]:
     execution_cfg = config.get("execution", {})
     analytics_cfg = config.get("analytics", {})
     return {
@@ -92,6 +96,8 @@ def _build_broker_config(config: Dict[str, Any]) -> Dict[str, Any]:
         "default_taker_fee_bps": execution_cfg.get("default_taker_fee_bps", 12.0),
         "reliability": execution_cfg.get("reliability", {}),
         "regime_overlay": execution_cfg.get("regime_overlay", {}),
+        "capacity_curves": execution_cfg.get("capacity_curves", {}),
+        "expected_alpha_bps_by_strategy": execution_cfg.get("expected_alpha_bps_by_strategy", {}),
     }
 
 
@@ -132,6 +138,20 @@ def _current_eta_map(router: RiskAwareRouter) -> Dict[tuple[str, str], float]:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config/paper.yaml")
+    parser.add_argument(
+        "--operator-tier",
+        choices=["simple", "pro"],
+        default="",
+        help="Operator UX tier override (simple or pro).",
+    )
+    parser.add_argument(
+        "--risk-profile",
+        default="",
+        help=(
+            "Risk tolerance profile override "
+            "(conservative, balanced, aggressive, professional, or custom key)."
+        ),
+    )
     parser.add_argument("--symbols", default="")
     parser.add_argument("--cycles", type=int, default=500)
     parser.add_argument("--sleep-seconds", type=float, default=1.0)
@@ -157,9 +177,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 async def _run(args: argparse.Namespace) -> Dict[str, Any]:
     config = _load_yaml(args.config)
+    operator_tier = resolve_operator_tier(config, override=(args.operator_tier or None))
+    validate_operator_tier_overrides(
+        tier=operator_tier,
+        has_market_override=False,
+        has_strategy_override=False,
+        has_symbol_override=bool(args.symbols),
+    )
+    risk_cfg, risk_profile = resolve_effective_risk_config(
+        config,
+        override_profile=(args.risk_profile or None),
+    )
 
-    risk_limits = _build_risk_limits(config)
-    broker_config = _build_broker_config(config)
+    risk_limits = _build_risk_limits(risk_cfg)
+    broker_config = _build_broker_config(config, risk_cfg=risk_cfg)
     fill_provider = MicrostructurePaperFillProvider(
         config=PaperFillModelConfig(
             adverse_selection_bps=float(args.paper_base_slippage_bps),
@@ -175,7 +206,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
         fill_provider=fill_provider,
     )
 
-    capital = float(config.get("risk", {}).get("initial_capital", 10000.0))
+    capital = float(risk_cfg.get("initial_capital", 10000.0))
     router.set_capital(capital, source="paper_campaign")
 
     router.configure_market_adapters(config.get("markets", {}))
@@ -190,6 +221,12 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
     strategy_returns = {
         "campaign": np.linspace(-0.002, 0.002, 30),
     }
+    revenue_diagnostics = RevenueDiagnostics(
+        str(broker_config.get("tca_db_path", "data/tca_records.csv"))
+    )
+    campaign_expected_alpha = float(
+        broker_config.get("expected_alpha_bps_by_strategy", {}).get("campaign", 0.0)
+    )
     portfolio_changes = list(np.linspace(-5.0, 5.0, 30))
 
     out_dir = Path(args.out_dir)
@@ -213,6 +250,8 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                 notional_usd=float(args.notional_usd),
                 price=float(price),
                 order_type=OrderType.LIMIT,
+                strategy_id="campaign",
+                expected_alpha_bps=campaign_expected_alpha,
             )
 
             portfolio = build_portfolio_snapshot(
@@ -295,8 +334,14 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         max_critical_alerts=0,
                     ),
                 )
+                revenue_payload = revenue_diagnostics.payload(
+                    lookback_days=int(args.lookback_days),
+                    limit=20,
+                )
                 last_snapshot = {
                     "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "risk_profile": risk_profile_payload(risk_profile),
+                    "operator_tier": operator_tier.name,
                     "cycle": cycle + 1,
                     "stats": {
                         "submitted": stats.submitted,
@@ -305,13 +350,16 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         "reject_rate": stats.reject_rate,
                     },
                     "eta": {
-                        "markets": {f"{key[0]}@{key[1]}": float(val) for key, val in updated_eta.items()},
+                        "markets": {
+                            f"{key[0]}@{key[1]}": float(val) for key, val in updated_eta.items()
+                        },
                     },
                     "reliability": reliability,
                     "calibration": calibration,
                     "readiness": readiness,
                     "ops_health": ops_health,
                     "promotion_gate": promotion_gate,
+                    "revenue": revenue_payload,
                 }
                 path = _write_snapshot(out_dir, last_snapshot)
                 print(
@@ -327,6 +375,8 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
         await router.stop_market_data()
 
     final = {
+        "risk_profile": risk_profile_payload(risk_profile),
+        "operator_tier": operator_tier.name,
         "submitted": stats.submitted,
         "filled": stats.filled,
         "rejected": stats.rejected,
@@ -335,6 +385,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
         "promotion_gate": last_snapshot.get("promotion_gate", {}),
         "reliability": last_snapshot.get("reliability", {}),
         "readiness": last_snapshot.get("readiness", {}),
+        "revenue": last_snapshot.get("revenue", {}),
     }
     return final
 

@@ -1,6 +1,6 @@
 # Risk Management System
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -22,7 +22,9 @@ class RiskManager:
     """Institutional-grade risk management"""
 
     def __init__(self, config: dict):
-        self.limits = RiskLimits(**config)
+        allowed = {field.name for field in fields(RiskLimits)}
+        limits_cfg = {k: v for k, v in config.items() if k in allowed}
+        self.limits = RiskLimits(**limits_cfg)
         self.current_drawdown = 0.0
         self.peak_portfolio_value = 0.0
         self.daily_pnl = 0.0

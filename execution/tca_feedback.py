@@ -54,10 +54,16 @@ class TCATradeRecord:
     spread_bps: float
     vol_24h: float
     depth_1pct_usd: float
+    strategy_id: str = "unknown"
+    expected_alpha_bps: float = 0.0
 
     @property
     def slippage_error(self) -> float:
         return self.predicted_slippage_bps - self.realized_slippage_bps
+
+    @property
+    def realized_net_alpha_bps(self) -> float:
+        return float(self.expected_alpha_bps) - float(self.realized_total_bps)
 
 
 def _ensure_datetime(value) -> datetime:
@@ -120,6 +126,14 @@ class TCADatabase:
         for _, row in frame.iterrows():
             payload = row.to_dict()
             payload["timestamp"] = _ensure_datetime(payload["timestamp"])
+            strategy_id = payload.get("strategy_id", "unknown")
+            if pd.isna(strategy_id) or str(strategy_id).strip() == "":
+                strategy_id = "unknown"
+            expected_alpha_bps = payload.get("expected_alpha_bps", 0.0)
+            if pd.isna(expected_alpha_bps):
+                expected_alpha_bps = 0.0
+            payload["strategy_id"] = str(strategy_id)
+            payload["expected_alpha_bps"] = float(expected_alpha_bps)
             records.append(TCATradeRecord(**payload))
         return records
 
@@ -145,6 +159,8 @@ class TCADatabase:
                     "spread_bps": record.spread_bps,
                     "vol_24h": record.vol_24h,
                     "depth_1pct_usd": record.depth_1pct_usd,
+                    "strategy_id": record.strategy_id,
+                    "expected_alpha_bps": record.expected_alpha_bps,
                 }
             )
         return pd.DataFrame(rows)

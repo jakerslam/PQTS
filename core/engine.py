@@ -17,6 +17,11 @@ from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFil
 from execution.risk_aware_router import OrderResult, RiskAwareRouter
 from execution.smart_router import OrderRequest as RouterOrderRequest, OrderType as RouterOrderType
 from risk.kill_switches import RiskLimits as KillSwitchLimits
+from risk.risk_tolerance import (
+    RiskToleranceProfile,
+    resolve_effective_risk_config,
+    risk_profile_payload,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -114,6 +119,7 @@ class TradingEngine:
         )
         self.latest_data_quality_report: Optional[DataQualityReport] = None
         self._portfolio_change_history: List[float] = [0.0] * 30
+        self._risk_profile_override: Optional[str] = None
         runtime_cfg = self.config.get("runtime", {})
         self.state_path = Path(runtime_cfg.get("state_path", "data/engine_state.json"))
         self.state_version = 1
@@ -122,6 +128,8 @@ class TradingEngine:
 
         logger.info(f"TradingEngine initialized in {self.mode} mode")
         logger.info("Toggle state: %s", self.toggle_manager.snapshot())
+        _, profile = self._effective_risk_config()
+        logger.info("Risk tolerance profile: %s", profile.name)
 
     def _load_config(self, path: str) -> dict:
         with open(path, "r") as f:
@@ -165,7 +173,8 @@ class TradingEngine:
             broker_config=broker_config,
             fill_provider=fill_provider,
         )
-        initial_capital = self.config.get("risk", {}).get("initial_capital")
+        risk_cfg, _profile = self._effective_risk_config()
+        initial_capital = risk_cfg.get("initial_capital")
         if initial_capital is None:
             raise ValueError(
                 "risk.initial_capital must be set in config. Capital injection is required."
@@ -204,7 +213,7 @@ class TradingEngine:
         return value / 100.0 if value > 1.0 else value
 
     def _build_router_risk_limits(self) -> KillSwitchLimits:
-        risk_cfg = self.config.get("risk", {})
+        risk_cfg, _profile = self._effective_risk_config()
         return KillSwitchLimits(
             max_daily_loss_pct=self._pct(
                 risk_cfg.get("max_daily_loss_pct", risk_cfg.get("max_portfolio_risk_pct", 2.0)),
@@ -218,7 +227,7 @@ class TradingEngine:
         )
 
     def _build_router_broker_config(self) -> Dict[str, Any]:
-        risk_cfg = self.config.get("risk", {})
+        risk_cfg, _profile = self._effective_risk_config()
         execution_cfg = self.config.get("execution", {})
         broker_config = {
             "enabled": True,
@@ -239,6 +248,12 @@ class TradingEngine:
             "default_taker_fee_bps": execution_cfg.get("default_taker_fee_bps", 12.0),
             "reliability": execution_cfg.get("reliability", {}),
             "regime_overlay": execution_cfg.get("regime_overlay", {}),
+            "capacity_curves": execution_cfg.get("capacity_curves", {}),
+            "expected_alpha_bps_by_strategy": execution_cfg.get(
+                "expected_alpha_bps_by_strategy",
+                {},
+            ),
+            "risk_profile": risk_profile_payload(_profile),
         }
         return broker_config
 
@@ -246,8 +261,15 @@ class TradingEngine:
         """Initialize risk management"""
         from .risk_manager import RiskManager
 
-        self.risk_manager = RiskManager(self.config.get("risk", {}))
+        risk_cfg, _profile = self._effective_risk_config()
+        self.risk_manager = RiskManager(risk_cfg)
         logger.info("Risk manager initialized")
+
+    def _effective_risk_config(self) -> tuple[Dict[str, Any], RiskToleranceProfile]:
+        return resolve_effective_risk_config(
+            self.config,
+            override_profile=self._risk_profile_override,
+        )
 
     async def _init_strategies(self):
         """Initialize trading strategies"""
@@ -446,7 +468,7 @@ class TradingEngine:
         capital = (
             self.router.get_capital()
             if self.router is not None
-            else float(self.config.get("risk", {}).get("initial_capital", 0.0))
+            else float(self._effective_risk_config()[0].get("initial_capital", 0.0))
         )
         leverage = gross_exposure / capital if capital > 0 else 0.0
         return {
@@ -729,9 +751,29 @@ class TradingEngine:
         self.toggle_manager.apply_strategy_profile(profile_name)
         self._sync_toggle_state()
 
+    def set_risk_tolerance_profile(self, profile_name: str):
+        """Set risk tolerance profile to scale hard limits before startup."""
+        if self.router is not None or self.risk_manager is not None:
+            raise RuntimeError(
+                "Risk tolerance profile must be set before market/risk initialization."
+            )
+        profile = str(profile_name).strip()
+        if not profile:
+            raise ValueError("Risk tolerance profile cannot be empty")
+        try:
+            _, resolved = resolve_effective_risk_config(self.config, override_profile=profile)
+        except ValueError as exc:
+            raise ToggleValidationError(str(exc)) from exc
+        self._risk_profile_override = resolved.name
+        logger.info("Applied risk tolerance profile override: %s", resolved.name)
+
     def get_toggle_state(self) -> Dict[str, Any]:
         """Return full runtime toggle snapshot."""
-        return self.toggle_manager.snapshot()
+        state = self.toggle_manager.snapshot()
+        _, profile = self._effective_risk_config()
+        state["risk_profile"] = profile.name
+        state["risk_profile_scale"] = float(profile.risk_limit_scale)
+        return state
 
     def _sync_toggle_state(self):
         """

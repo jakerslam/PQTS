@@ -31,6 +31,7 @@ def _args() -> Namespace:
         min_fills=200,
         max_p95_slippage_bps=20.0,
         max_mape_pct=35.0,
+        risk_profile="conservative",
         out_dir="data/reports",
     )
 
@@ -60,3 +61,4 @@ def test_build_campaign_cmd_contains_expected_flags():
     assert "--symbols BTCUSDT,ETHUSDT" in joined
     assert "--cycles 50" in joined
     assert "--notional-usd 150.0" in joined
+    assert "--risk-profile conservative" in joined

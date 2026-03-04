@@ -14,6 +14,7 @@ from typing import Any, Dict, List
 import yaml
 
 from analytics.attribution import log_event
+from core.operator_tier import resolve_operator_tier, validate_operator_tier_overrides
 from research.handoff_blob import build_handoff_blob
 
 ROOT = Path(__file__).resolve().parent
@@ -59,7 +60,7 @@ def _symbols_for_market(config: Dict[str, Any], market: str) -> List[str]:
 
 
 def _build_campaign_cmd(args: argparse.Namespace, symbols: List[str]) -> List[str]:
-    return [
+    cmd = [
         sys.executable,
         str(ROOT / "scripts" / "run_paper_campaign.py"),
         "--config",
@@ -87,6 +88,13 @@ def _build_campaign_cmd(args: argparse.Namespace, symbols: List[str]) -> List[st
         "--out-dir",
         args.out_dir,
     ]
+    risk_profile = str(getattr(args, "risk_profile", "") or "").strip()
+    if risk_profile:
+        cmd.extend(["--risk-profile", risk_profile])
+    operator_tier = str(getattr(args, "operator_tier", "") or "").strip()
+    if operator_tier:
+        cmd.extend(["--operator-tier", operator_tier])
+    return cmd
 
 
 def _write_report(
@@ -143,6 +151,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--market", choices=["crypto", "equities", "forex", "all"], default="crypto"
     )
+    parser.add_argument(
+        "--operator-tier",
+        choices=["simple", "pro"],
+        default="",
+        help="Operator UX tier override (simple or pro).",
+    )
     parser.add_argument("--strat", default="ml-ensemble")
     parser.add_argument("--source", default="manual")
     parser.add_argument("--config", default="config/paper.yaml")
@@ -155,6 +169,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-fills", type=int, default=200)
     parser.add_argument("--max-p95-slippage-bps", type=float, default=20.0)
     parser.add_argument("--max-mape-pct", type=float, default=35.0)
+    parser.add_argument(
+        "--risk-profile",
+        default="",
+        help=(
+            "Risk tolerance profile override "
+            "(conservative, balanced, aggressive, professional, or custom key)."
+        ),
+    )
     parser.add_argument("--out-dir", default="data/reports")
     return parser
 
@@ -162,6 +184,17 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     config = _load_yaml(args.config)
+    try:
+        operator_tier = resolve_operator_tier(config, override=(args.operator_tier or None))
+        validate_operator_tier_overrides(
+            tier=operator_tier,
+            has_market_override=bool(args.market and args.market != "crypto"),
+            has_strategy_override=bool(args.strat and args.strat != "ml-ensemble"),
+            has_symbol_override=False,
+        )
+    except ValueError as exc:
+        print(f"Invalid operator tier option: {exc}", file=sys.stderr)
+        return 2
     symbols = _symbols_for_market(config, args.market)
     cmd = _build_campaign_cmd(args, symbols)
 
@@ -204,6 +237,7 @@ def main() -> int:
         metadata={
             "market": args.market,
             "strategy": args.strat,
+            "operator_tier": operator_tier.name,
             "report_path": str(report_path),
             "handoff_blob_path": str(handoff_path),
             "submitted": int(campaign_result.get("submitted", 0)),
@@ -215,6 +249,7 @@ def main() -> int:
         "report_path": str(report_path),
         "handoff_blob_path": str(handoff_path),
         "dashboard_url": "http://localhost:8050",
+        "operator_tier": operator_tier.name,
         "campaign_result": campaign_result,
     }
     print(json.dumps(summary, sort_keys=True))

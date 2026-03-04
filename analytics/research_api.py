@@ -500,3 +500,16 @@ class ResearchDashboardAPI:
             "artifacts": records,
             "promotion_audit": promotion_audit,
         }
+
+    def get_experiment_governance(self, experiment_id: str) -> Dict[str, Any]:
+        """Return immutable run registry and rollback provenance for one experiment."""
+        runs = self.db.list_experiment_runs(experiment_id=experiment_id)
+        rollbacks = self.db.list_rollback_events(experiment_id=experiment_id)
+        return {
+            "experiment_id": str(experiment_id),
+            "run_count": int(len(runs)),
+            "rollback_count": int(len(rollbacks)),
+            "latest_run": self.db.latest_experiment_run(experiment_id),
+            "runs": runs.to_dict(orient="records"),
+            "rollbacks": rollbacks.to_dict(orient="records"),
+        }

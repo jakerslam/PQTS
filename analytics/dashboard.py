@@ -4,7 +4,6 @@ import logging
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +43,7 @@ class AnalyticsDashboard:
         self.config = config
         self.data_dir = Path(config.get("data_dir", "data/analytics"))
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.tca_db_path = str(config.get("tca_db_path", "data/tca_records.csv"))
 
         # Performance tracking
         self.daily_pnl = []
@@ -141,10 +141,19 @@ class AnalyticsDashboard:
         report = {
             "generated_at": datetime.utcnow().isoformat(),
             "metrics": asdict(metrics),
-            "open_positions": len(self.positions),
+            "open_positions": 0,
             "total_trades_all_time": len(self.trade_history),
             "equity_latest": self.equity_curve[-1]["value"] if self.equity_curve else 0,
         }
+        try:
+            from analytics.revenue_api import get_revenue_kpis
+
+            report["revenue_kpis"] = get_revenue_kpis(
+                tca_db_path=self.tca_db_path,
+                lookback_days=int(self.config.get("revenue_lookback_days", 30)),
+            )
+        except Exception:
+            report["revenue_kpis"] = {}
 
         # Save report
         report_path = self.data_dir / f"report_{datetime.utcnow().strftime('%Y%m%d')}.json"

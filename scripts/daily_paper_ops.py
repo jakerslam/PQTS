@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
 import json
-from pathlib import Path
 import subprocess
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -71,6 +71,9 @@ def _build_campaign_cmd(args: argparse.Namespace) -> List[str]:
         "--promotion-max-days",
         str(int(args.promotion_max_days)),
     ]
+    risk_profile = str(getattr(args, "risk_profile", "") or "").strip()
+    if risk_profile:
+        cmd.extend(["--risk-profile", risk_profile])
     if args.campaign_symbols:
         cmd.extend(["--symbols", args.campaign_symbols])
     return cmd
@@ -104,6 +107,14 @@ def _run(cmd: List[str]) -> subprocess.CompletedProcess[str]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config/paper.yaml")
+    parser.add_argument(
+        "--risk-profile",
+        default="",
+        help=(
+            "Risk tolerance profile override "
+            "(conservative, balanced, aggressive, professional, or custom key)."
+        ),
+    )
     parser.add_argument("--campaign-symbols", default="BTCUSDT,ETHUSDT,BTC-USD,ETH-USD")
     parser.add_argument("--campaign-cycles", type=int, default=1440)
     parser.add_argument("--campaign-sleep-seconds", type=float, default=60.0)

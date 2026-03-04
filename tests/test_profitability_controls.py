@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import sys
 
 import numpy as np
 
@@ -16,7 +16,11 @@ from execution.fee_optimizer import FeeRebateOptimizer
 from execution.reliability import ExecutionReliabilityMonitor
 from execution.risk_aware_router import RiskAwareRouter
 from execution.smart_router import OrderRequest, OrderType
-from portfolio.strategy_allocator import StrategyBudgetInput, StrategyCapitalAllocator
+from portfolio.strategy_allocator import (
+    StrategyBudgetInput,
+    StrategyCapitalAllocator,
+    StrategyUtilityConfig,
+)
 from risk.kill_switches import RiskLimits
 from risk.regime_overlay import RegimeExposureOverlay
 from strategies.inventory_transfer import InventoryRiskTransferEngine
@@ -159,6 +163,45 @@ def test_strategy_allocator_penalizes_capacity_and_normalizes_weights():
 
     assert abs(sum(weights.values()) - 1.0) < 1e-9
     assert weights["good"] > weights["capacity_bound"]
+
+
+def test_strategy_allocator_utility_respects_risk_aversion():
+    conservative = StrategyCapitalAllocator(
+        max_weight=0.9,
+        min_weight=0.0,
+        capacity_haircut=0.0,
+        utility_config=StrategyUtilityConfig(risk_aversion=10.0),
+    )
+    aggressive = StrategyCapitalAllocator(
+        max_weight=0.9,
+        min_weight=0.0,
+        capacity_haircut=0.0,
+        utility_config=StrategyUtilityConfig(risk_aversion=1.0),
+    )
+    inputs = [
+        StrategyBudgetInput(
+            strategy_id="high_vol",
+            expected_return=0.85,
+            annual_vol=0.45,
+            annual_turnover=2.0,
+            cost_per_turnover=0.004,
+            capacity_ratio=0.8,
+        ),
+        StrategyBudgetInput(
+            strategy_id="low_vol",
+            expected_return=0.24,
+            annual_vol=0.15,
+            annual_turnover=2.0,
+            cost_per_turnover=0.004,
+            capacity_ratio=0.8,
+        ),
+    ]
+
+    conservative_w = conservative.allocate_utility(inputs)
+    aggressive_w = aggressive.allocate_utility(inputs)
+
+    assert conservative_w["low_vol"] > conservative_w["high_vol"]
+    assert aggressive_w["high_vol"] > conservative_w["high_vol"]
 
 
 def test_market_data_quality_monitor_flags_drift_and_missing_symbols():
@@ -331,3 +374,110 @@ def test_router_failover_switches_away_from_degraded_primary(tmp_path):
     assert result.exchange == "coinbase"
     assert result.audit_log.get("routing_failover", {}).get("from_exchange") == "binance"
     assert result.audit_log.get("routing_failover", {}).get("to_exchange") == "coinbase"
+
+
+def test_router_capacity_curve_blocks_negative_expected_edge(tmp_path):
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+        ),
+        broker_config={
+            "enabled": True,
+            "capacity_curves": {
+                "enabled": True,
+                "storage_path": str(tmp_path / "capacity_samples.jsonl"),
+                "min_points": 5,
+            },
+        },
+        tca_db_path=str(tmp_path / "router_capacity.csv"),
+    )
+    router.set_capital(100000.0, source="unit_test")
+    strategy_returns, portfolio_changes = _strategy_inputs()
+    market_data = {
+        "binance": {
+            "BTC-USD": {
+                "price": 50000.0,
+                "spread": 0.0002,
+                "volume_24h": 2_000_000,
+            }
+        },
+        "order_book": {
+            "bids": [(49990.0, 2.0), (49980.0, 4.0)],
+            "asks": [(50010.0, 1.5), (50020.0, 3.0)],
+        },
+    }
+    order = OrderRequest(
+        symbol="BTC-USD",
+        side="buy",
+        quantity=0.2,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+        strategy_id="mm_blocked",
+        expected_alpha_bps=0.0,
+    )
+
+    result = asyncio.run(
+        router.submit_order(
+            order=order,
+            market_data=market_data,
+            portfolio=_portfolio_snapshot(),
+            strategy_returns=strategy_returns,
+            portfolio_changes=portfolio_changes,
+        )
+    )
+
+    assert result.success is False
+    assert "CAPACITY_CURVE_BLOCK" in str(result.rejected_reason)
+
+
+def test_router_tca_records_strategy_and_expected_alpha(tmp_path):
+    router = RiskAwareRouter(
+        risk_config=RiskLimits(
+            max_daily_loss_pct=0.02,
+            max_drawdown_pct=0.2,
+            max_gross_leverage=2.0,
+        ),
+        broker_config={"enabled": True, "capacity_curves": {"enabled": True}},
+        tca_db_path=str(tmp_path / "router_strategy_tca.csv"),
+    )
+    router.set_capital(100000.0, source="unit_test")
+    strategy_returns, portfolio_changes = _strategy_inputs()
+    market_data = {
+        "binance": {
+            "BTC-USD": {
+                "price": 50000.0,
+                "spread": 0.0002,
+                "volume_24h": 2_000_000,
+            }
+        },
+        "order_book": {
+            "bids": [(49990.0, 2.0), (49980.0, 4.0)],
+            "asks": [(50010.0, 1.5), (50020.0, 3.0)],
+        },
+    }
+    order = OrderRequest(
+        symbol="BTC-USD",
+        side="buy",
+        quantity=0.1,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+        strategy_id="mm_live",
+        expected_alpha_bps=25.0,
+    )
+    result = asyncio.run(
+        router.submit_order(
+            order=order,
+            market_data=market_data,
+            portfolio=_portfolio_snapshot(),
+            strategy_returns=strategy_returns,
+            portfolio_changes=portfolio_changes,
+        )
+    )
+
+    assert result.success is True
+    assert router.tca_db.records
+    latest = router.tca_db.records[-1]
+    assert latest.strategy_id == "mm_live"
+    assert latest.expected_alpha_bps == 25.0

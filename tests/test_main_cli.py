@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -61,6 +62,10 @@ def test_parser_accepts_toggle_flags():
             "crypto,forex",
             "--strategies",
             "scalping,arb",
+            "--risk-profile",
+            "conservative",
+            "--operator-tier",
+            "pro",
             "--show-toggles",
         ]
     )
@@ -69,6 +74,8 @@ def test_parser_accepts_toggle_flags():
     assert args.profile == "crypto_only"
     assert args.markets == "crypto,forex"
     assert args.strategies == "scalping,arb"
+    assert args.risk_profile == "conservative"
+    assert args.operator_tier == "pro"
     assert args.show_toggles is True
 
 
@@ -86,6 +93,8 @@ def test_apply_cli_toggles_overrides_profile(tmp_path):
             "forex",
             "--strategies",
             "scalping",
+            "--risk-profile",
+            "conservative",
         ]
     )
 
@@ -94,3 +103,23 @@ def test_apply_cli_toggles_overrides_profile(tmp_path):
 
     assert state["active_markets"] == ["forex"]
     assert state["active_strategies"] == ["scalping"]
+    assert state["risk_profile"] == "conservative"
+
+
+def test_apply_cli_toggles_blocks_simple_tier_direct_overrides(tmp_path):
+    config = _base_config()
+    config["runtime"] = {"operator_tier": "simple"}
+    config_path = tmp_path / "cli_simple.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    engine = TradingEngine(str(config_path))
+
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            str(config_path),
+            "--markets",
+            "crypto",
+        ]
+    )
+    with pytest.raises(ValueError):
+        apply_cli_toggles(engine, args)

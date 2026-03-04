@@ -39,6 +39,8 @@ python dashboard/start.py
 
 # Run paper trading
 python main.py config/paper.yaml
+# or enforce a specific user risk tolerance profile:
+python main.py config/paper.yaml --risk-profile conservative
 ```
 
 ## ⚡ One-Command Demo
@@ -47,6 +49,8 @@ python main.py config/paper.yaml
 make demo
 # or:
 python demo.py --market crypto --strat ml-ensemble --source x_launch_thread
+# optional:
+# python demo.py --market crypto --risk-profile aggressive
 ```
 
 The demo runs a deterministic paper-simulation slice, emits:
@@ -66,7 +70,8 @@ python scripts/run_simulation_suite.py \
   --markets crypto,equities,forex \
   --strategies market_making,funding_arbitrage,cross_exchange \
   --cycles-per-scenario 60 \
-  --readiness-every 20
+  --readiness-every 20 \
+  --risk-profile balanced
 ```
 
 Artifacts:

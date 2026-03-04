@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from argparse import Namespace
 import importlib.util
 import json
-from pathlib import Path
 import sys
-
+from argparse import Namespace
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MODULE_PATH = ROOT / "scripts" / "daily_paper_ops.py"
@@ -20,6 +19,7 @@ SPEC.loader.exec_module(MODULE)
 def _args() -> Namespace:
     return Namespace(
         config="config/paper.yaml",
+        risk_profile="balanced",
         campaign_symbols="BTCUSDT,ETHUSDT",
         campaign_cycles=120,
         campaign_sleep_seconds=0.0,
@@ -47,7 +47,7 @@ def _args() -> Namespace:
 
 
 def test_parse_json_from_output_reads_last_json_object():
-    payload = MODULE._parse_json_from_output("line\n{\"a\":1}\n{\"b\":2}\n")
+    payload = MODULE._parse_json_from_output('line\n{"a":1}\n{"b":2}\n')
     assert payload == {"b": 2}
 
 
@@ -59,6 +59,7 @@ def test_build_campaign_cmd_contains_expected_flags():
     assert "--cycles 120" in joined
     assert "--notional-usd 150.0" in joined
     assert "--paper-stress-multiplier 3.0" in joined
+    assert "--risk-profile balanced" in joined
 
 
 def test_build_readiness_cmd_contains_expected_flags():

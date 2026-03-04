@@ -24,6 +24,14 @@ def _parse_csv(value: str) -> List[str]:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config/paper.yaml")
+    parser.add_argument(
+        "--risk-profile",
+        default="",
+        help=(
+            "Risk tolerance profile override "
+            "(conservative, balanced, aggressive, professional, or custom key)."
+        ),
+    )
     parser.add_argument("--markets", default="crypto,equities,forex")
     parser.add_argument("--strategies", default="market_making,funding_arbitrage,cross_exchange")
     parser.add_argument("--cycles-per-scenario", type=int, default=120)
@@ -73,6 +81,7 @@ async def _run(args: argparse.Namespace) -> dict:
         paper_min_slippage_bps=args.paper_min_slippage_bps,
         paper_stress_multiplier=args.paper_stress_multiplier,
         paper_stress_fill_ratio_multiplier=args.paper_stress_fill_ratio_multiplier,
+        risk_profile=(args.risk_profile or None),
     )
     payload = await runner.run_suite(
         markets=_parse_csv(args.markets),

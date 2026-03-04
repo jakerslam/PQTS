@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -19,12 +21,25 @@ from execution.canary_ramp import (  # noqa: E402
     CanaryRampMetrics,
     CanaryRampPolicy,
 )
+from risk.risk_tolerance import (  # noqa: E402
+    resolve_risk_tolerance_profile,
+    risk_profile_payload,
+    scale_canary_steps_for_profile,
+)
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"Expected object JSON at {path}")
+    return payload
+
+
+def _load_yaml(path: Path) -> Dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected object YAML at {path}")
     return payload
 
 
@@ -45,6 +60,15 @@ def _parse_dt(value: str) -> datetime:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", default="config/paper.yaml")
+    parser.add_argument(
+        "--risk-profile",
+        default="",
+        help=(
+            "Risk tolerance profile override "
+            "(conservative, balanced, aggressive, professional, or custom key)."
+        ),
+    )
     parser.add_argument("--reports-dir", default="data/reports")
     parser.add_argument("--campaign-snapshot", default="")
     parser.add_argument("--slo-health", default="")
@@ -68,6 +92,11 @@ def _parse_steps(value: str) -> list[float]:
 
 def main() -> int:
     args = build_parser().parse_args()
+    config = _load_yaml(Path(args.config))
+    risk_profile = resolve_risk_tolerance_profile(
+        config,
+        override_profile=(args.risk_profile or None),
+    )
     reports_dir = Path(args.reports_dir)
     campaign_path = (
         Path(args.campaign_snapshot)
@@ -82,7 +111,7 @@ def main() -> int:
     slo = _load_json(slo_path)
 
     policy = CanaryRampPolicy(
-        steps=_parse_steps(args.steps),
+        steps=scale_canary_steps_for_profile(_parse_steps(args.steps), profile=risk_profile),
         min_days_per_step=int(args.min_days_per_step),
         max_reject_rate=float(args.max_reject_rate),
         max_slippage_mape_pct=float(args.max_slippage_mape_pct),
@@ -123,6 +152,7 @@ def main() -> int:
 
     payload = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "risk_profile": risk_profile_payload(risk_profile),
         "campaign_snapshot": str(campaign_path),
         "slo_health": str(slo_path),
         "decision": decision,

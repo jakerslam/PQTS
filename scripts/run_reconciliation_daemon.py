@@ -20,6 +20,10 @@ if str(ROOT) not in sys.path:
 from execution.reconciliation_daemon import ReconciliationConfig, ReconciliationDaemon  # noqa: E402
 from execution.risk_aware_router import RiskAwareRouter  # noqa: E402
 from risk.kill_switches import RiskLimits  # noqa: E402
+from risk.risk_tolerance import (  # noqa: E402
+    resolve_effective_risk_config,
+    risk_profile_payload,
+)
 
 
 def _load_yaml(path: str) -> Dict[str, Any]:
@@ -34,8 +38,7 @@ def _pct(value: Any, default: float) -> float:
     return token / 100.0 if token > 1.0 else token
 
 
-def _build_risk_limits(config: Dict[str, Any]) -> RiskLimits:
-    risk_cfg = config.get("risk", {})
+def _build_risk_limits(risk_cfg: Dict[str, Any]) -> RiskLimits:
     return RiskLimits(
         max_daily_loss_pct=_pct(
             risk_cfg.get("max_daily_loss_pct", risk_cfg.get("max_portfolio_risk_pct", 2.0)),
@@ -49,8 +52,13 @@ def _build_risk_limits(config: Dict[str, Any]) -> RiskLimits:
     )
 
 
-def _build_broker_config(config: Dict[str, Any], *, tca_db: str) -> Dict[str, Any]:
-    risk_cfg = config.get("risk", {})
+def _build_broker_config(
+    config: Dict[str, Any],
+    *,
+    tca_db: str,
+    risk_cfg: Dict[str, Any],
+    risk_profile_payload_value: Dict[str, Any],
+) -> Dict[str, Any]:
     execution_cfg = config.get("execution", {})
     return {
         "enabled": True,
@@ -69,6 +77,7 @@ def _build_broker_config(config: Dict[str, Any], *, tca_db: str) -> Dict[str, An
         "default_taker_fee_bps": execution_cfg.get("default_taker_fee_bps", 12.0),
         "reliability": execution_cfg.get("reliability", {}),
         "regime_overlay": execution_cfg.get("regime_overlay", {}),
+        "risk_profile": dict(risk_profile_payload_value),
     }
 
 
@@ -87,6 +96,14 @@ def _parse_aliases(value: str) -> Dict[str, str]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config/paper.yaml")
+    parser.add_argument(
+        "--risk-profile",
+        default="",
+        help=(
+            "Risk tolerance profile override "
+            "(conservative, balanced, aggressive, professional, or custom key)."
+        ),
+    )
     parser.add_argument("--cycles", type=int, default=10)
     parser.add_argument("--sleep-seconds", type=float, default=5.0)
     parser.add_argument("--tca-db", default="data/tca_records.csv")
@@ -112,12 +129,22 @@ def build_parser() -> argparse.ArgumentParser:
 
 async def _run(args: argparse.Namespace) -> Dict[str, Any]:
     config = _load_yaml(args.config)
+    risk_cfg, risk_profile = resolve_effective_risk_config(
+        config,
+        override_profile=(args.risk_profile or None),
+    )
+    profile_payload = risk_profile_payload(risk_profile)
     router = RiskAwareRouter(
-        risk_config=_build_risk_limits(config),
-        broker_config=_build_broker_config(config, tca_db=args.tca_db),
+        risk_config=_build_risk_limits(risk_cfg),
+        broker_config=_build_broker_config(
+            config,
+            tca_db=args.tca_db,
+            risk_cfg=risk_cfg,
+            risk_profile_payload_value=profile_payload,
+        ),
         tca_db_path=str(args.tca_db),
     )
-    capital = float(config.get("risk", {}).get("initial_capital", 10000.0))
+    capital = float(risk_cfg.get("initial_capital", 10000.0))
     router.set_capital(capital, source="reconciliation_daemon")
     router.configure_market_adapters(config.get("markets", {}))
     await router.start_market_data()
@@ -144,6 +171,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
 
     payload = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "risk_profile": profile_payload,
         "cycles": cycles,
         "incident_log": str(daemon.incident_log_path),
         "halted": bool(router.risk_engine.is_halted),

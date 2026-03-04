@@ -34,3 +34,9 @@ def test_load_json_reads_object(tmp_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
     assert MODULE._load_json(path) == payload
+
+
+def test_parser_accepts_risk_profile_flag():
+    parser = MODULE.build_parser()
+    args = parser.parse_args(["--risk-profile", "aggressive"])
+    assert args.risk_profile == "aggressive"

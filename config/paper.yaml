@@ -118,6 +118,12 @@ strategies:
 # ============================================
 risk:
   initial_capital: 10000.0
+  risk_tolerance_profile: balanced  # conservative, balanced, aggressive, professional, or custom key
+  risk_tolerance_profiles:
+    prop_desk:
+      description: "Higher-capacity profile for experienced desk operators"
+      risk_limit_scale: 1.2
+      canary_allocation_scale: 1.1
   max_portfolio_risk_pct: 2.0
   max_position_risk_pct: 1.0
   max_drawdown_pct: 10.0

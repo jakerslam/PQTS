@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from analytics.paper_readiness import PaperTrackRecordEvaluator
+from execution.capacity_curves import StrategyCapacityCurveModel
 from execution.order_ledger import ImmutableOrderLedger
 from execution.realistic_costs import (
     Bps,
@@ -251,6 +252,22 @@ class RiskAwareRouter:
             failure_slo=float(reliability_cfg.get("failure_slo", 0.01)),
             cooldown_seconds=int(reliability_cfg.get("cooldown_seconds", 300)),
         )
+        capacity_cfg = broker_config.get("capacity_curves", {})
+        self.capacity_model = StrategyCapacityCurveModel(
+            enabled=bool(capacity_cfg.get("enabled", False)),
+            storage_path=str(
+                capacity_cfg.get("storage_path", "data/analytics/capacity_curve_samples.jsonl")
+            ),
+            min_points=int(capacity_cfg.get("min_points", 8)),
+            max_points_per_key=int(capacity_cfg.get("max_points_per_key", 300)),
+            throttle_buffer=float(capacity_cfg.get("throttle_buffer", 0.95)),
+        )
+        self._default_expected_alpha_bps: Dict[str, float] = {
+            str(key): float(value)
+            for key, value in (
+                broker_config.get("expected_alpha_bps_by_strategy", {}) or {}
+            ).items()
+        }
         # Order admission gate to prevent race-condition bypass across state changes.
         self._submit_order_lock = asyncio.Lock()
 
@@ -266,6 +283,12 @@ class RiskAwareRouter:
         logger.info(f"  Daily loss limit: {risk_config.max_daily_loss_pct:.1%}")
         logger.info(f"  Max drawdown: {risk_config.max_drawdown_pct:.1%}")
         logger.info(f"  Max leverage: {risk_config.max_gross_leverage:.1f}x")
+
+    def _resolve_expected_alpha_bps(self, order: OrderRequest) -> float:
+        explicit = float(getattr(order, "expected_alpha_bps", 0.0) or 0.0)
+        if explicit != 0.0:
+            return explicit
+        return float(self._default_expected_alpha_bps.get(str(order.strategy_id), 0.0))
 
     def set_capital(self, capital: float, source: str = "manual"):
         """
@@ -497,6 +520,8 @@ class RiskAwareRouter:
                 "quantity": order.quantity,
                 "type": order.order_type.value,
                 "price": order.price,
+                "strategy_id": str(order.strategy_id),
+                "expected_alpha_bps": float(getattr(order, "expected_alpha_bps", 0.0) or 0.0),
             },
         }
 
@@ -777,6 +802,75 @@ class RiskAwareRouter:
             "expected_slippage": route.expected_slippage,
             "ranked_exchanges": ranked_exchanges,
         }
+        expected_alpha_bps = self._resolve_expected_alpha_bps(order)
+        predicted_total_router_bps = float(
+            Bps.from_pct(
+                (float(route.expected_cost) + float(route.expected_slippage)) / max(notional, 1e-12)
+            )
+        )
+        predicted_net_alpha_bps = float(expected_alpha_bps - predicted_total_router_bps)
+
+        capacity_decision = self.capacity_model.evaluate_order(
+            strategy_id=str(order.strategy_id),
+            venue=route.exchange,
+            symbol=order.symbol,
+            candidate_notional_usd=float(notional),
+            predicted_net_alpha_bps=predicted_net_alpha_bps,
+        )
+        audit_entry["capacity_curve"] = {
+            "strategy_id": str(order.strategy_id),
+            "requested_notional_usd": float(notional),
+            "approved_notional_usd": float(capacity_decision.approved_notional_usd),
+            "throttle_ratio": float(capacity_decision.throttle_ratio),
+            "marginal_net_alpha_bps": float(capacity_decision.marginal_net_alpha_bps),
+            "reason": capacity_decision.reason,
+            "blocked": bool(capacity_decision.blocked),
+            "points_used": int(capacity_decision.points_used),
+            "expected_alpha_bps": float(expected_alpha_bps),
+            "predicted_total_router_bps": float(predicted_total_router_bps),
+            "predicted_net_alpha_bps": float(predicted_net_alpha_bps),
+        }
+
+        if capacity_decision.blocked:
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = f"CAPACITY_CURVE_BLOCK: {capacity_decision.reason}"
+            self.audit_log.append(audit_entry)
+            return OrderResult(
+                success=False,
+                decision=RiskDecision.HALT,
+                risk_state=risk_state,
+                order_id=None,
+                exchange=route.exchange,
+                rejected_reason=audit_entry["reject_reason"],
+                audit_log=audit_entry,
+            )
+
+        approved_notional = float(capacity_decision.approved_notional_usd)
+        if approved_notional + 1e-9 < float(notional):
+            original_quantity = float(order.quantity)
+            order.quantity = float(max(approved_notional / max(float(price), 1e-12), 0.0))
+            notional = float(order.quantity * float(price))
+            audit_entry.setdefault("modified", {})
+            audit_entry["modified"]["capacity_curve"] = {
+                "original_quantity": original_quantity,
+                "new_quantity": float(order.quantity),
+                "reason": capacity_decision.reason,
+            }
+            if order.quantity <= 0 or notional <= 0:
+                self.reject_count += 1
+                audit_entry["rejected"] = True
+                audit_entry["reject_reason"] = "CAPACITY_CURVE: quantity throttled to zero"
+                self.audit_log.append(audit_entry)
+                return OrderResult(
+                    success=False,
+                    decision=RiskDecision.HALT,
+                    risk_state=risk_state,
+                    order_id=None,
+                    exchange=route.exchange,
+                    rejected_reason=audit_entry["reject_reason"],
+                    audit_log=audit_entry,
+                )
 
         venue_caps = self.broker_config.get("max_venue_notional", {})
         venue_cap = venue_caps.get(route.exchange)
@@ -941,6 +1035,7 @@ class RiskAwareRouter:
             spread_bps=spread_bps,
             depth_1pct_usd=depth_1pct_usd,
             vol_24h=float(market_data.get("vol_24h", self.cost_model.base_vol)),
+            expected_alpha_bps=float(expected_alpha_bps),
         )
         requested_qty = float(max(order.quantity, 1e-12))
         fill_ratio = float(fill.executed_qty) / requested_qty
@@ -963,6 +1058,14 @@ class RiskAwareRouter:
             latency_ms=execution_latency_ms,
             rejected=False,
             failed=False,
+        )
+        self.capacity_model.record(
+            strategy_id=str(order.strategy_id),
+            venue=route.exchange,
+            symbol=order.symbol,
+            notional_usd=float(realized_notional),
+            net_alpha_bps=float(tca_payload.get("realized_net_alpha_bps", 0.0)),
+            timestamp=fill.timestamp,
         )
         audit_entry["execution_quality"] = {
             "latency_ms": execution_latency_ms,
@@ -994,6 +1097,7 @@ class RiskAwareRouter:
         spread_bps: float,
         depth_1pct_usd: float,
         vol_24h: float,
+        expected_alpha_bps: float,
     ) -> Dict[str, float]:
         """Persist predicted vs. realized slippage/costs for TCA calibration."""
         if notional <= 0 or reference_price <= 0:
@@ -1048,29 +1152,39 @@ class RiskAwareRouter:
             spread_bps=spread_bps,
             vol_24h=vol_24h,
             depth_1pct_usd=depth_1pct_usd,
+            strategy_id=str(order.strategy_id),
+            expected_alpha_bps=float(expected_alpha_bps),
         )
         self.tca_db.add_record(record)
         self.tca_db.save()
+        realized_net_alpha_bps = float(expected_alpha_bps) - realized_total_bps
 
         audit_entry["tca"] = {
             "predicted_slippage_bps": predicted_slippage_bps,
             "realized_slippage_bps": realized_slippage_bps,
             "predicted_total_bps": predicted_total_bps,
             "realized_total_bps": realized_total_bps,
+            "strategy_id": str(order.strategy_id),
+            "expected_alpha_bps": float(expected_alpha_bps),
+            "realized_net_alpha_bps": realized_net_alpha_bps,
         }
         logger.info(
-            "TCA %s %s@%s: predicted_slip=%.3f bps realized_slip=%.3f bps",
+            "TCA %s %s@%s strategy=%s: predicted_slip=%.3f bps realized_slip=%.3f bps net_alpha=%.3f bps",
             order_id,
             fill.symbol,
             fill.venue,
+            str(order.strategy_id),
             predicted_slippage_bps,
             realized_slippage_bps,
+            realized_net_alpha_bps,
         )
         return {
             "predicted_slippage_bps": predicted_slippage_bps,
             "realized_slippage_bps": realized_slippage_bps,
             "predicted_total_bps": predicted_total_bps,
             "realized_total_bps": realized_total_bps,
+            "expected_alpha_bps": float(expected_alpha_bps),
+            "realized_net_alpha_bps": realized_net_alpha_bps,
         }
 
     def _create_token(self) -> "_RouterToken":
@@ -1500,6 +1614,10 @@ class RiskAwareRouter:
             "capital": self._capital,
             "audit_entries": len(self.audit_log),
             "reliability": self.reliability_monitor.summary(),
+            "capacity_curves": {
+                "enabled": bool(self.capacity_model.enabled),
+                "storage_path": str(self.capacity_model.storage_path),
+            },
         }
 
     def run_weekly_tca_calibration(

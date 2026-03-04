@@ -75,13 +75,18 @@ except Exception:  # pragma: no cover - fallback for minimal environments
             }
 
 
-from portfolio.strategy_allocator import StrategyBudgetInput, StrategyCapitalAllocator
+from portfolio.strategy_allocator import (
+    StrategyBudgetInput,
+    StrategyCapitalAllocator,
+    StrategyUtilityConfig,
+)
 from research.auto_generator import AutoStrategyGenerator, StrategyVariant
 from research.database import BacktestResult, Experiment, ResearchDatabase
 from research.r_analytics_bridge import RAnalyticsBridge
 from research.regime_detector import MarketRegime, RegimeDetector
 from research.report_builder import ResearchAnalyticsReportBuilder
 from research.walk_forward import WalkForwardTester, WalkForwardWindow
+from risk.risk_tolerance import resolve_risk_tolerance_profile
 
 logger = logging.getLogger(__name__)
 
@@ -200,10 +205,24 @@ class AIResearchAgent:
             capacity_cfg.get("max_annual_turnover_notional", max(self.deployable_capital, 0.0))
         )
         allocation_cfg = config.get("allocation", {})
+        risk_profile = resolve_risk_tolerance_profile(config)
+        self.risk_tolerance_profile = risk_profile.name
+        default_risk_aversion = {
+            "conservative": 8.0,
+            "balanced": 4.0,
+            "aggressive": 2.5,
+            "professional": 2.0,
+        }.get(self.risk_tolerance_profile, 4.0)
+        self.allocation_utility = StrategyUtilityConfig(
+            risk_aversion=float(allocation_cfg.get("risk_aversion", default_risk_aversion)),
+            turnover_penalty=float(allocation_cfg.get("turnover_penalty", 1.0)),
+            capacity_penalty=float(allocation_cfg.get("capacity_penalty", 1.0)),
+        )
         self.strategy_allocator = StrategyCapitalAllocator(
             max_weight=float(allocation_cfg.get("max_weight", 0.35)),
             min_weight=float(allocation_cfg.get("min_weight", 0.0)),
             capacity_haircut=float(allocation_cfg.get("capacity_haircut", 0.05)),
+            utility_config=self.allocation_utility,
         )
         self.last_allocation_weights: Dict[str, float] = {}
 
@@ -741,7 +760,10 @@ class AIResearchAgent:
             )
             for row in selected
         ]
-        allocation_weights = self.strategy_allocator.allocate(allocation_inputs)
+        allocation_weights = self.strategy_allocator.allocate_utility(
+            allocation_inputs,
+            utility=self.allocation_utility,
+        )
         self.last_allocation_weights = dict(allocation_weights)
 
         for result in selected:
@@ -854,6 +876,17 @@ class AIResearchAgent:
         )
         if not updated:
             return False
+        self.db.register_experiment_run(
+            experiment_id=strategy_id,
+            stage=target_stage,
+            decision_action=f"promote_to_{target_stage}",
+            operator="autopilot",
+            config_hash="stage_gate",
+            evidence={
+                "assessment": assessment,
+                "source_stage": assessment["source_stage"],
+            },
+        )
 
         if target_stage == "live_canary" and strategy_id not in self.live_canary:
             self.live_canary.append(strategy_id)
@@ -887,6 +920,12 @@ class AIResearchAgent:
                 "promoted_to_paper": len(promoted),
                 "promoted_ids": promoted,
                 "allocation_weights": self.last_allocation_weights,
+                "allocation_mode": "risk_utility",
+                "risk_tolerance_profile": self.risk_tolerance_profile,
+                "allocation_risk_aversion": float(self.allocation_utility.risk_aversion),
+                "experiment_runs_recorded": int(
+                    len([r for r in strategy_reports.get("reports", []) if r.get("run_id")])
+                ),
             },
             "objective": objective_assessment,
             "performance": {
@@ -997,12 +1036,28 @@ class AIResearchAgent:
                     "r_analytics": row.get("r_analytics", {}),
                 },
             )
+            run_id = self.db.register_experiment_run(
+                experiment_id=report.experiment_id,
+                stage=stage,
+                decision_action=decision_action,
+                operator="autopilot",
+                config_hash=str(lineage.get("config_hash", "")),
+                evidence={
+                    "report_id": report.report_id,
+                    "report_sha256": report_hash,
+                    "report_path": str(path),
+                    "promotion_reason": decision_reason,
+                    "gate_checks": gate_checks,
+                    "promoted": bool(promoted),
+                },
+            )
             entries.append(
                 {
                     "experiment_id": report.experiment_id,
                     "report_id": report.report_id,
                     "path": str(path),
                     "sha256": report_hash,
+                    "run_id": run_id,
                     "decision": decision_action,
                     "promoted": promoted,
                 }
@@ -1031,6 +1086,14 @@ class AIResearchAgent:
                 self.paper_trading.remove(strategy_id)
                 self.db.update_experiment_status(
                     strategy_id, "backtest", reason="paper_monitor_demote"
+                )
+                self.db.register_experiment_run(
+                    experiment_id=strategy_id,
+                    stage="backtest",
+                    decision_action="demote_to_backtest",
+                    operator="autopilot",
+                    config_hash="paper_monitor",
+                    evidence={"summary": summary},
                 )
 
             metrics[strategy_id] = {

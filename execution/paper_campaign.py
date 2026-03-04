@@ -72,6 +72,8 @@ def build_probe_order(
     notional_usd: float,
     price: float,
     order_type: OrderType = OrderType.LIMIT,
+    strategy_id: str = "campaign",
+    expected_alpha_bps: float = 0.0,
 ) -> OrderRequest:
     quantity = float(notional_usd) / max(float(price), 1e-9)
     return OrderRequest(
@@ -80,6 +82,8 @@ def build_probe_order(
         quantity=float(quantity),
         order_type=order_type,
         price=float(price) if order_type == OrderType.LIMIT else None,
+        strategy_id=str(strategy_id or "campaign"),
+        expected_alpha_bps=float(expected_alpha_bps),
     )
 
 

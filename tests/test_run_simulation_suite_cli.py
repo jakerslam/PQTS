@@ -31,6 +31,8 @@ def test_parser_accepts_expected_flags():
             "40",
             "--symbols-per-market",
             "1",
+            "--risk-profile",
+            "conservative",
         ]
     )
 
@@ -38,3 +40,4 @@ def test_parser_accepts_expected_flags():
     assert args.strategies == "market_making,funding_arbitrage"
     assert args.cycles_per_scenario == 40
     assert args.symbols_per_market == 1
+    assert args.risk_profile == "conservative"

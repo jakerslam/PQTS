@@ -27,6 +27,10 @@ from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFil
 from execution.risk_aware_router import RiskAwareRouter
 from execution.smart_router import OrderType
 from risk.kill_switches import RiskLimits
+from risk.risk_tolerance import (
+    resolve_effective_risk_config,
+    risk_profile_payload,
+)
 
 
 @dataclass(frozen=True)
@@ -64,9 +68,14 @@ class SimulationSuiteRunner:
         paper_min_slippage_bps: float = 1.0,
         paper_stress_multiplier: float = 3.0,
         paper_stress_fill_ratio_multiplier: float = 0.70,
+        risk_profile: str | None = None,
     ):
         self.config_path = str(config_path)
         self.config = self._load_yaml(self.config_path)
+        self._risk_cfg, self._risk_profile = resolve_effective_risk_config(
+            self.config,
+            override_profile=risk_profile,
+        )
 
         self.out_dir = Path(out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -124,15 +133,14 @@ class SimulationSuiteRunner:
         return f"sim_{scenario.market}_{scenario.strategy}_{token}"
 
     def _capital(self) -> float:
-        risk_cfg = self.config.get("risk", {})
-        if "initial_capital" not in risk_cfg:
+        if "initial_capital" not in self._risk_cfg:
             raise RuntimeError(
                 "config/risk.initial_capital must be set before simulation suite runs."
             )
-        return float(risk_cfg.get("initial_capital"))
+        return float(self._risk_cfg.get("initial_capital"))
 
     def _build_risk_limits(self) -> RiskLimits:
-        risk_cfg = self.config.get("risk", {})
+        risk_cfg = self._risk_cfg
         return RiskLimits(
             max_daily_loss_pct=self._pct(
                 risk_cfg.get("max_daily_loss_pct", risk_cfg.get("max_portfolio_risk_pct", 2.0)),
@@ -146,7 +154,7 @@ class SimulationSuiteRunner:
         )
 
     def _build_broker_config(self, *, tca_db_path: str) -> Dict[str, Any]:
-        risk_cfg = self.config.get("risk", {})
+        risk_cfg = self._risk_cfg
         execution_cfg = self.config.get("execution", {})
         return {
             "enabled": True,
@@ -165,6 +173,7 @@ class SimulationSuiteRunner:
             "default_taker_fee_bps": execution_cfg.get("default_taker_fee_bps", 12.0),
             "reliability": execution_cfg.get("reliability", {}),
             "regime_overlay": execution_cfg.get("regime_overlay", {}),
+            "risk_profile": risk_profile_payload(self._risk_profile),
         }
 
     def _symbols_for_market(self, market: str) -> List[str]:
@@ -288,6 +297,7 @@ class SimulationSuiteRunner:
         payload = {
             "created_at": datetime.now(timezone.utc).isoformat(),
             "config_path": self.config_path,
+            "risk_profile": risk_profile_payload(self._risk_profile),
             "scenario_count": len(results),
             "results": results,
             "leaderboard_path": str(leaderboard_path),
@@ -518,6 +528,7 @@ class SimulationSuiteRunner:
         summary = self.telemetry.summarize_run(run_id)
         return {
             "run_id": run_id,
+            "risk_profile": risk_profile_payload(self._risk_profile),
             "scenario": asdict(scenario),
             "submitted": stats.submitted,
             "filled": stats.filled,

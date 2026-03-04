@@ -23,6 +23,8 @@ def test_parser_accepts_cycles_and_paths():
             "tmp/ws.jsonl",
             "--max-messages-per-stream",
             "5",
+            "--risk-profile",
+            "aggressive",
             "--no-live-fetcher",
         ]
     )
@@ -30,4 +32,5 @@ def test_parser_accepts_cycles_and_paths():
     assert args.cycles == 3
     assert args.events_path == "tmp/ws.jsonl"
     assert args.max_messages_per_stream == 5
+    assert args.risk_profile == "aggressive"
     assert args.no_live_fetcher is True

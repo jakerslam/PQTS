@@ -30,6 +30,8 @@ class OrderRequest:
     price: Optional[float] = None
     stop_price: Optional[float] = None
     time_in_force: str = "GTC"  # GTC, IOC, FOK
+    strategy_id: str = "unknown"
+    expected_alpha_bps: float = 0.0
 
 
 @dataclass
@@ -238,6 +240,8 @@ class SmartOrderRouter:
                 order_type=OrderType.LIMIT,
                 price=request.price,
                 time_in_force=request.time_in_force,
+                strategy_id=request.strategy_id,
+                expected_alpha_bps=float(request.expected_alpha_bps),
             )
             splits.append(split)
 

@@ -1,14 +1,16 @@
 # Protheus Quant Trading System
 # Quick Start Script
 
-import asyncio
-import sys
-import os
 import argparse
+import asyncio
+import os
+import sys
 
-from core.engine import TradingEngine
-from core.toggle_manager import ToggleValidationError
 from analytics.dashboard import AnalyticsDashboard
+from core.engine import TradingEngine
+from core.operator_tier import resolve_operator_tier, validate_operator_tier_overrides
+from core.toggle_manager import ToggleValidationError
+
 
 def _csv_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
@@ -35,20 +37,43 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Comma-separated active strategy names.",
     )
     parser.add_argument(
+        "--risk-profile",
+        help=(
+            "Risk tolerance profile override "
+            "(conservative, balanced, aggressive, professional, or custom profile key)."
+        ),
+    )
+    parser.add_argument(
         "--show-toggles",
         action="store_true",
         help="Print resolved toggle state and continue startup.",
     )
+    parser.add_argument(
+        "--operator-tier",
+        choices=["simple", "pro"],
+        default="",
+        help="Operator UX tier override (simple or pro).",
+    )
     return parser
 
 
-def apply_cli_toggles(engine: TradingEngine, args: argparse.Namespace) -> None:
+def apply_cli_toggles(engine: TradingEngine, args: argparse.Namespace) -> str:
+    tier = resolve_operator_tier(engine.config, override=(args.operator_tier or None))
+    validate_operator_tier_overrides(
+        tier=tier,
+        has_market_override=bool(args.markets),
+        has_strategy_override=bool(args.strategies),
+        has_symbol_override=False,
+    )
     if args.profile:
         engine.apply_strategy_profile(args.profile)
     if args.markets:
         engine.set_active_markets(_csv_list(args.markets))
     if args.strategies:
         engine.set_active_strategies(_csv_list(args.strategies))
+    if args.risk_profile:
+        engine.set_risk_tolerance_profile(args.risk_profile)
+    return tier.name
 
 
 async def main():
@@ -66,43 +91,48 @@ async def main():
         print("\nCreate a config file or use:")
         print("  python main.py config/paper.yaml")
         sys.exit(1)
-    
+
     # Initialize engine
     engine = TradingEngine(config_path)
     try:
-        apply_cli_toggles(engine, args)
+        operator_tier = apply_cli_toggles(engine, args)
     except ToggleValidationError as exc:
         print(f"\n❌ Invalid toggle option: {exc}")
+        sys.exit(2)
+    except ValueError as exc:
+        print(f"\n❌ Invalid operator tier option: {exc}")
         sys.exit(2)
 
     toggle_state = engine.get_toggle_state()
     active_markets = toggle_state.get("active_markets", [])
     active_strategies = toggle_state.get("active_strategies", [])
-    
+
     # Initialize dashboard
-    dashboard = AnalyticsDashboard(engine.config.get('analytics', {}))
-    
+    dashboard = AnalyticsDashboard(engine.config.get("analytics", {}))
+
     try:
         print("\n🚀 Starting trading engine...")
         print("   Mode: Paper Trading")
         print(f"   Markets: {', '.join(active_markets) if active_markets else 'none'}")
         print(f"   Strategies: {', '.join(active_strategies) if active_strategies else 'none'}")
+        print(f"   Operator Tier: {operator_tier}")
         if args.show_toggles:
             print(f"   Toggle State: {toggle_state}")
         print("\nPress Ctrl+C to stop\n")
-        
+
         # Start engine
         await engine.start()
-        
+
     except KeyboardInterrupt:
         print("\n\n🛑 Stopping trading engine...")
         await engine.stop()
         print("✅ Trading engine stopped")
-        
+
         # Generate final report
         report = dashboard.generate_report()
         print("\n📊 Final Performance Report:")
         dashboard.print_dashboard()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

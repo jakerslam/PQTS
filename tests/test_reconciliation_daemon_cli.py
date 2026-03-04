@@ -20,7 +20,10 @@ def test_parse_aliases_reads_colon_pairs():
 
 def test_parser_accepts_halt_flags():
     parser = MODULE.build_parser()
-    args = parser.parse_args(["--halt-on-mismatch", "--cycles", "2"])
+    args = parser.parse_args(
+        ["--halt-on-mismatch", "--cycles", "2", "--risk-profile", "professional"]
+    )
 
     assert args.halt_on_mismatch is True
     assert args.cycles == 2
+    assert args.risk_profile == "professional"
