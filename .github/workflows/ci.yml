@@ -1,3 +1,5 @@
+# GitHub Actions CI for PQTS
+# Tests: pytest, lint, security, type-check
 name: PQTS CI
 
 on:

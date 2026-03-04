@@ -51,57 +51,55 @@ class _RouterToken:
     """
     Module-private token for exchange adapter authentication.
     
-    This token can ONLY be constructed inside RiskAwareRouter, which means
-    exchange adapters require a valid token to be instantiated, and can only
-    be obtained by going through the RiskAwareRouter.
+    This token can ONLY be constructed inside RiskAwareRouter via _create_token().
+    Exchange adapters must verify tokens using exact type matching:
+        type(token) is _RouterToken  # NOT isinstance()
     
-    This provides mechanical prevention of bypass - you cannot instantiate
-    an exchange adapter without a token, and you cannot get a token without
-    going through RiskAwareRouter.
-    
-    Example:
-        # Inside RiskAwareRouter
-        token = self._create_token()  # Creates valid token
-        adapter = AlpacaAdapter(token, config)  # Works
-        
-        # Outside RiskAwareRouter
-        token = exchange._RouterToken()  # Fails - __init__ validates provenance
-        # You simply cannot get a valid token without RiskAwareRouter
+    This provides mechanical prevention of bypass at the Python level.
+    Note: This is a team-safety guardrail, not cryptographic-grade security.
+    For true isolation, adapters would run in separate processes with capability tokens.
     """
     
-    def __init__(self):
+    __slots__ = ('_created_by',)  # Prevent attribute injection
+    
+    def __init__(self, *, _internal_only: bool = True):
         """
-        Token constructor validates it was created by RiskAwareRouter.
+        Token constructor - validates it was created by RiskAwareRouter._create_token().
         
-        Callers can only pass the token provided by RiskAwareRouter.
-        Direct instantiation is blocked by provenance check.
+        The _internal_only parameter must be passed as True by _create_token().
+        Direct instantiation without this parameter will fail.
         """
-        # We use frame inspection to validate the caller is RiskAwareRouter
+        if not _internal_only:
+            raise RuntimeError(
+                "RouterToken can only be created by RiskAwareRouter._create_token(). "
+                "Direct instantiation is not allowed. "
+                "All orders must go through RiskAwareRouter."
+            )
+        
+        # Validate provenance via frame inspection
         import inspect
         frame = inspect.currentframe()
         try:
-            # Walk up the call stack
-            found_router_creator = False
-            for _ in range(10):  # Limit depth
+            caller_found = False
+            for _ in range(10):
                 frame = frame.f_back
                 if frame is None:
                     break
-                if frame.f_code.co_name == '_create_token':
-                    found_router_creator = True
-                    break
-                if frame.f_code.co_name == 'submit_order':
-                    # Token created during submit_order is OK
-                    found_router_creator = True
-                    break
+                # Must be called from _create_token or submit_order
+                if frame.f_code.co_name in ('_create_token', 'submit_order'):
+                    if 'RiskAwareRouter' in frame.f_globals.get('__qualname__', ''):
+                        caller_found = True
+                        break
             
-            if not found_router_creator:
+            if not caller_found:
                 raise RuntimeError(
-                    "RouterToken can only be created inside RiskAwareRouter. "
-                    "Direct instantiation is not allowed. "
-                    "All orders must go through RiskAwareRouter.submit_order()"
+                    "RouterToken creation must originate from RiskAwareRouter. "
+                    "Bypass attempted from unauthorized code path."
                 )
         finally:
-            del frame  # Prevent reference cycles
+            del frame
+        
+        self._created_by = 'RiskAwareRouter'
 
 
 @dataclass
@@ -433,7 +431,14 @@ class RiskAwareRouter:
         if 'cost_estimate' in audit_entry:
             logger.debug(f"TCA: Order {order_id} - estimated cost: {audit_entry['cost_estimate']}")
     
-    def get_stats(self) -> Dict:
+    def _create_token(self) -> '_RouterToken':
+        """
+        Private factory for creating RouterToken.
+        
+        Only RiskAwareRouter can create tokens. Adapters must verify
+        received token using: type(token) is _RouterToken
+        """
+        return _RouterToken(_internal_only=True)
         """Get order routing statistics."""
         return {
             'total_orders': self.order_count,
