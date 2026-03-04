@@ -173,6 +173,7 @@ class SimulationSuiteRunner:
             "default_taker_fee_bps": execution_cfg.get("default_taker_fee_bps", 12.0),
             "reliability": execution_cfg.get("reliability", {}),
             "regime_overlay": execution_cfg.get("regime_overlay", {}),
+            "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
             "risk_profile": risk_profile_payload(self._risk_profile),
         }
 

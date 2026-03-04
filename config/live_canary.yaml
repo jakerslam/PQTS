@@ -39,6 +39,13 @@ execution:
   idempotency_ttl_seconds: 300.0
   strategy_disable_list_path: data/analytics/strategy_disable_list.json
   strategy_disable_reload_seconds: 15.0
+  market_data_resilience:
+    enabled: true
+    stale_after_seconds: 2.0
+    replay_window_seconds: 30.0
+    backup_venues_by_venue:
+      binance: [coinbase]
+      coinbase: [binance]
   allocation_controls:
     enabled: true
     lookback_seconds: 3600
@@ -87,6 +94,16 @@ runtime:
     allow_live_trading: true
   secrets:
     backend: env
+    enforce_rotation: true
+    rotation_metadata:
+      BINANCE_LIVE_API_KEY: "2026-02-01T00:00:00+00:00"
+      BINANCE_LIVE_API_SECRET: "2026-02-01T00:00:00+00:00"
+      COINBASE_LIVE_API_KEY: "2026-02-01T00:00:00+00:00"
+      COINBASE_LIVE_API_SECRET: "2026-02-01T00:00:00+00:00"
+      COINBASE_LIVE_PASSPHRASE: "2026-02-01T00:00:00+00:00"
+  operator_mode_presets:
+    simple_profile: market_maker_only
+    pro_profile: quant_canary
   autopilot:
     mode: hybrid
     auto_apply_on_start: true
@@ -96,3 +113,10 @@ runtime:
     pro:
       min_active_strategies: 1
       max_active_strategies: 2
+strategy_profiles:
+  market_maker_only:
+    markets: [crypto]
+    strategies: [market_making]
+  quant_canary:
+    markets: [crypto]
+    strategies: [market_making, funding_arbitrage]

@@ -42,6 +42,10 @@ from execution.live_ops_controls import (
     RateLimitConfig,
     RateLimitTracker,
 )
+from execution.market_data_resilience import (
+    MarketDataResilienceManager,
+    MarketDataResiliencePolicy,
+)
 from execution.order_ledger import ImmutableOrderLedger
 from execution.realistic_costs import (
     Bps,
@@ -342,6 +346,30 @@ class RiskAwareRouter:
         }
         self._allocation_events: List[Tuple[datetime, str, str, float]] = []
         self._load_strategy_disable_list(force=True)
+        md_res_cfg = broker_config.get("market_data_resilience", {}) or {}
+        backup_by_venue = md_res_cfg.get("backup_venues_by_venue", {}) or {}
+        backup_by_market = md_res_cfg.get("backup_venues_by_market", {}) or {}
+        self.market_data_resilience = MarketDataResilienceManager(
+            policy=MarketDataResiliencePolicy(
+                enabled=bool(md_res_cfg.get("enabled", True)),
+                stale_after_seconds=float(md_res_cfg.get("stale_after_seconds", 5.0)),
+                replay_window_seconds=float(md_res_cfg.get("replay_window_seconds", 120.0)),
+                backup_venues_by_venue={
+                    str(k): [
+                        str(v)
+                        for v in (values if isinstance(values, (list, tuple, set)) else [values])
+                    ]
+                    for k, values in dict(backup_by_venue).items()
+                },
+                backup_venues_by_market={
+                    str(k): [
+                        str(v)
+                        for v in (values if isinstance(values, (list, tuple, set)) else [values])
+                    ]
+                    for k, values in dict(backup_by_market).items()
+                },
+            )
+        )
         # Order admission gate to prevent race-condition bypass across state changes.
         self._submit_order_lock = asyncio.Lock()
 
@@ -1830,13 +1858,35 @@ class RiskAwareRouter:
         aggregated_prices: List[float] = []
         aggregated_volumes: List[float] = []
         fallback_order_book = None
+        now = datetime.now(timezone.utc)
+        raw_quotes: Dict[Tuple[str, str], Optional[Dict[str, Any]]] = {}
+        resilience_decisions: List[Dict[str, Any]] = []
+
+        for venue_name, venue in self.market_venues.items():
+            for symbol in venue.symbols:
+                raw_quotes[(venue_name, symbol)] = await self._fetch_symbol_quote(venue, symbol)
 
         for venue_name, venue in self.market_venues.items():
             venue_quotes: Dict[str, Dict[str, float]] = {}
             for symbol in venue.symbols:
-                quote = await self._fetch_symbol_quote(venue, symbol)
+                raw_quote = raw_quotes.get((venue_name, symbol))
+                quote, resolution = self.market_data_resilience.resolve(
+                    venue=venue_name,
+                    symbol=symbol,
+                    market=venue.market,
+                    live_quote=raw_quote,
+                    raw_quotes=raw_quotes,
+                    now=now,
+                )
                 if quote is None:
                     quote = self._synthetic_quote(symbol=symbol, venue=venue_name)
+                    resolution = type(resolution)(
+                        mode="synthetic",
+                        source_venue=venue_name,
+                        stale=resolution.stale,
+                        gap=resolution.gap,
+                        replay_age_seconds=resolution.replay_age_seconds,
+                    )
 
                 venue_quotes[symbol] = {
                     "price": quote["price"],
@@ -1847,6 +1897,13 @@ class RiskAwareRouter:
                 aggregated_volumes.append(quote["volume_24h"])
                 if fallback_order_book is None:
                     fallback_order_book = quote["order_book"]
+                resilience_decisions.append(
+                    {
+                        "venue": venue_name,
+                        "symbol": symbol,
+                        **resolution.to_dict(),
+                    }
+                )
 
             if venue_quotes:
                 snapshot[venue_name] = venue_quotes
@@ -1860,6 +1917,10 @@ class RiskAwareRouter:
         snapshot["last_price"] = float(sum(aggregated_prices) / len(aggregated_prices))
         snapshot["vol_24h"] = float(sum(aggregated_volumes) / len(aggregated_volumes))
         snapshot["order_book"] = fallback_order_book
+        snapshot["resilience"] = {
+            **self.market_data_resilience.snapshot_metrics(),
+            "decisions": resilience_decisions,
+        }
         return snapshot
 
     async def _fetch_symbol_quote(
@@ -1891,6 +1952,7 @@ class RiskAwareRouter:
                     "volume_24h": float(
                         ticker.get("quoteVolume", 0) or ticker.get("volume", 0) or 0
                     ),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "order_book": {
                         "bids": [(float(p), float(s)) for p, s in orderbook.get("bids", [])[:5]],
                         "asks": [(float(p), float(s)) for p, s in orderbook.get("asks", [])[:5]],
@@ -1910,6 +1972,7 @@ class RiskAwareRouter:
                     "price": price or (ask + bid) / 2,
                     "spread": spread,
                     "volume_24h": float(ticker.get("volume", 0) or 0),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "order_book": self._synthetic_order_book(price or (ask + bid) / 2),
                 }
 
@@ -1926,6 +1989,7 @@ class RiskAwareRouter:
                     "price": price,
                     "spread": spread,
                     "volume_24h": float(quote.get("v", 0) or quote.get("volume", 0) or 0),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "order_book": self._synthetic_order_book(price),
                 }
 
@@ -1945,6 +2009,7 @@ class RiskAwareRouter:
                     "price": price,
                     "spread": spread,
                     "volume_24h": float(row.get("tradeable", 1)) * 1_000_000,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "order_book": self._synthetic_order_book(price),
                 }
         except Exception as exc:
@@ -1972,6 +2037,7 @@ class RiskAwareRouter:
             "price": base,
             "spread": spread,
             "volume_24h": volume,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "order_book": order_book,
         }
 

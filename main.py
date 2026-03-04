@@ -16,6 +16,19 @@ def _csv_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _default_profile_for_tier(engine: TradingEngine, tier_name: str) -> str:
+    runtime = engine.config.get("runtime", {})
+    presets = runtime.get("operator_mode_presets", {}) if isinstance(runtime, dict) else {}
+    if not isinstance(presets, dict):
+        presets = {}
+    fallback = "casual_core" if str(tier_name) == "simple" else "pro_quant"
+    profile = str(presets.get(f"{tier_name}_profile", fallback)).strip()
+    profiles = engine.config.get("strategy_profiles", {})
+    if not isinstance(profiles, dict):
+        return ""
+    return profile if profile in profiles else ""
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run PQTS with runtime market/strategy toggles.")
     parser.add_argument(
@@ -86,14 +99,19 @@ def apply_cli_toggles(engine: TradingEngine, args: argparse.Namespace) -> str:
         has_strategy_override=bool(args.strategies) or has_autopilot_strategy_override,
         has_symbol_override=False,
     )
-    if args.profile:
-        engine.apply_strategy_profile(args.profile)
+    selected_profile = str(args.profile or "").strip()
+    if not selected_profile:
+        selected_profile = _default_profile_for_tier(engine, tier.name)
+    if selected_profile:
+        engine.apply_strategy_profile(selected_profile)
     if args.markets:
         engine.set_active_markets(_csv_list(args.markets))
     if args.strategies:
         engine.set_active_strategies(_csv_list(args.strategies))
     if args.autopilot_mode:
         engine.set_autopilot_mode(args.autopilot_mode)
+    elif tier.name == "simple":
+        engine.set_autopilot_mode("auto")
     if args.autopilot_mode or has_autopilot_strategy_override:
         engine.apply_autopilot_strategy_selection(
             include=_csv_list(args.autopilot_include) if args.autopilot_include else [],

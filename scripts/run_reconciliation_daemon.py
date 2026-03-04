@@ -90,6 +90,7 @@ def _build_broker_config(
             30.0,
         ),
         "allocation_controls": execution_cfg.get("allocation_controls", {}),
+        "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
         "risk_profile": dict(risk_profile_payload_value),
     }
 
@@ -127,6 +128,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--auto-resume", action="store_true")
     parser.add_argument("--resume-consecutive-clean-cycles", type=int, default=3)
     parser.add_argument("--resume-cooldown-seconds", type=float, default=60.0)
+    parser.add_argument("--auto-heal", action="store_true")
+    parser.add_argument("--auto-heal-retry-attempts", type=int, default=2)
+    parser.add_argument("--auto-heal-stale-order-seconds", type=float, default=120.0)
+    parser.add_argument("--auto-heal-max-cancel-attempts", type=int, default=25)
     halt_group = parser.add_mutually_exclusive_group()
     halt_group.add_argument("--halt-on-mismatch", dest="halt_on_mismatch", action="store_true")
     halt_group.add_argument(
@@ -179,6 +184,10 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
             resume_consecutive_clean_cycles=max(int(args.resume_consecutive_clean_cycles), 1),
             resume_cooldown_seconds=max(float(args.resume_cooldown_seconds), 0.0),
             symbol_aliases=_parse_aliases(args.symbol_aliases),
+            auto_heal_enabled=bool(args.auto_heal),
+            auto_heal_retry_attempts=max(int(args.auto_heal_retry_attempts), 0),
+            auto_heal_stale_order_seconds=max(float(args.auto_heal_stale_order_seconds), 0.0),
+            auto_heal_max_cancel_attempts=max(int(args.auto_heal_max_cancel_attempts), 0),
         ),
         incident_log_path=str(args.incident_log),
     )

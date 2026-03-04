@@ -170,6 +170,18 @@ risk:
   trailing_stop: true
 
 # ============================================
+# EXECUTION CONTROLS
+# ============================================
+execution:
+  market_data_resilience:
+    enabled: true
+    stale_after_seconds: 5.0
+    replay_window_seconds: 120.0
+    backup_venues_by_venue:
+      binance: ['coinbase']
+      coinbase: ['binance']
+
+# ============================================
 # RISK MANAGEMENT
 # ============================================
 analytics:
@@ -221,6 +233,9 @@ notifications:
 # ============================================
 runtime:
   operator_tier: pro
+  operator_mode_presets:
+    simple_profile: casual_core
+    pro_profile: pro_quant
   state_path: data/engine_state.json
   strict_strategy_contracts: true
   ops_events_path: data/analytics/ops_events.jsonl

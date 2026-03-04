@@ -31,7 +31,15 @@ def _base_config() -> dict:
             "crypto_only": {
                 "markets": ["crypto"],
                 "strategies": ["scalping", "arb"],
-            }
+            },
+            "casual_core": {
+                "markets": ["equities"],
+                "strategies": ["mean_reversion"],
+            },
+            "pro_quant": {
+                "markets": ["crypto", "equities", "forex"],
+                "strategies": ["scalping", "arb", "mean_reversion"],
+            },
         },
         "risk": {
             "initial_capital": 100000.0,
@@ -156,3 +164,21 @@ def test_apply_cli_toggles_blocks_simple_tier_direct_overrides(tmp_path):
     )
     with pytest.raises(ValueError):
         apply_cli_toggles(engine, args)
+
+
+def test_apply_cli_toggles_applies_simple_mode_defaults(tmp_path):
+    config = _base_config()
+    config["runtime"] = {"operator_tier": "simple"}
+    config_path = tmp_path / "cli_simple_defaults.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    engine = TradingEngine(str(config_path))
+
+    parser = build_arg_parser()
+    args = parser.parse_args([str(config_path)])
+    apply_cli_toggles(engine, args)
+    state = engine.get_toggle_state()
+
+    assert state["operator_tier"] == "simple"
+    assert state["active_markets"] == ["equities"]
+    assert state["active_strategies"] == ["mean_reversion"]
+    assert state["autopilot_mode"] == "auto"

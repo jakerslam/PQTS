@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
@@ -37,6 +37,10 @@ class ReconciliationConfig:
     resume_consecutive_clean_cycles: int = 3
     resume_cooldown_seconds: float = 60.0
     symbol_aliases: Dict[str, str] = field(default_factory=dict)
+    auto_heal_enabled: bool = False
+    auto_heal_retry_attempts: int = 2
+    auto_heal_stale_order_seconds: float = 120.0
+    auto_heal_max_cancel_attempts: int = 25
 
 
 class ReconciliationDaemon:
@@ -188,6 +192,143 @@ class ReconciliationDaemon:
         with self.incident_log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, sort_keys=True) + "\n")
 
+    @staticmethod
+    def _parse_ts(value: Any) -> datetime:
+        token = str(value or "").strip()
+        if not token:
+            return datetime.now(timezone.utc)
+        dt = datetime.fromisoformat(token.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+
+    def _latest_order_events(self) -> Dict[str, Dict[str, Any]]:
+        events = self.router.order_ledger.replay()
+        latest: Dict[str, Dict[str, Any]] = {}
+        for row in events:
+            if not isinstance(row, dict):
+                continue
+            order_id = str(row.get("order_id", "")).strip()
+            if not order_id:
+                continue
+            row_ts = self._parse_ts(row.get("timestamp"))
+            current = latest.get(order_id)
+            if current is None or row_ts >= self._parse_ts(current.get("timestamp")):
+                latest[order_id] = row
+        return latest
+
+    async def _cancel_stale_orders(self, *, now: datetime) -> Dict[str, Any]:
+        latest = self._latest_order_events()
+        cancelable_states = {"submitted", "acknowledged", "partially_filled"}
+        stale_after = timedelta(seconds=max(float(self.config.auto_heal_stale_order_seconds), 0.0))
+        stale_candidates: List[Dict[str, Any]] = []
+
+        for order_id, row in latest.items():
+            state = str(row.get("state", "")).strip().lower()
+            if state not in cancelable_states:
+                continue
+            event_ts = self._parse_ts(row.get("timestamp"))
+            if (now - event_ts) < stale_after:
+                continue
+            stale_candidates.append({"order_id": order_id, "event": row, "event_ts": event_ts})
+
+        stale_candidates.sort(key=lambda row: row["event_ts"])
+        stale_candidates = stale_candidates[
+            : max(int(self.config.auto_heal_max_cancel_attempts), 0)
+        ]
+
+        attempts = 0
+        cancelled = 0
+        failures = 0
+        for row in stale_candidates:
+            event = dict(row["event"])
+            metadata = event.get("metadata", {}) if isinstance(event.get("metadata"), dict) else {}
+            exchange = str(metadata.get("exchange", event.get("venue", ""))).strip()
+            symbol = str(event.get("symbol", metadata.get("symbol", ""))).strip()
+            venue_order_id = str(metadata.get("venue_order_id", row["order_id"])).strip()
+            if not exchange or not symbol or not venue_order_id:
+                continue
+            attempts += 1
+            try:
+                ok = await self.router.cancel_live_order(
+                    exchange=exchange,
+                    symbol=symbol,
+                    venue_order_id=venue_order_id,
+                )
+                if ok:
+                    cancelled += 1
+                else:
+                    failures += 1
+            except Exception:
+                failures += 1
+
+        return {
+            "stale_candidates": int(len(stale_candidates)),
+            "cancel_attempts": int(attempts),
+            "cancelled": int(cancelled),
+            "cancel_failures": int(failures),
+        }
+
+    async def _attempt_auto_heal(
+        self,
+        *,
+        internal_positions: Dict[str, float],
+        now: datetime,
+    ) -> Dict[str, Any]:
+        attempts: List[Dict[str, Any]] = []
+        refreshed = await self._collect_venue_positions()
+        aggregate = self._aggregate_venue_positions(refreshed)
+        refreshed_diffs = reconcile_positions(
+            internal_positions=internal_positions,
+            venue_positions=aggregate,
+            tolerance=float(self.config.tolerance),
+        )
+        refreshed_mismatches = [row for row in refreshed_diffs if not row.within_tolerance]
+        attempts.append({"step": "refresh_positions", "mismatches": int(len(refreshed_mismatches))})
+        if not refreshed_mismatches:
+            return {
+                "performed": True,
+                "reconciled": True,
+                "attempts": attempts,
+                "cancel_summary": {
+                    "stale_candidates": 0,
+                    "cancel_attempts": 0,
+                    "cancelled": 0,
+                    "cancel_failures": 0,
+                },
+            }
+
+        cancel_summary = await self._cancel_stale_orders(now=now)
+
+        reconciled = False
+        max_retries = max(int(self.config.auto_heal_retry_attempts), 0)
+        for idx in range(max_retries):
+            refreshed = await self._collect_venue_positions()
+            aggregate = self._aggregate_venue_positions(refreshed)
+            diffs = reconcile_positions(
+                internal_positions=internal_positions,
+                venue_positions=aggregate,
+                tolerance=float(self.config.tolerance),
+            )
+            mismatches = [row for row in diffs if not row.within_tolerance]
+            attempts.append(
+                {
+                    "step": "retry_reconcile",
+                    "attempt": int(idx + 1),
+                    "mismatches": int(len(mismatches)),
+                }
+            )
+            if not mismatches:
+                reconciled = True
+                break
+
+        return {
+            "performed": True,
+            "reconciled": bool(reconciled),
+            "attempts": attempts,
+            "cancel_summary": cancel_summary,
+        }
+
     async def reconcile_once(self) -> Dict[str, Any]:
         now = datetime.now(timezone.utc)
         internal = self._internal_positions_from_tca()
@@ -205,6 +346,17 @@ class ReconciliationDaemon:
         halt_reason = ""
         auto_resume = False
         resume_reason = ""
+        auto_heal = {
+            "performed": False,
+            "reconciled": False,
+            "attempts": [],
+            "cancel_summary": {
+                "stale_candidates": 0,
+                "cancel_attempts": 0,
+                "cancelled": 0,
+                "cancel_failures": 0,
+            },
+        }
 
         if mismatches:
             self._consecutive_clean_cycles = 0
@@ -221,6 +373,14 @@ class ReconciliationDaemon:
             self.router.force_halt(halt_reason)
             auto_halt = True
             self._last_auto_halt_at = now
+
+            if bool(self.config.auto_heal_enabled):
+                auto_heal = await self._attempt_auto_heal(
+                    internal_positions=internal,
+                    now=now,
+                )
+                if bool(auto_heal.get("reconciled", False)):
+                    self._consecutive_clean_cycles = max(self._consecutive_clean_cycles, 1)
 
         cooldown_ok = True
         if self._last_auto_halt_at is not None:
@@ -241,6 +401,16 @@ class ReconciliationDaemon:
                 "AUTO_RESUME_CLEAN_CYCLES: "
                 f"{self._consecutive_clean_cycles} clean checks after halt"
             )
+        elif (
+            bool(self.config.auto_resume_enabled)
+            and bool(self.router.risk_engine.is_halted)
+            and bool(auto_heal.get("performed", False))
+            and bool(auto_heal.get("reconciled", False))
+            and cooldown_ok
+        ):
+            self.router.risk_engine.reset()
+            auto_resume = True
+            resume_reason = "AUTO_RESUME_POST_HEAL: deterministic recovery reconciled state"
 
         payload = {
             "timestamp": _utc_now_iso(),
@@ -253,6 +423,7 @@ class ReconciliationDaemon:
                 "consecutive_clean_cycles": int(self._consecutive_clean_cycles),
             },
             "policy": asdict(self.config),
+            "auto_heal": auto_heal,
             "internal_positions": internal,
             "venue_positions": venue_positions,
             "aggregate_venue_positions": aggregate_venue,

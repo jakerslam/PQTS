@@ -148,3 +148,40 @@ def test_reconciliation_daemon_auto_resumes_after_clean_cycles(tmp_path):
 
     incident_rows = daemon.incident_log_path.read_text(encoding="utf-8").splitlines()
     assert len(incident_rows) == 2
+
+
+def test_reconciliation_daemon_auto_heal_reconciles_before_resume(tmp_path):
+    router = _router(tmp_path)
+    router.tca_db.add_record(_record(symbol="BTC-USD", side="buy", qty=1.0))
+
+    calls = {"count": 0}
+
+    async def provider():
+        calls["count"] += 1
+        if calls["count"] <= 2:
+            return {"binance": {"BTC-USD": 0.0}}
+        return {"binance": {"BTC-USD": 1.0}}
+
+    daemon = ReconciliationDaemon(
+        router=router,
+        config=ReconciliationConfig(
+            tolerance=1e-9,
+            max_mismatched_symbols=0,
+            halt_on_mismatch=True,
+            auto_resume_enabled=True,
+            auto_heal_enabled=True,
+            auto_heal_retry_attempts=3,
+            resume_consecutive_clean_cycles=10,
+            resume_cooldown_seconds=0.0,
+        ),
+        incident_log_path=str(tmp_path / "reconciliation_incidents.jsonl"),
+        venue_positions_provider=provider,
+    )
+
+    payload = asyncio.run(daemon.reconcile_once())
+
+    assert payload["summary"]["auto_halt_triggered"] is True
+    assert payload["auto_heal"]["performed"] is True
+    assert payload["auto_heal"]["reconciled"] is True
+    assert payload["summary"]["auto_resume_triggered"] is True
+    assert router.risk_engine.is_halted is False

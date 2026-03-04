@@ -97,6 +97,7 @@ def _build_broker_config(
             30.0,
         ),
         "allocation_controls": execution_cfg.get("allocation_controls", {}),
+        "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
         "risk_profile": dict(risk_profile_payload_value),
     }
 

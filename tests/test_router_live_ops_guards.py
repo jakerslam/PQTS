@@ -228,7 +228,18 @@ def test_market_data_endpoint_rate_limits_gate_adapter_calls(tmp_path):
     assert first["binance"]["BTCUSDT"]["price"] == 60000.0
     assert adapter.ticker_calls == 1
     assert adapter.orderbook_calls == 1
-    assert second["binance"]["BTCUSDT"]["price"] != 60000.0
+    decisions = second.get("resilience", {}).get("decisions", [])
+    binance_decision = next(
+        (
+            row
+            for row in decisions
+            if isinstance(row, dict)
+            and row.get("venue") == "binance"
+            and row.get("symbol") == "BTCUSDT"
+        ),
+        {},
+    )
+    assert binance_decision.get("mode") in {"replay", "synthetic", "failover"}
 
     stats = router.get_stats()
     denials = stats["live_ops_controls"]["rate_limit_denials_by_endpoint"]

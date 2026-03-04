@@ -334,6 +334,7 @@ class TradingEngine:
                 30.0,
             ),
             "allocation_controls": execution_cfg.get("allocation_controls", {}),
+            "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
             "risk_profile": risk_profile_payload(_profile),
             "tenant_plan": self.tenant_entitlements.plan,
             "tenant_id": self.tenant_entitlements.tenant_id,
