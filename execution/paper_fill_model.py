@@ -18,14 +18,14 @@ class PaperFillModelConfig:
     latency_jitter_ms: float = 45.0
     partial_fill_notional_usd: float = 25000.0
     min_partial_fill_ratio: float = 0.55
-    adverse_selection_bps: float = 8.0
+    adverse_selection_bps: float = 1.5
     min_slippage_bps: float = 1.0
     reality_stress_mode: bool = False
     stress_slippage_multiplier: float = 2.5
     stress_fill_ratio_multiplier: float = 0.70
     hard_reject_notional_usd: float = 250000.0
     queue_penalty_floor: float = 0.20
-    queue_slippage_bps_per_turnover: float = 0.50
+    queue_slippage_bps_per_turnover: float = 0.10
 
 
 class MicrostructurePaperFillProvider:

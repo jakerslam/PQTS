@@ -20,6 +20,7 @@ def _record(
     timestamp: datetime,
     predicted: float,
     realized: float,
+    prediction_profile: str = "unknown",
 ) -> TCATradeRecord:
     return TCATradeRecord(
         trade_id=trade_id,
@@ -39,11 +40,18 @@ def _record(
         spread_bps=2.0,
         vol_24h=1000000.0,
         depth_1pct_usd=100000.0,
+        prediction_profile=prediction_profile,
     )
 
 
 def _seed_db(
-    db: TCADatabase, *, days: int, fills_per_day: int, predicted: float, realized: float
+    db: TCADatabase,
+    *,
+    days: int,
+    fills_per_day: int,
+    predicted: float,
+    realized: float,
+    prediction_profile: str = "unknown",
 ) -> None:
     now = datetime.now(timezone.utc)
     for d in range(days):
@@ -54,6 +62,7 @@ def _seed_db(
                     timestamp=now - timedelta(days=d, minutes=i),
                     predicted=predicted,
                     realized=realized,
+                    prediction_profile=prediction_profile,
                 )
             )
     db.save()
@@ -123,6 +132,9 @@ def test_router_exposes_paper_readiness_assessment(tmp_path):
     router.set_capital(100000.0, source="unit_test")
 
     _seed_db(router.tca_db, days=35, fills_per_day=10, predicted=9.0, realized=12.0)
+    for rec in router.tca_db.records:
+        rec.prediction_profile = router.prediction_profile
+    router.tca_db.save()
 
     assessment = router.evaluate_paper_live_readiness(
         lookback_days=60,
@@ -150,3 +162,36 @@ def test_paper_readiness_uses_robust_slippage_mape_floor(tmp_path):
     )
 
     assert result.slippage_mape_pct == 300.0
+
+
+def test_paper_readiness_filters_by_prediction_profile(tmp_path):
+    db = TCADatabase(str(tmp_path / "tca.csv"))
+    _seed_db(
+        db,
+        days=35,
+        fills_per_day=8,
+        predicted=100.0,
+        realized=10.0,
+        prediction_profile="legacy_profile",
+    )
+    _seed_db(
+        db,
+        days=35,
+        fills_per_day=8,
+        predicted=12.0,
+        realized=12.0,
+        prediction_profile="current_profile",
+    )
+
+    result = PaperTrackRecordEvaluator(db).evaluate(
+        lookback_days=60,
+        min_days_required=30,
+        min_fills_required=200,
+        max_p95_slippage_bps=20.0,
+        max_mape_pct=35.0,
+        prediction_profile="current_profile",
+    )
+
+    assert result.passed_track_record is True
+    assert result.passed_slippage is True
+    assert result.slippage_mape_pct == 0.0

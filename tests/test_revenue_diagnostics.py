@@ -20,6 +20,7 @@ def _seed_record(
     exchange: str,
     expected_alpha_bps: float,
     realized_total_bps: float,
+    prediction_profile: str = "unknown",
 ) -> TCATradeRecord:
     return TCATradeRecord(
         trade_id=trade_id,
@@ -41,6 +42,7 @@ def _seed_record(
         depth_1pct_usd=100000.0,
         strategy_id=strategy_id,
         expected_alpha_bps=expected_alpha_bps,
+        prediction_profile=prediction_profile,
     )
 
 
@@ -102,3 +104,35 @@ def test_revenue_api_helpers_return_consistent_kpis(tmp_path):
     assert payload["summary"]["trades"] == 1
     assert kpis["trades"] == 1
     assert kpis["avg_realized_net_alpha_bps"] == payload["summary"]["avg_realized_net_alpha_bps"]
+
+
+def test_revenue_diagnostics_can_filter_prediction_profile(tmp_path):
+    db_path = tmp_path / "tca.csv"
+    db = TCADatabase(str(db_path))
+    db.add_record(
+        _seed_record(
+            trade_id="legacy",
+            strategy_id="campaign",
+            exchange="binance",
+            expected_alpha_bps=0.0,
+            realized_total_bps=25.0,
+            prediction_profile="legacy",
+        )
+    )
+    db.add_record(
+        _seed_record(
+            trade_id="current",
+            strategy_id="campaign",
+            exchange="binance",
+            expected_alpha_bps=0.0,
+            realized_total_bps=4.0,
+            prediction_profile="current",
+        )
+    )
+    db.save()
+
+    diag = RevenueDiagnostics(str(db_path))
+    payload = diag.payload(lookback_days=30, prediction_profile="current")
+
+    assert payload["summary"]["trades"] == 1
+    assert payload["summary"]["avg_realized_cost_bps"] == 4.0

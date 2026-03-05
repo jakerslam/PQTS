@@ -223,6 +223,12 @@ class SimulationSuiteRunner:
     @staticmethod
     def _current_eta_map(router: RiskAwareRouter) -> Dict[Tuple[str, str], float]:
         frame = router.tca_db.as_dataframe()
+        profile = str(getattr(router, "prediction_profile", "") or "").strip()
+        if profile:
+            if "prediction_profile" not in frame.columns:
+                frame = frame.iloc[0:0].copy()
+            else:
+                frame = frame[frame["prediction_profile"].astype(str) == profile].copy()
         if frame.empty:
             return dict(router.eta_by_symbol_venue)
 

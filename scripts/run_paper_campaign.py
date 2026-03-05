@@ -304,6 +304,12 @@ def _resolve_campaign_expected_alpha_bps(
 
 def _current_eta_map(router: RiskAwareRouter) -> Dict[tuple[str, str], float]:
     frame = router.tca_db.as_dataframe()
+    profile = str(getattr(router, "prediction_profile", "") or "").strip()
+    if profile:
+        if "prediction_profile" not in frame.columns:
+            frame = frame.iloc[0:0].copy()
+        else:
+            frame = frame[frame["prediction_profile"].astype(str) == profile].copy()
     if frame.empty:
         return dict(router.eta_by_symbol_venue)
 
@@ -578,6 +584,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                 revenue_payload = revenue_diagnostics.payload(
                     lookback_days=int(args.lookback_days),
                     limit=20,
+                    prediction_profile=str(getattr(router, "prediction_profile", "") or ""),
                 )
                 eta_map = _current_eta_map(router)
                 updated_eta, calibration = router.run_weekly_tca_calibration(

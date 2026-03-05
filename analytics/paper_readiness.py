@@ -62,8 +62,15 @@ class PaperTrackRecordEvaluator:
         min_fills_required: int = 200,
         max_p95_slippage_bps: float = 20.0,
         max_mape_pct: float = 35.0,
+        prediction_profile: str = "",
     ) -> PaperReadinessResult:
         frame = self.tca_db.as_dataframe()
+        profile_token = str(prediction_profile or "").strip()
+        if profile_token:
+            if "prediction_profile" not in frame.columns:
+                frame = frame.iloc[0:0].copy()
+            else:
+                frame = frame[frame["prediction_profile"].astype(str) == profile_token].copy()
         if frame.empty:
             return PaperReadinessResult(
                 lookback_days=lookback_days,

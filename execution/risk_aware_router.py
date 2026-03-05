@@ -260,6 +260,7 @@ class RiskAwareRouter:
         self.tca_db = TCADatabase(
             tca_db_path or broker_config.get("tca_db_path", "data/tca_records.csv")
         )
+        self.prediction_profile = self._build_prediction_profile()
         self.order_ledger = ImmutableOrderLedger(
             broker_config.get("order_ledger_path", "data/analytics/order_ledger.jsonl")
         )
@@ -510,6 +511,31 @@ class RiskAwareRouter:
         }
         self.eta_store_path.parent.mkdir(parents=True, exist_ok=True)
         self.eta_store_path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+
+    def _serialize_fill_provider_config(self) -> Dict[str, Any]:
+        cfg = getattr(self.fill_provider, "config", None)
+        if cfg is None:
+            return {}
+        if hasattr(cfg, "__dict__"):
+            return {str(k): v for k, v in vars(cfg).items()}
+        if isinstance(cfg, dict):
+            return {str(k): v for k, v in cfg.items()}
+        return {"repr": str(cfg)}
+
+    def _build_prediction_profile(self) -> str:
+        payload = {
+            "commission_rate": float(self.cost_model.commission),
+            "impact_constant": float(self.broker_config.get("impact_constant", 0.5)),
+            "base_volatility": float(self.cost_model.base_vol),
+            "impact_volatility_scale": float(getattr(self.cost_model, "impact_volatility_scale", 0.0)),
+            "paper_prediction_blend": float(self.broker_config.get("paper_prediction_blend", 1.0)),
+            "live_execution": bool(self.broker_config.get("live_execution", False)),
+            "fill_provider": self.fill_provider.__class__.__name__,
+            "fill_provider_config": self._serialize_fill_provider_config(),
+        }
+        serialized = json.dumps(payload, sort_keys=True, default=str)
+        digest = hashlib.sha1(serialized.encode("utf-8")).hexdigest()[:12]
+        return f"predprof_{digest}"
 
     @staticmethod
     def _order_intent_fingerprint(order: OrderRequest) -> str:
@@ -1692,6 +1718,7 @@ class RiskAwareRouter:
             depth_1pct_usd=depth_1pct_usd,
             strategy_id=str(order.strategy_id),
             expected_alpha_bps=float(expected_alpha_bps),
+            prediction_profile=str(self.prediction_profile),
         )
         self.tca_db.add_record(record)
         self.tca_db.save()
@@ -2362,6 +2389,7 @@ class RiskAwareRouter:
             adaptation_rate=adaptation_rate,
             max_step_pct=max_step_pct,
             days=lookback_days,
+            prediction_profile=str(self.prediction_profile),
         )
         self.eta_by_symbol_venue = updated
 
@@ -2387,6 +2415,7 @@ class RiskAwareRouter:
             min_fills_required=min_fills_required,
             max_p95_slippage_bps=max_p95_slippage_bps,
             max_mape_pct=max_mape_pct,
+            prediction_profile=str(self.prediction_profile),
         )
         return result.to_dict()
 

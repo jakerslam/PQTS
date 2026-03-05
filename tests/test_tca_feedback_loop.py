@@ -32,6 +32,7 @@ def _record(
     exchange: str,
     predicted_slippage_bps: float,
     realized_slippage_bps: float,
+    prediction_profile: str = "unknown",
 ) -> TCATradeRecord:
     return TCATradeRecord(
         trade_id=trade_id,
@@ -51,6 +52,7 @@ def _record(
         spread_bps=2.0,
         vol_24h=0.4,
         depth_1pct_usd=100000.0,
+        prediction_profile=prediction_profile,
     )
 
 
@@ -325,6 +327,46 @@ def test_router_persists_eta_calibration_across_sessions(tmp_path):
 
     assert reloaded.eta_by_symbol_venue[("BTC-USD", "binance")] == pytest.approx(expected_eta)
     assert reloaded.cost_model.eta == pytest.approx(expected_eta)
+
+
+def test_weekly_calibration_filters_prediction_profile(tmp_path):
+    db = TCADatabase(str(tmp_path / "tca.csv"))
+    for idx in range(12):
+        db.add_record(
+            _record(
+                trade_id=f"legacy_{idx}",
+                symbol="BTC-USD",
+                exchange="binance",
+                predicted_slippage_bps=100.0,
+                realized_slippage_bps=10.0,
+                prediction_profile="legacy",
+            )
+        )
+    for idx in range(12):
+        db.add_record(
+            _record(
+                trade_id=f"current_{idx}",
+                symbol="BTC-USD",
+                exchange="binance",
+                predicted_slippage_bps=5.0,
+                realized_slippage_bps=10.0,
+                prediction_profile="current",
+            )
+        )
+
+    updated, analyses = weekly_calibrate_eta(
+        tca_db=db,
+        current_eta_by_market={("BTC-USD", "binance"): 0.4},
+        min_samples=10,
+        alert_threshold_pct=500.0,
+        adaptation_rate=1.0,
+        max_step_pct=1.0,
+        days=30,
+        prediction_profile="current",
+    )
+
+    assert updated[("BTC-USD", "binance")] > 0.4
+    assert analyses[0]["calibration_samples"] == 12
 
 
 def test_router_records_predicted_vs_realized_slippage(tmp_path):

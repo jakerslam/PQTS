@@ -84,6 +84,7 @@ class TCATradeRecord:
     depth_1pct_usd: float
     strategy_id: str = "unknown"
     expected_alpha_bps: float = 0.0
+    prediction_profile: str = "unknown"
 
     @property
     def slippage_error(self) -> float:
@@ -160,8 +161,12 @@ class TCADatabase:
             expected_alpha_bps = payload.get("expected_alpha_bps", 0.0)
             if pd.isna(expected_alpha_bps):
                 expected_alpha_bps = 0.0
+            prediction_profile = payload.get("prediction_profile", "unknown")
+            if pd.isna(prediction_profile) or str(prediction_profile).strip() == "":
+                prediction_profile = "unknown"
             payload["strategy_id"] = str(strategy_id)
             payload["expected_alpha_bps"] = float(expected_alpha_bps)
+            payload["prediction_profile"] = str(prediction_profile)
             records.append(TCATradeRecord(**payload))
         return records
 
@@ -189,6 +194,7 @@ class TCADatabase:
                     "depth_1pct_usd": record.depth_1pct_usd,
                     "strategy_id": record.strategy_id,
                     "expected_alpha_bps": record.expected_alpha_bps,
+                    "prediction_profile": record.prediction_profile,
                 }
             )
         return pd.DataFrame(rows)
@@ -253,12 +259,24 @@ class TCACalibrator:
         alert_threshold_pct: float = 20.0,
         adaptation_rate: float = 0.75,
         max_step_pct: float = 0.80,
+        prediction_profile: str = "",
     ):
         self.tca_db = tca_db
         self.min_samples = min_samples
         self.alert_threshold_pct = alert_threshold_pct
         self.adaptation_rate = float(np.clip(float(adaptation_rate), 0.0, 1.0))
         self.max_step_pct = float(max(float(max_step_pct), 0.0))
+        self.prediction_profile = str(prediction_profile or "").strip()
+
+    def _filter_prediction_profile(self, frame: pd.DataFrame) -> pd.DataFrame:
+        if frame.empty:
+            return frame
+        if not self.prediction_profile:
+            return frame
+        if "prediction_profile" not in frame.columns:
+            return frame.iloc[0:0].copy()
+        mask = frame["prediction_profile"].astype(str) == self.prediction_profile
+        return frame[mask].copy()
 
     @staticmethod
     def _apply_lookback(frame: pd.DataFrame, *, days: int) -> pd.DataFrame:
@@ -276,14 +294,17 @@ class TCACalibrator:
         days: int,
     ) -> Tuple[pd.DataFrame, str]:
         symbol_frame = self.tca_db.get_by_symbol_venue(symbol, exchange, days=days)
+        symbol_frame = self._filter_prediction_profile(symbol_frame)
         if len(symbol_frame) >= self.min_samples:
             return symbol_frame, "symbol_venue"
 
         venue_frame = self.tca_db.get_by_venue(exchange, days=days)
+        venue_frame = self._filter_prediction_profile(venue_frame)
         if len(venue_frame) >= self.min_samples:
             return venue_frame, "venue_fallback"
 
         global_frame = self._apply_lookback(self.tca_db.as_dataframe(), days=days)
+        global_frame = self._filter_prediction_profile(global_frame)
         if len(global_frame) >= self.min_samples:
             return global_frame, "global_fallback"
 
@@ -439,6 +460,7 @@ def weekly_calibrate_eta(
     adaptation_rate: float = 0.75,
     max_step_pct: float = 0.80,
     days: int = 30,
+    prediction_profile: str = "",
 ) -> Tuple[Dict[Tuple[str, str], float], List[Dict[str, Any]]]:
     """Callable weekly calibration entrypoint for schedulers/jobs."""
 
@@ -448,6 +470,7 @@ def weekly_calibrate_eta(
         alert_threshold_pct=alert_threshold_pct,
         adaptation_rate=adaptation_rate,
         max_step_pct=max_step_pct,
+        prediction_profile=prediction_profile,
     )
     return calibrator.run_weekly_calibration_by_market(
         current_eta_by_market=current_eta_by_market,

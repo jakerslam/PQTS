@@ -31,10 +31,22 @@ class RevenueDiagnostics:
         self.tca_db = TCADatabase(self.tca_db_path)
 
     @staticmethod
-    def _normalize_frame(frame: pd.DataFrame, *, lookback_days: int) -> pd.DataFrame:
+    def _normalize_frame(
+        frame: pd.DataFrame,
+        *,
+        lookback_days: int,
+        prediction_profile: str = "",
+    ) -> pd.DataFrame:
         if frame.empty:
             return frame
         df = frame.copy()
+        profile_token = str(prediction_profile or "").strip()
+        if profile_token:
+            if "prediction_profile" not in df.columns:
+                return df.iloc[0:0].copy()
+            df = df[df["prediction_profile"].astype(str) == profile_token].copy()
+            if df.empty:
+                return df
         if "strategy_id" not in df.columns:
             df["strategy_id"] = "unknown"
         if "expected_alpha_bps" not in df.columns:
@@ -69,13 +81,17 @@ class RevenueDiagnostics:
         ) * 100.0
         return df
 
-    def _frame(self, *, lookback_days: int) -> pd.DataFrame:
+    def _frame(self, *, lookback_days: int, prediction_profile: str = "") -> pd.DataFrame:
         # Re-load each call so dashboard views include latest router writes.
         self.tca_db = TCADatabase(self.tca_db_path)
-        return self._normalize_frame(self.tca_db.as_dataframe(), lookback_days=lookback_days)
+        return self._normalize_frame(
+            self.tca_db.as_dataframe(),
+            lookback_days=lookback_days,
+            prediction_profile=prediction_profile,
+        )
 
-    def summary(self, *, lookback_days: int = 30) -> Dict[str, Any]:
-        frame = self._frame(lookback_days=lookback_days)
+    def summary(self, *, lookback_days: int = 30, prediction_profile: str = "") -> Dict[str, Any]:
+        frame = self._frame(lookback_days=lookback_days, prediction_profile=prediction_profile)
         if frame.empty:
             return _empty_summary()
         return {
@@ -122,9 +138,13 @@ class RevenueDiagnostics:
         return normalized
 
     def leak_alerts(
-        self, *, lookback_days: int = 30, min_notional_usd: float = 5000.0
+        self,
+        *,
+        lookback_days: int = 30,
+        min_notional_usd: float = 5000.0,
+        prediction_profile: str = "",
     ) -> List[Dict[str, Any]]:
-        frame = self._frame(lookback_days=lookback_days)
+        frame = self._frame(lookback_days=lookback_days, prediction_profile=prediction_profile)
         if frame.empty:
             return []
         grouped = (
@@ -158,12 +178,21 @@ class RevenueDiagnostics:
             for _, row in flagged.iterrows()
         ]
 
-    def payload(self, *, lookback_days: int = 30, limit: int = 25) -> Dict[str, Any]:
-        frame = self._frame(lookback_days=lookback_days)
+    def payload(
+        self,
+        *,
+        lookback_days: int = 30,
+        limit: int = 25,
+        prediction_profile: str = "",
+    ) -> Dict[str, Any]:
+        frame = self._frame(lookback_days=lookback_days, prediction_profile=prediction_profile)
         return {
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "lookback_days": int(lookback_days),
-            "summary": self.summary(lookback_days=lookback_days),
+            "summary": self.summary(
+                lookback_days=lookback_days,
+                prediction_profile=prediction_profile,
+            ),
             "by_strategy": self._group_rows(frame, by=["strategy_id"], limit=limit),
             "by_venue": self._group_rows(frame, by=["exchange"], limit=limit),
             "by_symbol": self._group_rows(frame, by=["symbol"], limit=limit),
@@ -172,5 +201,8 @@ class RevenueDiagnostics:
                 by=["strategy_id", "exchange"],
                 limit=limit,
             ),
-            "leak_alerts": self.leak_alerts(lookback_days=lookback_days),
+            "leak_alerts": self.leak_alerts(
+                lookback_days=lookback_days,
+                prediction_profile=prediction_profile,
+            ),
         }

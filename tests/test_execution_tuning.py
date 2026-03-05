@@ -106,6 +106,9 @@ def test_paper_fill_provider_applies_queue_position_penalty():
             partial_fill_notional_usd=1000.0,
             min_partial_fill_ratio=0.10,
             queue_penalty_floor=0.10,
+            adverse_selection_bps=8.0,
+            min_slippage_bps=0.1,
+            queue_slippage_bps_per_turnover=0.5,
         )
     )
 
