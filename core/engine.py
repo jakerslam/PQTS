@@ -320,6 +320,7 @@ class TradingEngine:
                 "expected_alpha_bps_by_strategy",
                 {},
             ),
+            "profitability_gate": execution_cfg.get("profitability_gate", {}),
             "require_live_client_order_id": execution_cfg.get(
                 "require_live_client_order_id",
                 True,

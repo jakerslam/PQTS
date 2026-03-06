@@ -39,6 +39,16 @@ execution:
   idempotency_ttl_seconds: 300.0
   strategy_disable_list_path: data/analytics/strategy_disable_list.json
   strategy_disable_reload_seconds: 15.0
+  expected_alpha_bps_by_strategy:
+    market_making: 12.0
+    funding_arbitrage: 10.0
+    campaign: 12.0
+  profitability_gate:
+    enabled: true
+    min_edge_bps: 0.5
+    block_non_positive_expected_alpha: true
+    auto_block_campaign_zero_alpha: true
+    campaign_strategy_ids: [campaign]
   market_data_resilience:
     enabled: true
     stale_after_seconds: 2.0

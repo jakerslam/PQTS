@@ -14,6 +14,7 @@ SWITCH_KEYS: tuple[str, ...] = (
     "maker_urgency_ladder",
     "confidence_allocator",
     "shorting_controls",
+    "profitability_gate",
     "market_data_resilience",
     "tca_calibration_feedback",
     "slippage_stress_model",
@@ -36,6 +37,9 @@ _ALIASES: Dict[str, str] = {
     "confidence": "confidence_allocator",
     "shorting_controls": "shorting_controls",
     "shorting": "shorting_controls",
+    "profitability_gate": "profitability_gate",
+    "profitability": "profitability_gate",
+    "alpha_gate": "profitability_gate",
     "market_data_resilience": "market_data_resilience",
     "market_data": "market_data_resilience",
     "md_resilience": "market_data_resilience",
@@ -100,6 +104,7 @@ def _switch_defaults(config: Mapping[str, Any]) -> Dict[str, bool]:
     maker_ladder_cfg = execution_cfg.get("maker_urgency_ladder", {})
     confidence_alloc_cfg = execution_cfg.get("confidence_allocator", {})
     shorting_cfg = execution_cfg.get("shorting_controls", {})
+    profitability_cfg = execution_cfg.get("profitability_gate", {})
     md_resilience_cfg = execution_cfg.get("market_data_resilience", {})
     tca_calibration_cfg = execution_cfg.get("tca_calibration", {})
     paper_fill_cfg = execution_cfg.get("paper_fill_model", {})
@@ -118,6 +123,8 @@ def _switch_defaults(config: Mapping[str, Any]) -> Dict[str, bool]:
         confidence_alloc_cfg = {}
     if not isinstance(shorting_cfg, Mapping):
         shorting_cfg = {}
+    if not isinstance(profitability_cfg, Mapping):
+        profitability_cfg = {}
     if not isinstance(md_resilience_cfg, Mapping):
         md_resilience_cfg = {}
     if not isinstance(tca_calibration_cfg, Mapping):
@@ -133,6 +140,7 @@ def _switch_defaults(config: Mapping[str, Any]) -> Dict[str, bool]:
         "maker_urgency_ladder": bool(maker_ladder_cfg.get("enabled", True)),
         "confidence_allocator": bool(confidence_alloc_cfg.get("enabled", False)),
         "shorting_controls": bool(shorting_cfg.get("enabled", False)),
+        "profitability_gate": bool(profitability_cfg.get("enabled", False)),
         "market_data_resilience": bool(md_resilience_cfg.get("enabled", True)),
         "tca_calibration_feedback": bool(tca_calibration_cfg.get("enabled", True)),
         "slippage_stress_model": bool(paper_fill_cfg.get("reality_stress_mode", True)),
@@ -185,6 +193,7 @@ def apply_mechanism_switches(
     maker_ladder_cfg = _ensure_dict(execution_cfg, "maker_urgency_ladder")
     confidence_alloc_cfg = _ensure_dict(execution_cfg, "confidence_allocator")
     shorting_cfg = _ensure_dict(execution_cfg, "shorting_controls")
+    profitability_cfg = _ensure_dict(execution_cfg, "profitability_gate")
     md_resilience_cfg = _ensure_dict(execution_cfg, "market_data_resilience")
     tca_calibration_cfg = _ensure_dict(execution_cfg, "tca_calibration")
     paper_fill_cfg = _ensure_dict(execution_cfg, "paper_fill_model")
@@ -196,6 +205,7 @@ def apply_mechanism_switches(
     maker_ladder_cfg["enabled"] = bool(state["maker_urgency_ladder"])
     confidence_alloc_cfg["enabled"] = bool(state["confidence_allocator"])
     shorting_cfg["enabled"] = bool(state["shorting_controls"])
+    profitability_cfg["enabled"] = bool(state["profitability_gate"])
     md_resilience_cfg["enabled"] = bool(state["market_data_resilience"])
     tca_calibration_cfg["enabled"] = bool(state["tca_calibration_feedback"])
     paper_fill_cfg["reality_stress_mode"] = bool(state["slippage_stress_model"])

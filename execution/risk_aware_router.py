@@ -310,6 +310,29 @@ class RiskAwareRouter:
                 broker_config.get("expected_alpha_bps_by_strategy", {}) or {}
             ).items()
         }
+        profitability_cfg = broker_config.get("profitability_gate", {}) or {}
+        self.profitability_gate_enabled = bool(profitability_cfg.get("enabled", False))
+        self.profitability_min_edge_bps = max(
+            float(profitability_cfg.get("min_edge_bps", 0.0)),
+            0.0,
+        )
+        self.profitability_block_non_positive_expected_alpha = bool(
+            profitability_cfg.get("block_non_positive_expected_alpha", False)
+        )
+        self.profitability_auto_block_campaign_zero_alpha = bool(
+            profitability_cfg.get("auto_block_campaign_zero_alpha", True)
+        )
+        raw_campaign_strategy_ids = profitability_cfg.get("campaign_strategy_ids", ("campaign",))
+        if isinstance(raw_campaign_strategy_ids, (list, tuple, set)):
+            campaign_strategy_ids = {
+                str(item).strip().lower()
+                for item in raw_campaign_strategy_ids
+                if str(item).strip()
+            }
+        else:
+            token = str(raw_campaign_strategy_ids).strip().lower()
+            campaign_strategy_ids = {token} if token else set()
+        self.profitability_campaign_strategy_ids = campaign_strategy_ids or {"campaign"}
         self.require_live_client_order_id = bool(
             broker_config.get("require_live_client_order_id", True)
         )
@@ -436,6 +459,9 @@ class RiskAwareRouter:
         if explicit != 0.0:
             return explicit
         return float(self._default_expected_alpha_bps.get(str(order.strategy_id), 0.0))
+
+    def _is_campaign_strategy(self, strategy_id: str) -> bool:
+        return str(strategy_id).strip().lower() in self.profitability_campaign_strategy_ids
 
     @staticmethod
     def _parse_rate_limit_configs(raw_cfg: Any) -> Dict[Tuple[str, str], RateLimitConfig]:
@@ -1404,6 +1430,86 @@ class RiskAwareRouter:
             )
         )
         predicted_net_alpha_bps = float(expected_alpha_bps - predicted_total_router_bps)
+        required_alpha_bps = float(predicted_total_router_bps + self.profitability_min_edge_bps)
+        audit_entry["profitability_gate"] = {
+            "enabled": bool(self.profitability_gate_enabled),
+            "block_non_positive_expected_alpha": bool(
+                self.profitability_block_non_positive_expected_alpha
+            ),
+            "auto_block_campaign_zero_alpha": bool(
+                self.profitability_auto_block_campaign_zero_alpha
+            ),
+            "strategy_id": str(strategy_id),
+            "campaign_strategy_ids": sorted(self.profitability_campaign_strategy_ids),
+            "expected_alpha_bps": float(expected_alpha_bps),
+            "predicted_total_router_bps": float(predicted_total_router_bps),
+            "predicted_net_alpha_bps": float(predicted_net_alpha_bps),
+            "min_edge_bps": float(self.profitability_min_edge_bps),
+            "required_alpha_bps": float(required_alpha_bps),
+            "passed": True,
+        }
+        if self.profitability_gate_enabled:
+            if (
+                self.profitability_auto_block_campaign_zero_alpha
+                and self._is_campaign_strategy(strategy_id)
+                and float(expected_alpha_bps) <= 0.0
+            ):
+                self.reject_count += 1
+                audit_entry["rejected"] = True
+                audit_entry["profitability_gate"]["passed"] = False
+                audit_entry["reject_reason"] = (
+                    "PROFITABILITY_GATE: campaign expected_alpha_bps <= 0"
+                )
+                self.audit_log.append(audit_entry)
+                return OrderResult(
+                    success=False,
+                    decision=RiskDecision.HALT,
+                    risk_state=risk_state,
+                    order_id=None,
+                    exchange=route.exchange,
+                    rejected_reason=audit_entry["reject_reason"],
+                    audit_log=audit_entry,
+                )
+            if (
+                self.profitability_block_non_positive_expected_alpha
+                and float(expected_alpha_bps) <= 0.0
+            ):
+                self.reject_count += 1
+                audit_entry["rejected"] = True
+                audit_entry["profitability_gate"]["passed"] = False
+                audit_entry["reject_reason"] = (
+                    "PROFITABILITY_GATE: expected_alpha_bps <= 0"
+                )
+                self.audit_log.append(audit_entry)
+                return OrderResult(
+                    success=False,
+                    decision=RiskDecision.HALT,
+                    risk_state=risk_state,
+                    order_id=None,
+                    exchange=route.exchange,
+                    rejected_reason=audit_entry["reject_reason"],
+                    audit_log=audit_entry,
+                )
+            if float(expected_alpha_bps) + 1e-9 < float(required_alpha_bps):
+                self.reject_count += 1
+                audit_entry["rejected"] = True
+                audit_entry["profitability_gate"]["passed"] = False
+                audit_entry["reject_reason"] = (
+                    "PROFITABILITY_GATE: "
+                    f"expected_alpha_bps {expected_alpha_bps:.4f} < "
+                    f"predicted_total_router_bps {predicted_total_router_bps:.4f} + "
+                    f"min_edge_bps {self.profitability_min_edge_bps:.4f}"
+                )
+                self.audit_log.append(audit_entry)
+                return OrderResult(
+                    success=False,
+                    decision=RiskDecision.HALT,
+                    risk_state=risk_state,
+                    order_id=None,
+                    exchange=route.exchange,
+                    rejected_reason=audit_entry["reject_reason"],
+                    audit_log=audit_entry,
+                )
 
         capacity_decision = self.capacity_model.evaluate_order(
             strategy_id=str(order.strategy_id),
@@ -2548,6 +2654,17 @@ class RiskAwareRouter:
             "capacity_curves": {
                 "enabled": bool(self.capacity_model.enabled),
                 "storage_path": str(self.capacity_model.storage_path),
+            },
+            "profitability_gate": {
+                "enabled": bool(self.profitability_gate_enabled),
+                "min_edge_bps": float(self.profitability_min_edge_bps),
+                "block_non_positive_expected_alpha": bool(
+                    self.profitability_block_non_positive_expected_alpha
+                ),
+                "auto_block_campaign_zero_alpha": bool(
+                    self.profitability_auto_block_campaign_zero_alpha
+                ),
+                "campaign_strategy_ids": sorted(self.profitability_campaign_strategy_ids),
             },
             "live_ops_controls": {
                 "idempotency_ttl_seconds": float(self.idempotency_guard.ttl_seconds),

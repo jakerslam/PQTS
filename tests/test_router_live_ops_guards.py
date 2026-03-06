@@ -395,6 +395,93 @@ def test_router_blocks_strategy_venue_scope_from_disable_list(tmp_path):
     assert "[strategy_venue]" in str(result.rejected_reason)
 
 
+def test_profitability_gate_blocks_zero_alpha_campaign_orders(tmp_path):
+    router = _router(
+        tmp_path,
+        profitability_gate={
+            "enabled": True,
+            "min_edge_bps": 0.5,
+            "auto_block_campaign_zero_alpha": True,
+        },
+    )
+    order = OrderRequest(
+        symbol="BTCUSDT",
+        side="buy",
+        quantity=0.01,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+        strategy_id="campaign",
+        expected_alpha_bps=0.0,
+        client_order_id="profitability-campaign-1",
+    )
+
+    result = asyncio.run(_submit(router, order))
+
+    assert result.success is False
+    assert result.rejected_reason == "PROFITABILITY_GATE: campaign expected_alpha_bps <= 0"
+    gate = result.audit_log.get("profitability_gate", {})
+    assert gate.get("enabled") is True
+    assert gate.get("passed") is False
+
+
+def test_profitability_gate_rejects_alpha_below_cost_plus_buffer(tmp_path):
+    router = _router(
+        tmp_path,
+        profitability_gate={
+            "enabled": True,
+            "min_edge_bps": 200.0,
+            "auto_block_campaign_zero_alpha": False,
+        },
+    )
+    order = OrderRequest(
+        symbol="BTCUSDT",
+        side="buy",
+        quantity=0.01,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+        strategy_id="cost_test",
+        expected_alpha_bps=5.0,
+        client_order_id="profitability-edge-1",
+    )
+
+    result = asyncio.run(_submit(router, order))
+
+    assert result.success is False
+    assert "PROFITABILITY_GATE: expected_alpha_bps" in str(result.rejected_reason)
+    gate = result.audit_log.get("profitability_gate", {})
+    assert float(gate.get("required_alpha_bps", 0.0)) > float(gate.get("expected_alpha_bps", 0.0))
+    assert gate.get("passed") is False
+
+
+def test_profitability_gate_allows_alpha_above_cost_plus_buffer(tmp_path):
+    router = _router(
+        tmp_path,
+        profitability_gate={
+            "enabled": True,
+            "min_edge_bps": 0.5,
+            "auto_block_campaign_zero_alpha": False,
+        },
+    )
+    order = OrderRequest(
+        symbol="BTCUSDT",
+        side="buy",
+        quantity=0.01,
+        order_type=OrderType.LIMIT,
+        price=50000.0,
+        strategy_id="high_edge",
+        expected_alpha_bps=1000.0,
+        client_order_id="profitability-edge-2",
+    )
+
+    result = asyncio.run(_submit(router, order))
+
+    assert result.success is True
+    gate = result.audit_log.get("profitability_gate", {})
+    assert gate.get("enabled") is True
+    assert gate.get("passed") is True
+    assert float(gate.get("expected_alpha_bps", 0.0)) > float(gate.get("required_alpha_bps", 0.0))
+
+
 def test_router_confidence_allocator_scales_quantity(tmp_path):
     router = _router(
         tmp_path,

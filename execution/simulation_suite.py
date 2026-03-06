@@ -184,6 +184,7 @@ class SimulationSuiteRunner:
             "regime_overlay": execution_cfg.get("regime_overlay", {}),
             "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
             "tca_calibration": execution_cfg.get("tca_calibration", {}),
+            "profitability_gate": execution_cfg.get("profitability_gate", {}),
             "risk_profile": risk_profile_payload(self._risk_profile),
         }
 

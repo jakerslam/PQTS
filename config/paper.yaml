@@ -194,6 +194,26 @@ execution:
     hard_floor_on_negative_lower: true
   tca_calibration:
     enabled: true
+  expected_alpha_bps_by_strategy:
+    campaign: 12.0
+    scalping: 18.0
+    arbitrage: 14.0
+    trend_following: 9.0
+    swing_trend: 8.0
+    hold_carry: 7.0
+    mean_reversion: 10.0
+    ml: 11.0
+    volume_profile: 9.0
+    order_flow: 12.0
+    liquidity_sweep: 13.0
+    market_making: 10.0
+    funding_arbitrage: 9.0
+  profitability_gate:
+    enabled: true
+    min_edge_bps: 0.5
+    block_non_positive_expected_alpha: false
+    auto_block_campaign_zero_alpha: true
+    campaign_strategy_ids: ['campaign']
   paper_prediction_blend: 1.0
   paper_fill_model:
     reality_stress_mode: true
@@ -213,6 +233,7 @@ mechanism_switches:
   maker_urgency_ladder: true
   confidence_allocator: false
   shorting_controls: false
+  profitability_gate: true
   market_data_resilience: true
   tca_calibration_feedback: true
   slippage_stress_model: true

@@ -25,6 +25,7 @@ def test_parse_switch_overrides_accepts_aliases_and_boolean_tokens():
             "slippage_stress=false",
             "md_resilience=1",
             "confidence=on",
+            "alpha_gate=on",
         ]
     )
 
@@ -33,6 +34,7 @@ def test_parse_switch_overrides_accepts_aliases_and_boolean_tokens():
     assert overrides["slippage_stress_model"] is False
     assert overrides["market_data_resilience"] is True
     assert overrides["confidence_allocator"] is True
+    assert overrides["profitability_gate"] is True
 
 
 def test_parse_switch_overrides_rejects_invalid_entries():
@@ -53,6 +55,7 @@ def test_resolve_mechanism_switches_uses_config_defaults_then_overrides():
             "maker_urgency_ladder": {"enabled": True},
             "confidence_allocator": {"enabled": False},
             "shorting_controls": {"enabled": False},
+            "profitability_gate": {"enabled": True},
             "market_data_resilience": {"enabled": True},
             "reliability": {"enable_failover": True},
             "tca_calibration": {"enabled": True},
@@ -68,6 +71,7 @@ def test_resolve_mechanism_switches_uses_config_defaults_then_overrides():
         overrides={
             "capacity_curves": False,
             "market_data_resilience": False,
+            "profitability_gate": False,
         },
     )
 
@@ -75,6 +79,7 @@ def test_resolve_mechanism_switches_uses_config_defaults_then_overrides():
     assert resolved["capacity_curves"] is False
     assert resolved["allocation_controls"] is False
     assert resolved["market_data_resilience"] is False
+    assert resolved["profitability_gate"] is False
     assert resolved["routing_failover"] is True
     assert resolved["maker_urgency_ladder"] is True
     assert resolved["confidence_allocator"] is False
@@ -93,6 +98,7 @@ def test_apply_mechanism_switches_materializes_execution_paths():
     execution = switched["execution"]
     assert execution["regime_overlay"]["enabled"] is False
     assert execution["shorting_controls"]["enabled"] is True
+    assert execution["profitability_gate"]["enabled"] is False
     assert execution["tca_calibration"]["enabled"] is False
     assert execution["maker_urgency_ladder"]["enabled"] is True
     assert execution["confidence_allocator"]["enabled"] is False

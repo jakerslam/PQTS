@@ -156,6 +156,7 @@ def _build_broker_config(
         "regime_overlay": execution_cfg.get("regime_overlay", {}),
         "capacity_curves": execution_cfg.get("capacity_curves", {}),
         "expected_alpha_bps_by_strategy": execution_cfg.get("expected_alpha_bps_by_strategy", {}),
+        "profitability_gate": execution_cfg.get("profitability_gate", {}),
         "require_live_client_order_id": execution_cfg.get("require_live_client_order_id", True),
         "idempotency_ttl_seconds": execution_cfg.get("idempotency_ttl_seconds", 300.0),
         "distributed_ops_state": execution_cfg.get("distributed_ops_state", {}),
@@ -462,7 +463,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help=(
             "Mechanism switch override for ablations, e.g. --switch capacity_curves=off. "
             "Valid keys: routing_failover,capacity_curves,allocation_controls,regime_overlay,"
-            "maker_urgency_ladder,confidence_allocator,shorting_controls,"
+            "maker_urgency_ladder,confidence_allocator,shorting_controls,profitability_gate,"
             "market_data_resilience,tca_calibration_feedback,"
             "slippage_stress_model"
         ),

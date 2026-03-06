@@ -96,6 +96,7 @@ def _build_broker_config(
         "market_data_resilience": execution_cfg.get("market_data_resilience", {}),
         "confidence_allocator": execution_cfg.get("confidence_allocator", {}),
         "maker_urgency_ladder": execution_cfg.get("maker_urgency_ladder", {}),
+        "profitability_gate": execution_cfg.get("profitability_gate", {}),
         "risk_profile": dict(risk_profile_payload_value),
     }
 
