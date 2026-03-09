@@ -20,7 +20,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 ## 01. Core Runtime Contracts + API Platform (`P0`)
 
 - [x] Create canonical schemas for account, positions, orders, fills, PnL snapshots, risk state, tool payloads, and error envelopes.
-- [ ] Create `services/api` FastAPI service scaffold with health/readiness endpoints and OpenAPI generation.
+- [x] Create `services/api` FastAPI service scaffold with health/readiness endpoints and OpenAPI generation.
 - [ ] Implement API auth foundation (session/token flow + role model) and protect privileged endpoints.
 - [ ] Implement core REST endpoints: account summary, positions, orders, fills, PnL snapshots, risk state.
 - [ ] Implement core WebSocket channels: orders, fills, positions, PnL, risk/kill-switch incidents.
