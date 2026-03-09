@@ -65,14 +65,21 @@ if [[ ! -f "$BACKLOG" ]]; then
 fi
 
 existing_map_file="$(mktemp)"
+existing_labels_file="$(mktemp)"
 cleanup() {
   rm -f "$existing_map_file"
+  rm -f "$existing_labels_file"
 }
 trap cleanup EXIT
 
 lookup_existing_number() {
   local ticket_id="$1"
   awk -F'\t' -v id="$ticket_id" '$1 == id { print $2; exit }' "$existing_map_file"
+}
+
+label_exists() {
+  local label="$1"
+  grep -Fxq "$label" "$existing_labels_file"
 }
 
 if [[ "$MODE" == "execute" ]]; then
@@ -89,6 +96,8 @@ if [[ "$MODE" == "execute" ]]; then
     echo "Error: Could not determine target repo. Pass --repo OWNER/REPO." >&2
     exit 1
   fi
+
+  gh label list --repo "$REPO" --limit 1000 --json name -q '.[].name' > "$existing_labels_file" || true
 
   while IFS=$'\t' read -r number title; do
     if [[ "$title" =~ ^(PQTS-[0-9]{3})[[:space:]] ]]; then
@@ -174,10 +183,18 @@ EOF
   fi
 
   cmd=(gh issue create --repo "$REPO" --title "$issue_title" --body "$body")
+  skipped_label_list=()
   for label in "${label_list[@]}"; do
     [[ -z "$label" ]] && continue
-    cmd+=(--label "$label")
+    if label_exists "$label"; then
+      cmd+=(--label "$label")
+    else
+      skipped_label_list+=("$label")
+    fi
   done
+  if (( ${#skipped_label_list[@]} > 0 )); then
+    echo "WARN ${id}: skipping unavailable labels: $(IFS=,; echo "${skipped_label_list[*]}")"
+  fi
 
   created_url="$("${cmd[@]}")"
   created_num="${created_url##*/}"
