@@ -8,6 +8,22 @@ version = "0.1.0"
 description = "Production-oriented quant research and execution platform."
 readme = "README.md"
 requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+  {name = "PQTS Contributors"},
+]
+keywords = ["quant", "trading", "algorithmic-trading", "backtesting", "risk-management"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Financial and Insurance Industry",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business :: Financial :: Investment",
+]
 dependencies = [
   "pandas==2.3.3",
   "numpy==2.4.2",
@@ -33,6 +49,14 @@ dependencies = [
   "riskfolio-lib==7.2.1",
   "hmmlearn==0.3.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/jakerslam/pqts"
+Repository = "https://github.com/jakerslam/pqts"
+Issues = "https://github.com/jakerslam/pqts/issues"
+
+[project.scripts]
+pqts = "app.runtime:cli_main"
 
 [project.optional-dependencies]
 dev = [

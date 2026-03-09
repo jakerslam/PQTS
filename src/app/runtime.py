@@ -79,3 +79,11 @@ async def main(argv: list[str] | None = None) -> None:
         if modules_started:
             await registry.stop_all(runtime_context)
         raise
+
+
+def cli_main() -> None:
+    """Synchronous console entrypoint used by setuptools scripts."""
+
+    import asyncio
+
+    asyncio.run(main())

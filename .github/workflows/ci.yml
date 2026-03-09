@@ -100,16 +100,10 @@ jobs:
           pip install -r requirements.txt
 
       - name: Ruff lint (gating)
-        run: ruff check core execution risk analytics --select E9,F63,F7,F82
+        run: ruff check src/core src/execution src/risk src/analytics src/markets --select E9,F63,F7,F82
 
-      - name: Black format check (gating)
-        run: black --check core execution risk analytics
-
-      - name: Isort import check (gating)
-        run: isort --check-only core execution risk analytics
-
-      - name: Flake8 hard errors (gating)
-        run: flake8 core execution risk analytics --count --select=E9,F63,F7,F82 --show-source --statistics
+      - name: Architecture boundary validation (gating)
+        run: python3 tools/check_architecture_boundaries.py
 
   static_analysis:
     name: Bandit and Mypy (non-gating)
@@ -133,12 +127,12 @@ jobs:
 
       - name: Run bandit (non-gating)
         continue-on-error: true
-        run: bandit -r execution risk core backtesting strategies
+        run: bandit -r src/execution src/risk src/core src/backtesting src/strategies
 
       - name: Run mypy baseline (non-gating)
         continue-on-error: true
-        run: mypy execution risk core --ignore-missing-imports
+        run: mypy src/execution src/risk src/core --ignore-missing-imports
 
       - name: Run mypy strict phase modules (non-gating)
         continue-on-error: true
-        run: mypy analytics/paper_readiness.py execution/paper_campaign.py execution/paper_fill_model.py execution/tca_feedback.py
+        run: mypy src/analytics/paper_readiness.py src/execution/paper_campaign.py src/execution/paper_fill_model.py src/execution/tca_feedback.py

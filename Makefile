@@ -3,7 +3,7 @@ PYTHON ?= python3
 VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site docker-up test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -50,6 +50,12 @@ arch-map:
 scaffold-module:
 	@echo "Usage: make scaffold-module NAME=<module_name> REQUIRES=<a,b> PROVIDES=<x,y>"
 	$(VENV_PY) tools/scaffold_module.py "$(NAME)" --requires "$(REQUIRES)" --provides "$(PROVIDES)"
+
+leaderboard-site:
+	$(VENV_PY) scripts/export_simulation_leaderboard_site.py --reports-dir data/reports --output-dir site
+
+docker-up:
+	docker compose up --build
 
 test:
 	$(VENV_PY) -m pytest -q

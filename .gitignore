@@ -44,6 +44,9 @@ models/*.joblib
 logs/
 *.log
 
+# Generated static sites
+site/
+
 # IDE
 .vscode/
 .idea/

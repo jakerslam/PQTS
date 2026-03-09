@@ -1,7 +1,9 @@
 # PQTS - Protheus Quant Trading System
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
+[![CI](https://github.com/jakerslam/pqts/actions/workflows/ci.yml/badge.svg)](https://github.com/jakerslam/pqts/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/pqts.svg)](https://pypi.org/project/pqts/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-Paper%20Trading-yellow.svg)]()
 
 > A professional-grade algorithmic trading platform for crypto, equities, and forex markets.
@@ -37,6 +39,9 @@ cp .env.example .env
 # Start dashboard
 python src/dashboard/start.py
 
+# Optional package install once published:
+# pip install pqts
+
 # Run paper trading
 python main.py config/paper.yaml
 # or enforce a specific user risk tolerance profile:
@@ -47,6 +52,19 @@ python main.py config/paper.yaml \
   --autopilot-include mean_reversion \
   --autopilot-exclude ml
 ```
+
+## 🐳 Docker Compose
+
+One-command local stack (app + dashboard + Redis + Postgres, optional Grafana profile):
+
+```bash
+docker compose up --build
+# optional observability profile:
+# docker compose --profile observability up --build
+```
+
+Dashboard: `http://localhost:8501`  
+Grafana (optional): `http://localhost:3000` (`admin` / `admin`)
 
 ## ⚡ One-Command Demo
 
@@ -124,6 +142,12 @@ Artifacts:
 - event telemetry log: `data/analytics/simulation_events.jsonl`
 
 The dashboard now renders this telemetry in a dedicated **Simulation Leaderboard** panel.
+
+Static leaderboard export (for GitHub Pages):
+
+```bash
+python scripts/export_simulation_leaderboard_site.py --reports-dir data/reports --output-dir site
+```
 
 Execution drift report:
 

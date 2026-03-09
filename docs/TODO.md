@@ -6,15 +6,10 @@ This file tracks engineering chores/fix items (not net-new product capabilities 
 
 ## P0
 
-- [ ] Add `LICENSE` file with MIT text and ensure repository metadata reflects license choice.
-- [ ] Add GitHub Actions CI pipeline covering:
-  - `pytest`
-  - `ruff`
-  - `mypy`
-  - architecture boundary validation (`tools/check_architecture_boundaries.py`)
-  - security scan
-- [ ] Add README badges for CI status and package/release status.
-- [ ] Finalize PyPI distribution workflow (`pip install pqts`) including release automation and publish credentials documentation.
+- [x] Add `LICENSE` file with MIT text and ensure repository metadata reflects license choice.
+- [x] Add GitHub Actions CI pipeline coverage for `pytest`, `ruff`, `mypy`, architecture boundary validation, and security scan.
+- [x] Add README badges for CI status and package/release status.
+- [ ] Finalize PyPI publication workflow (`pip install pqts`) including trusted publishing setup and release credentials documentation.
 
 ## P1
 
