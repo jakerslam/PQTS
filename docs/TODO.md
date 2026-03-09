@@ -39,7 +39,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 - [x] Add unit-aware metric extraction (`USD`, `shares`, etc.) and form-scoped filters (10-Q/10-K).
 - [x] Add tabular normalization layer for SEC payloads with accession/report-date traceability.
 - [x] Implement multi-source retrieval surface (structured market/financial + web/news) with provenance metadata.
-- [ ] Add provider adapter error envelopes and response-shape normalization for all external connectors.
+- [x] Add provider adapter error envelopes and response-shape normalization for all external connectors.
 
 ## 03. Execution + Risk Intelligence (`P1`)
 

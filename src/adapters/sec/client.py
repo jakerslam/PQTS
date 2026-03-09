@@ -7,6 +7,8 @@ from typing import Any
 
 import requests
 
+from adapters.provider_contracts import ProviderResponseEnvelope, call_with_envelope
+
 
 def validate_sec_user_agent(value: str) -> str:
     """Validate SEC-compliant requester identity User-Agent string."""
@@ -68,3 +70,18 @@ class SECClient:
         if not isinstance(payload, dict):
             raise ValueError("SEC response payload must be a JSON object.")
         return payload
+
+    def get_json_enveloped(
+        self,
+        path: str,
+        *,
+        trace_id: str | None = None,
+    ) -> ProviderResponseEnvelope[dict[str, Any]]:
+        cleaned = "/" + path.lstrip("/")
+        endpoint = f"{self.base_url}{cleaned}"
+        return call_with_envelope(
+            provider="sec",
+            endpoint=endpoint,
+            callback=lambda: self.get_json(cleaned),
+            trace_id=trace_id,
+        )
