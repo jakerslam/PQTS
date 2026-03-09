@@ -47,7 +47,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 - [x] Implement cross-market dependency graph + logical constraint checks + violation alerts.
 - [x] Build calibration surface pipeline and mispricing diagnostics (bucket/regime based).
 - [x] Implement uncertainty-adjusted Kelly sizing with caps and minimum-edge gates.
-- [ ] Implement VWAP/TWAP/depth-aware execution slicing and execution quality telemetry.
+- [x] Implement VWAP/TWAP/depth-aware execution slicing and execution quality telemetry.
 - [ ] Add orderbook sequence-gap detection and deterministic resync/recovery logic.
 - [ ] Implement informed-flow/liquidity indicators (including VPIN-style) and automated quote/size kill switches.
 - [ ] Add portfolio VaR + drawdown guardrails with automatic new-risk gating.
