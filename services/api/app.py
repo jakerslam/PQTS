@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
+from .auth import APIIdentity, build_token_store, require_admin, require_identity, require_operator
 from .config import APISettings
 
 
@@ -29,6 +30,7 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
         redoc_url=redoc_url,
     )
     app.state.settings = resolved
+    app.state.token_store = build_token_store(resolved.auth_tokens)
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, Any]:
@@ -58,6 +60,32 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
             "version": resolved.service_version,
             "environment": resolved.environment,
             "dependencies": dependencies,
+            "timestamp": _utc_now_iso(),
+        }
+
+    @app.get("/v1/auth/me", tags=["auth"])
+    def auth_me(identity: Annotated[APIIdentity, Depends(require_identity)]) -> dict[str, Any]:
+        return {
+            "identity": identity.to_dict(),
+            "service": resolved.service_name,
+            "timestamp": _utc_now_iso(),
+        }
+
+    @app.post("/v1/operator/pause", tags=["operator"])
+    def pause_trading(identity: Annotated[APIIdentity, Depends(require_operator)]) -> dict[str, Any]:
+        return {
+            "status": "accepted",
+            "action": "pause_trading",
+            "requested_by": identity.subject,
+            "timestamp": _utc_now_iso(),
+        }
+
+    @app.post("/v1/admin/kill-switch", tags=["admin"])
+    def admin_kill_switch(identity: Annotated[APIIdentity, Depends(require_admin)]) -> dict[str, Any]:
+        return {
+            "status": "accepted",
+            "action": "kill_switch",
+            "requested_by": identity.subject,
             "timestamp": _utc_now_iso(),
         }
 

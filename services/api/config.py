@@ -23,6 +23,7 @@ class APISettings:
     enable_openapi: bool = True
     database_url: str = ""
     redis_url: str = ""
+    auth_tokens: str = ""
 
     @classmethod
     def from_env(cls) -> "APISettings":
@@ -35,4 +36,5 @@ class APISettings:
             enable_openapi=_env_bool("PQTS_API_ENABLE_OPENAPI", cls.enable_openapi),
             database_url=os.getenv("PQTS_DATABASE_URL", ""),
             redis_url=os.getenv("PQTS_REDIS_URL", ""),
+            auth_tokens=os.getenv("PQTS_API_TOKENS", ""),
         )
