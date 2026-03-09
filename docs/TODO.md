@@ -34,7 +34,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 - [x] Build master ticker→CIK ingestion pipeline from SEC `company_tickers.json`.
 - [x] Add canonical CIK normalization utility (int and zero-padded 10-digit string forms).
 - [x] Implement SEC submissions ingestion (`CIK{cik}.json`) with form/date/accession normalization.
-- [ ] Implement SEC `companyfacts` taxonomy traversal (`dei`, `us-gaap`) with missing-tag-safe parsing.
+- [x] Implement SEC `companyfacts` taxonomy traversal (`dei`, `us-gaap`) with missing-tag-safe parsing.
 - [ ] Implement SEC `companyconcept` metric endpoint adapter with taxonomy/concept validation.
 - [ ] Add unit-aware metric extraction (`USD`, `shares`, etc.) and form-scoped filters (10-Q/10-K).
 - [ ] Add tabular normalization layer for SEC payloads with accession/report-date traceability.
