@@ -200,22 +200,24 @@ Access at `http://localhost:8501`
 
 ## 🧠 Architecture
 
+PQTS now uses a canonical **modular monolith** layout:
+
+- `app/`: composition root and runtime entrypoints
+- `contracts/`: module and event contracts
+- `modules/`: module descriptors and lifecycle hooks
+- `adapters/`: external I/O adapter descriptors/loaders
+
+Legacy packages (`core/`, `execution/`, `analytics/`, `risk/`, `strategies/`, etc.) remain active during migration and are wired through `app`.
+
+Architecture tooling:
+
+```bash
+python tools/check_architecture_boundaries.py
+python tools/print_architecture_map.py
+python tools/scaffold_module.py order_intelligence --requires data,signals --provides flow_signals
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    PQTS v1.1.0                           │
-├─────────────────────────────────────────────────────────┤
-│  Markets: Binance, Coinbase, Alpaca (paper/live)          │
-│  Strategies: 10 channels, 20+ sub-strategies            │
-│  Indicators: 15+ universal technical indicators         │
-│  Risk: Kelly sizing, VaR, correlation limits            │
-│  ML: Ensemble with online learning                      │
-│  Execution: Smart routing, TWAP, maker/taker            │
-├─────────────────────────────────────────────────────────┤
-│  Backtesting: Event-driven, realistic costs             │
-│  Dashboard: Real-time Streamlit interface               │
-│  Analytics: Sharpe, drawdown, win rate tracking         │
-└─────────────────────────────────────────────────────────┘
-```
+
+Detailed rules and migration notes: `ARCHITECTURE.md`
 
 ## 📚 Documentation
 
