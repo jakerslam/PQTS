@@ -56,7 +56,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 
 ## 04. Web App + Generative UI (`P1`)
 
-- [ ] Create `apps/web` Next.js + TypeScript app scaffold with API client/env wiring.
+- [x] Create `apps/web` Next.js + TypeScript app scaffold with API client/env wiring.
 - [ ] Build authenticated dashboard shell (navigation, auth-aware routing, error boundaries).
 - [ ] Implement first production pages: portfolio overview, orders/fills tape, risk/alerts panel.
 - [ ] Add tool-aware UI registry mapping tool type → loading component + final component + fallback renderer.

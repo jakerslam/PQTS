@@ -58,6 +58,12 @@ site/
 .DS_Store
 Thumbs.db
 
+# Node / frontend
+node_modules/
+.next/
+apps/web/node_modules/
+apps/web/.next/
+
 # Secrets
 config/credentials.yaml
 config/secrets.yaml
