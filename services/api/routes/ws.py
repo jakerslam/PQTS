@@ -9,6 +9,7 @@ from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
 
 from services.api.auth import resolve_identity_for_token
+from services.api.correlation import RUN_HEADER, TRACE_HEADER, build_run_id, build_trace_id
 from services.api.state import APIRuntimeStore, StreamHub
 
 router = APIRouter()
@@ -29,6 +30,16 @@ def _resolve_token(websocket: WebSocket) -> tuple[str, str]:
     if auth.lower().startswith("bearer "):
         return auth.split(" ", 1)[1].strip(), "bearer"
     return "", ""
+
+
+def _resolve_ws_correlation(websocket: WebSocket) -> tuple[str, str]:
+    trace_id = websocket.query_params.get("trace_id", "").strip()
+    run_id = websocket.query_params.get("run_id", "").strip()
+    if not trace_id:
+        trace_id = websocket.headers.get(TRACE_HEADER, "").strip() or build_trace_id()
+    if not run_id:
+        run_id = websocket.headers.get(RUN_HEADER, "").strip() or build_run_id()
+    return trace_id, run_id
 
 
 async def _authenticate_websocket(websocket: WebSocket) -> bool:
@@ -53,6 +64,7 @@ async def _serve_channel(
     store: APIRuntimeStore = websocket.app.state.store
     hub: StreamHub = websocket.app.state.stream_hub
     account_id = _account_from_websocket(websocket)
+    trace_id, run_id = _resolve_ws_correlation(websocket)
 
     await hub.connect(channel, websocket)
     try:
@@ -61,6 +73,8 @@ async def _serve_channel(
                 "channel": channel,
                 "event": "snapshot",
                 "payload": snapshot(store, account_id),
+                "trace_id": trace_id,
+                "run_id": run_id,
             }
         )
         while True:
@@ -70,6 +84,8 @@ async def _serve_channel(
                     "channel": channel,
                     "event": "heartbeat",
                     "payload": snapshot(store, account_id),
+                    "trace_id": trace_id,
+                    "run_id": run_id,
                 }
             )
     except WebSocketDisconnect:

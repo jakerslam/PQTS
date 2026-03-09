@@ -48,6 +48,8 @@ def test_orders_channel_streams_snapshot_and_broadcast_update() -> None:
         first = websocket.receive_json()
         assert first["channel"] == "orders"
         assert first["event"] == "snapshot"
+        assert first["trace_id"].startswith("trace-")
+        assert first["run_id"].startswith("run-")
 
         write = client.post("/v1/execution/orders", json=order_payload, headers=_operator())
         assert write.status_code == 200
@@ -55,6 +57,8 @@ def test_orders_channel_streams_snapshot_and_broadcast_update() -> None:
         event = websocket.receive_json()
         assert event["channel"] == "orders"
         assert event["event"] == "order_appended"
+        assert event["trace_id"].startswith("trace-")
+        assert event["run_id"].startswith("run-")
         assert event["payload"]["order"]["order_id"] == "ord-ws-1"
 
 
@@ -70,6 +74,8 @@ def test_risk_channel_streams_incident_broadcast() -> None:
     with client.websocket_connect("/ws/risk?token=viewer-token&account_id=paper-main") as websocket:
         first = websocket.receive_json()
         assert first["event"] == "snapshot"
+        assert first["trace_id"].startswith("trace-")
+        assert first["run_id"].startswith("run-")
 
         write = client.post("/v1/risk/incidents", json=payload, headers=_operator())
         assert write.status_code == 200
@@ -77,6 +83,8 @@ def test_risk_channel_streams_incident_broadcast() -> None:
         event = websocket.receive_json()
         assert event["channel"] == "risk"
         assert event["event"] == "risk_incident"
+        assert event["trace_id"].startswith("trace-")
+        assert event["run_id"].startswith("run-")
         assert event["payload"]["incident"]["code"] == "kill_switch"
 
 

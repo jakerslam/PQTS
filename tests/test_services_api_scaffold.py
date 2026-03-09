@@ -29,6 +29,8 @@ def test_health_endpoint_returns_service_payload() -> None:
     assert response.status_code == 200
 
     payload = response.json()
+    assert response.headers.get("x-trace-id", "").startswith("trace-")
+    assert response.headers.get("x-run-id", "").startswith("run-")
     assert payload["status"] == "ok"
     assert payload["service"] == "PQTS API Test"
     assert payload["version"] == "9.9.9"
@@ -45,6 +47,8 @@ def test_ready_endpoint_includes_dependency_shape() -> None:
 
     payload = response.json()
     assert payload["status"] == "ready"
+    assert payload["trace_id"].startswith("trace-")
+    assert payload["run_id"].startswith("run-")
     assert payload["dependencies"]["database"]["configured"] is True
     assert payload["dependencies"]["redis"]["configured"] is True
     assert payload["dependencies"]["database"]["reachable"] in {True, False}

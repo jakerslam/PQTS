@@ -17,6 +17,7 @@ from contracts.api import (
 )
 from services.api.auth import APIIdentity, require_identity, require_operator
 from services.api.cache import APICache, enforce_rate_limit, get_cache
+from services.api.correlation import read_request_correlation, with_correlation
 from services.api.persistence import APIPersistence, get_persistence
 from services.api.state import APIRuntimeStore, StreamHub, get_store, get_stream_hub
 
@@ -70,7 +71,7 @@ def get_account_summary(
         account = store.accounts.get(account_id)
     if account is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found.")
-    return {"account": account.to_dict()}
+    return with_correlation(request, {"account": account.to_dict()})
 
 
 @router.put("/accounts/{account_id}")
@@ -85,6 +86,7 @@ async def upsert_account_summary(
     persistence: Annotated[APIPersistence | None, Depends(get_persistence)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
+    trace_id, run_id = read_request_correlation(request)
     payload["account_id"] = account_id
     try:
         snapshot = AccountSummary.from_dict(payload)
@@ -97,8 +99,10 @@ async def upsert_account_summary(
         "risk",
         "account_upsert",
         {"account_id": account_id, "account": snapshot.to_dict()},
+        trace_id=trace_id,
+        run_id=run_id,
     )
-    return {"account": snapshot.to_dict()}
+    return with_correlation(request, {"account": snapshot.to_dict()})
 
 
 @router.get("/portfolio/positions")
@@ -116,7 +120,7 @@ def list_positions(
         if persistence is not None
         else store.positions.get(account_id, [])
     )
-    return {"positions": [item.to_dict() for item in rows]}
+    return with_correlation(request, {"positions": [item.to_dict() for item in rows]})
 
 
 @router.post("/portfolio/positions")
@@ -130,6 +134,7 @@ async def append_position(
     persistence: Annotated[APIPersistence | None, Depends(get_persistence)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
+    trace_id, run_id = read_request_correlation(request)
     try:
         snapshot = PositionSnapshot.from_dict(payload)
     except Exception as exc:
@@ -141,8 +146,10 @@ async def append_position(
         "positions",
         "position_appended",
         {"account_id": snapshot.account_id, "position": snapshot.to_dict()},
+        trace_id=trace_id,
+        run_id=run_id,
     )
-    return {"position": snapshot.to_dict()}
+    return with_correlation(request, {"position": snapshot.to_dict()})
 
 
 @router.get("/execution/orders")
@@ -158,7 +165,7 @@ def list_orders(
     rows = (
         persistence.list_orders(account_id) if persistence is not None else store.orders.get(account_id, [])
     )
-    return {"orders": [item.to_dict() for item in rows]}
+    return with_correlation(request, {"orders": [item.to_dict() for item in rows]})
 
 
 @router.post("/execution/orders")
@@ -172,6 +179,7 @@ async def append_order(
     persistence: Annotated[APIPersistence | None, Depends(get_persistence)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
+    trace_id, run_id = read_request_correlation(request)
     try:
         snapshot = OrderSnapshot.from_dict(payload)
     except Exception as exc:
@@ -183,8 +191,10 @@ async def append_order(
         "orders",
         "order_appended",
         {"account_id": snapshot.account_id, "order": snapshot.to_dict()},
+        trace_id=trace_id,
+        run_id=run_id,
     )
-    return {"order": snapshot.to_dict()}
+    return with_correlation(request, {"order": snapshot.to_dict()})
 
 
 @router.get("/execution/fills")
@@ -200,7 +210,7 @@ def list_fills(
     rows = (
         persistence.list_fills(account_id) if persistence is not None else store.fills.get(account_id, [])
     )
-    return {"fills": [item.to_dict() for item in rows]}
+    return with_correlation(request, {"fills": [item.to_dict() for item in rows]})
 
 
 @router.post("/execution/fills")
@@ -214,6 +224,7 @@ async def append_fill(
     persistence: Annotated[APIPersistence | None, Depends(get_persistence)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
+    trace_id, run_id = read_request_correlation(request)
     try:
         snapshot = FillSnapshot.from_dict(payload)
     except Exception as exc:
@@ -225,8 +236,10 @@ async def append_fill(
         "fills",
         "fill_appended",
         {"account_id": snapshot.account_id, "fill": snapshot.to_dict()},
+        trace_id=trace_id,
+        run_id=run_id,
     )
-    return {"fill": snapshot.to_dict()}
+    return with_correlation(request, {"fill": snapshot.to_dict()})
 
 
 @router.get("/pnl/snapshots")
@@ -244,7 +257,7 @@ def list_pnl_snapshots(
         if persistence is not None
         else store.pnl_snapshots.get(account_id, [])
     )
-    return {"snapshots": [item.to_dict() for item in rows]}
+    return with_correlation(request, {"snapshots": [item.to_dict() for item in rows]})
 
 
 @router.post("/pnl/snapshots")
@@ -258,6 +271,7 @@ async def append_pnl_snapshot(
     persistence: Annotated[APIPersistence | None, Depends(get_persistence)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
+    trace_id, run_id = read_request_correlation(request)
     try:
         snapshot = PnLSnapshot.from_dict(payload)
     except Exception as exc:
@@ -269,8 +283,10 @@ async def append_pnl_snapshot(
         "pnl",
         "pnl_snapshot_appended",
         {"account_id": snapshot.account_id, "snapshot": snapshot.to_dict()},
+        trace_id=trace_id,
+        run_id=run_id,
     )
-    return {"snapshot": snapshot.to_dict()}
+    return with_correlation(request, {"snapshot": snapshot.to_dict()})
 
 
 @router.get("/risk/state/{account_id}")
@@ -290,7 +306,7 @@ def get_risk_state(
     )
     if snapshot is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Risk state not found.")
-    return {"risk_state": snapshot.to_dict()}
+    return with_correlation(request, {"risk_state": snapshot.to_dict()})
 
 
 @router.put("/risk/state/{account_id}")
@@ -305,6 +321,7 @@ async def upsert_risk_state(
     persistence: Annotated[APIPersistence | None, Depends(get_persistence)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
+    trace_id, run_id = read_request_correlation(request)
     payload["account_id"] = account_id
     try:
         snapshot = RiskStateSnapshot.from_dict(payload)
@@ -317,8 +334,10 @@ async def upsert_risk_state(
         "risk",
         "risk_state_upserted",
         {"account_id": account_id, "risk_state": snapshot.to_dict()},
+        trace_id=trace_id,
+        run_id=run_id,
     )
-    return {"risk_state": snapshot.to_dict()}
+    return with_correlation(request, {"risk_state": snapshot.to_dict()})
 
 
 @router.post("/risk/incidents")
@@ -332,6 +351,7 @@ async def append_risk_incident(
     persistence: Annotated[APIPersistence | None, Depends(get_persistence)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
+    trace_id, run_id = read_request_correlation(request)
     account_id = str(payload.get("account_id", "paper-main")).strip() or "paper-main"
     incident = {
         "account_id": account_id,
@@ -348,5 +368,7 @@ async def append_risk_incident(
         "risk",
         "risk_incident",
         {"account_id": account_id, "incident": incident},
+        trace_id=trace_id,
+        run_id=run_id,
     )
-    return {"incident": incident}
+    return with_correlation(request, {"incident": incident})

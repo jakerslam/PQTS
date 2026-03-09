@@ -118,7 +118,15 @@ class StreamHub:
     def disconnect(self, channel: str, websocket: WebSocket) -> None:
         self._channels.setdefault(channel, set()).discard(websocket)
 
-    async def broadcast(self, channel: str, event: str, payload: dict[str, Any]) -> None:
+    async def broadcast(
+        self,
+        channel: str,
+        event: str,
+        payload: dict[str, Any],
+        *,
+        trace_id: str | None = None,
+        run_id: str | None = None,
+    ) -> None:
         listeners = list(self._channels.get(channel, set()))
         dead: list[WebSocket] = []
         message = {
@@ -126,6 +134,8 @@ class StreamHub:
             "event": event,
             "payload": payload,
             "timestamp": _utc_now().isoformat(),
+            "trace_id": trace_id,
+            "run_id": run_id,
         }
         for websocket in listeners:
             try:

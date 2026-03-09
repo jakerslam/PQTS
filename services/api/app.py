@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 from typing import Annotated, Any
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 
 from .auth import APIIdentity, build_token_store, require_admin, require_identity, require_operator
 from .cache import APICache, get_cache
 from .config import APISettings
+from .correlation import RUN_HEADER, TRACE_HEADER, build_run_id, build_trace_id, with_correlation
 from .persistence import APIPersistence
 from .routes import core_router, ws_router
 from .state import APIRuntimeStore, StreamHub
@@ -34,6 +35,17 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
         docs_url=docs_url,
         redoc_url=redoc_url,
     )
+
+    @app.middleware("http")
+    async def add_correlation_ids(request: Request, call_next):  # type: ignore[no-untyped-def]
+        trace_id = request.headers.get(TRACE_HEADER, "").strip() or build_trace_id()
+        run_id = request.headers.get(RUN_HEADER, "").strip() or build_run_id()
+        request.state.trace_id = trace_id
+        request.state.run_id = run_id
+        response = await call_next(request)
+        response.headers[TRACE_HEADER] = trace_id
+        response.headers[RUN_HEADER] = run_id
+        return response
     app.state.settings = resolved
     app.state.token_store = build_token_store(resolved.auth_tokens)
     app.state.cache = APICache.connect(resolved.redis_url)
@@ -46,17 +58,17 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
         app.state.persistence.hydrate_store(app.state.store)
 
     @app.get("/health", tags=["health"])
-    def health() -> dict[str, Any]:
-        return {
+    def health(request: Request) -> dict[str, Any]:
+        return with_correlation(request, {
             "status": "ok",
             "service": resolved.service_name,
             "version": resolved.service_version,
             "environment": resolved.environment,
             "timestamp": _utc_now_iso(),
-        }
+        })
 
     @app.get("/ready", tags=["health"])
-    def ready() -> dict[str, Any]:
+    def ready(request: Request) -> dict[str, Any]:
         database_configured = bool(resolved.database_url)
         dependencies = {
             "database": {
@@ -68,54 +80,64 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
                 "reachable": bool(app.state.cache.is_redis) if bool(resolved.redis_url) else None,
             },
         }
-        return {
+        return with_correlation(request, {
             "status": "ready",
             "service": resolved.service_name,
             "version": resolved.service_version,
             "environment": resolved.environment,
             "dependencies": dependencies,
             "timestamp": _utc_now_iso(),
-        }
+        })
 
     @app.get("/v1/auth/me", tags=["auth"])
-    def auth_me(identity: Annotated[APIIdentity, Depends(require_identity)]) -> dict[str, Any]:
-        return {
+    def auth_me(
+        request: Request,
+        identity: Annotated[APIIdentity, Depends(require_identity)],
+    ) -> dict[str, Any]:
+        return with_correlation(request, {
             "identity": identity.to_dict(),
             "service": resolved.service_name,
             "timestamp": _utc_now_iso(),
-        }
+        })
 
     @app.post("/v1/auth/sessions", tags=["auth"])
     def create_session(
+        request: Request,
         identity: Annotated[APIIdentity, Depends(require_identity)],
         cache: Annotated[APICache, Depends(get_cache)],
     ) -> dict[str, Any]:
         session_token = f"sess_{uuid4().hex}"
         cache.set(f"session:{session_token}", identity.token, ttl_seconds=12 * 60 * 60)
-        return {
+        return with_correlation(request, {
             "session_token": session_token,
             "expires_in_seconds": 12 * 60 * 60,
             "identity": identity.to_dict(),
             "timestamp": _utc_now_iso(),
-        }
+        })
 
     @app.post("/v1/operator/pause", tags=["operator"])
-    def pause_trading(identity: Annotated[APIIdentity, Depends(require_operator)]) -> dict[str, Any]:
-        return {
+    def pause_trading(
+        request: Request,
+        identity: Annotated[APIIdentity, Depends(require_operator)],
+    ) -> dict[str, Any]:
+        return with_correlation(request, {
             "status": "accepted",
             "action": "pause_trading",
             "requested_by": identity.subject,
             "timestamp": _utc_now_iso(),
-        }
+        })
 
     @app.post("/v1/admin/kill-switch", tags=["admin"])
-    def admin_kill_switch(identity: Annotated[APIIdentity, Depends(require_admin)]) -> dict[str, Any]:
-        return {
+    def admin_kill_switch(
+        request: Request,
+        identity: Annotated[APIIdentity, Depends(require_admin)],
+    ) -> dict[str, Any]:
+        return with_correlation(request, {
             "status": "accepted",
             "action": "kill_switch",
             "requested_by": identity.subject,
             "timestamp": _utc_now_iso(),
-        }
+        })
 
     app.include_router(core_router)
     app.include_router(ws_router)
