@@ -6,6 +6,12 @@ Last updated: 2026-03-04 (America/Denver)
 
 Provide one canonical, machine-readable artifact per strategy run so research, execution analytics, promotion, and pilot attribution are auditable and comparable.
 
+## Language Positioning
+
+- Python remains the primary implementation language for this subsystem.
+- R is intentionally scoped to optional statistical validation tasks, not orchestration/runtime control.
+- If R validation is unavailable and `r_analytics.required=false`, the system continues with Python-native validation gates.
+
 ## Implemented Components
 
 1. Canonical models:

@@ -217,10 +217,16 @@ python tools/print_architecture_map.py
 python tools/scaffold_module.py order_intelligence --requires data,signals --provides flow_signals
 ```
 
-Detailed rules and migration notes: `ARCHITECTURE.md`
+Detailed rules and migration notes: `docs/ARCHITECTURE.md`
 
 ## 📚 Documentation
 
+- [Architecture](docs/ARCHITECTURE.md)
+- [Codex Compliance](docs/CODEX_COMPLIANCE.md)
+- [Implementation Direction](docs/IMPLEMENTATION_DIRECTION.md)
+- [SRS](docs/SRS.md)
+- [Development Summary](docs/DEVELOPMENT_SUMMARY.md)
+- [Live Money Roadmap](docs/ROADMAP_LIVE_MONEY.md)
 - [System Overview](docs/OVERVIEW.md)
 - [World-Class Execution Pack](docs/WORLD_CLASS_EXECUTION_PACK.md)
 - [Backtesting Guide](docs/BACKTESTING.md)

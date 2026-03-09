@@ -8,6 +8,12 @@
 - Easy to add modules.
 - AI-friendly structure with deterministic entrypoints.
 
+## Canonical References
+
+- `docs/CODEX_COMPLIANCE.md`
+- `docs/IMPLEMENTATION_DIRECTION.md`
+- `docs/ARCHITECTURE.md` (this document)
+
 ## Canonical Layout
 
 - `app/`: composition root, CLI wiring, runtime startup.
@@ -17,6 +23,13 @@
 
 Legacy domain code remains in place during migration:
 - `core/`, `execution/`, `analytics/`, `risk/`, `strategies/`, `markets/`, etc.
+
+## Language Strategy
+
+- Python is the default language for runtime execution, risk controls, orchestration, and strategy logic.
+- SQL/DuckDB/Polars-style data processing is preferred for heavy analytical aggregation workloads.
+- R is supported as an optional research validator path and is not required for core runtime operation.
+- Rust/C++ adoption is gated by measured latency/SLO evidence from profiling.
 
 ## Dependency Rules
 
@@ -39,6 +52,14 @@ Canonical layer rules enforced by `tools/check_architecture_boundaries.py`:
   - `strategies`
   - `execution`
   - `analytics`
+
+## R Analytics Boundary
+
+- Optional bridge:
+  - `research/r_analytics_bridge.py`
+  - `scripts/r/validate_experiment.R`
+- R validation may gate research promotion when explicitly enabled.
+- Core runtime and execution paths must remain operational without R.
 
 ## Developer Commands
 
