@@ -48,7 +48,7 @@ def test_ready_endpoint_includes_dependency_shape() -> None:
     assert payload["dependencies"]["database"]["configured"] is True
     assert payload["dependencies"]["redis"]["configured"] is True
     assert payload["dependencies"]["database"]["reachable"] in {True, False}
-    assert payload["dependencies"]["redis"]["reachable"] is None
+    assert payload["dependencies"]["redis"]["reachable"] in {True, False}
 
 
 def test_openapi_enabled_by_default() -> None:

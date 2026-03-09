@@ -24,6 +24,8 @@ class APISettings:
     database_url: str = ""
     redis_url: str = ""
     auth_tokens: str = ""
+    write_rate_limit_per_minute: int = 120
+    read_rate_limit_per_minute: int = 600
 
     @classmethod
     def from_env(cls) -> "APISettings":
@@ -37,4 +39,10 @@ class APISettings:
             database_url=os.getenv("PQTS_DATABASE_URL", ""),
             redis_url=os.getenv("PQTS_REDIS_URL", ""),
             auth_tokens=os.getenv("PQTS_API_TOKENS", ""),
+            write_rate_limit_per_minute=int(
+                os.getenv("PQTS_API_WRITE_RPM", str(cls.write_rate_limit_per_minute))
+            ),
+            read_rate_limit_per_minute=int(
+                os.getenv("PQTS_API_READ_RPM", str(cls.read_rate_limit_per_minute))
+            ),
         )

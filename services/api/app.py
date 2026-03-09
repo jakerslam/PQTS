@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Annotated, Any
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI
 
 from .auth import APIIdentity, build_token_store, require_admin, require_identity, require_operator
+from .cache import APICache, get_cache
 from .config import APISettings
 from .persistence import APIPersistence
 from .routes import core_router, ws_router
@@ -34,6 +36,7 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
     )
     app.state.settings = resolved
     app.state.token_store = build_token_store(resolved.auth_tokens)
+    app.state.cache = APICache.connect(resolved.redis_url)
     app.state.store = APIRuntimeStore.bootstrap()
     app.state.stream_hub = StreamHub()
     app.state.persistence = APIPersistence.connect(resolved.database_url)
@@ -62,7 +65,7 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
             },
             "redis": {
                 "configured": bool(resolved.redis_url),
-                "reachable": None,
+                "reachable": bool(app.state.cache.is_redis) if bool(resolved.redis_url) else None,
             },
         }
         return {
@@ -79,6 +82,20 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
         return {
             "identity": identity.to_dict(),
             "service": resolved.service_name,
+            "timestamp": _utc_now_iso(),
+        }
+
+    @app.post("/v1/auth/sessions", tags=["auth"])
+    def create_session(
+        identity: Annotated[APIIdentity, Depends(require_identity)],
+        cache: Annotated[APICache, Depends(get_cache)],
+    ) -> dict[str, Any]:
+        session_token = f"sess_{uuid4().hex}"
+        cache.set(f"session:{session_token}", identity.token, ttl_seconds=12 * 60 * 60)
+        return {
+            "session_token": session_token,
+            "expires_in_seconds": 12 * 60 * 60,
+            "identity": identity.to_dict(),
             "timestamp": _utc_now_iso(),
         }
 

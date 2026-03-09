@@ -82,6 +82,20 @@ def get_token_store(request: Request) -> dict[str, APIRole]:
     return build_token_store("")
 
 
+def _resolve_session_mapping(request: Request, session_token: str) -> str | None:
+    cache = getattr(request.app.state, "cache", None)
+    if cache is None or not hasattr(cache, "get"):
+        return None
+    try:
+        value = cache.get(f"session:{session_token}")
+    except Exception:
+        return None
+    if value is None:
+        return None
+    token = str(value).strip()
+    return token or None
+
+
 def resolve_identity_for_token(
     token: str,
     *,
@@ -106,6 +120,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def require_identity(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     token_store: Annotated[dict[str, APIRole], Depends(get_token_store)],
     session_token: Annotated[str | None, Header(alias="X-Session-Token")] = None,
@@ -116,7 +131,8 @@ def require_identity(
         token = credentials.credentials.strip()
         auth_scheme = "bearer"
     elif session_token:
-        token = session_token.strip()
+        mapped = _resolve_session_mapping(request, session_token.strip())
+        token = mapped if mapped is not None else session_token.strip()
         auth_scheme = "session"
 
     if not token:
