@@ -21,6 +21,7 @@
 - **Backtesting Framework**: Event-driven backtesting with realistic execution
 - **Real-time Dashboard**: Live P&L and performance metrics
 - **Paper Trading**: Test risk-free before going live
+- **Telegram/Discord Alerts**: Incident, kill-switch, and daily PnL notification hooks
 
 ## 🏆 Why PQTS
 
@@ -169,6 +170,32 @@ Or publish docs + leaderboard via GitHub Actions:
 
 ```bash
 gh workflow run "Publish Docs Site"
+```
+
+## 📂 Published Results
+
+Public reproducible result bundles live under `results/`.
+
+- baseline bundle: `results/2026-03-09_sim_suite_baseline/`
+- bundle schema/template: `results/RESULT_TEMPLATE.md`
+
+Each bundle includes the command, inputs, key metrics, and chart artifacts.
+
+## 🔔 Notifications (Telegram/Discord)
+
+Incident automation can dispatch notifications directly:
+
+```bash
+python scripts/run_incident_automation.py \
+  --discord-webhook-url "$PQTS_DISCORD_WEBHOOK_URL" \
+  --telegram-bot-token "$PQTS_TELEGRAM_BOT_TOKEN" \
+  --telegram-chat-id "$PQTS_TELEGRAM_CHAT_ID"
+```
+
+For direct/manual alerts:
+
+```bash
+python scripts/send_ops_notification.py --mode raw --message "PQTS heartbeat"
 ```
 
 Execution drift report:

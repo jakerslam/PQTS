@@ -1,0 +1,70 @@
+{
+  "config_path": "config/paper.yaml",
+  "created_at": "2026-03-09T17:57:23.528364+00:00",
+  "leaderboard": [
+    {
+      "avg_fill_rate": 0.0,
+      "avg_quality_score": 0.0,
+      "avg_reject_rate": 1.0,
+      "avg_slippage_mape_pct": 0.0,
+      "canary_ready_rate": 0.0,
+      "market": "crypto",
+      "optimization_priority": 2.0,
+      "promote_rate": 0.0,
+      "runs": 1,
+      "strategy": "market_making"
+    }
+  ],
+  "leaderboard_path": "data/reports/simulation_leaderboard_20260309T175723522900Z.csv",
+  "mechanism_switches": {
+    "allocation_controls": false,
+    "capacity_curves": false,
+    "confidence_allocator": false,
+    "maker_urgency_ladder": true,
+    "market_data_resilience": true,
+    "profitability_gate": true,
+    "regime_overlay": true,
+    "routing_failover": true,
+    "shorting_controls": false,
+    "slippage_stress_model": true,
+    "tca_calibration_feedback": true
+  },
+  "results": [
+    {
+      "filled": 0,
+      "ops_critical": 0,
+      "promotion_decision": "unknown",
+      "quality_score": 0.0,
+      "ready_for_canary": false,
+      "reject_rate": 1.0,
+      "rejected": 1,
+      "risk_profile": {
+        "canary_allocation_scale": 1.0,
+        "description": "Default profile with baseline hard limits.",
+        "name": "balanced",
+        "risk_limit_scale": 1.0
+      },
+      "run_id": "sim_crypto_market_making_37c87ff6e6",
+      "scenario": {
+        "cycles": 8,
+        "market": "crypto",
+        "notional_usd": 150.0,
+        "strategy": "market_making",
+        "symbols": [
+          "ADAUSDT"
+        ]
+      },
+      "submitted": 1,
+      "tca_path": "data/tca/simulation/sim_crypto_market_making_37c87ff6e6.csv",
+      "tca_records": 0
+    }
+  ],
+  "risk_profile": {
+    "canary_allocation_scale": 1.0,
+    "description": "Default profile with baseline hard limits.",
+    "name": "balanced",
+    "risk_limit_scale": 1.0
+  },
+  "scenario_count": 1,
+  "telemetry_log_path": "data/analytics/simulation_events.jsonl"
+}

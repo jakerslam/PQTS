@@ -17,3 +17,7 @@ Each bundle should include:
 Example:
 
 `2026-03-09_sim_suite_baseline/`
+
+## Current Public Bundles
+
+- `2026-03-09_sim_suite_baseline/`
