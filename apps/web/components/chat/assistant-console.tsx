@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { RichMarkdown } from "@/components/rich-markdown";
 import type { AssistantTurnResponse, ChatTurn } from "@/lib/chat/types";
 
 function nowIso(): string {
@@ -145,7 +146,11 @@ export function AssistantConsole() {
               <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
                 {turn.role.toUpperCase()} · {turn.status}
               </p>
-              <p style={{ margin: "6px 0 0" }}>{turn.text || "..."}</p>
+              {turn.role === "assistant" ? (
+                <RichMarkdown content={turn.text || "..."} />
+              ) : (
+                <p style={{ margin: "6px 0 0" }}>{turn.text || "..."}</p>
+              )}
               {turn.errorMessage ? (
                 <p style={{ margin: "6px 0 0", color: "#b42318" }}>{turn.errorMessage}</p>
               ) : null}

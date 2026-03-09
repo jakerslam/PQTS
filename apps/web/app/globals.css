@@ -61,3 +61,37 @@ main {
   font-weight: 700;
   margin: var(--space-1) 0 0;
 }
+
+.pqts-markdown {
+  margin-top: 6px;
+}
+
+.pqts-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.pqts-markdown th,
+.pqts-markdown td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+}
+
+.pqts-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.pqts-inline-code {
+  background: #eef3fa;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.pqts-code-block {
+  background: #0f1720;
+  border-radius: 8px;
+  color: #f6f8fa;
+  padding: 10px;
+  overflow-x: auto;
+}
