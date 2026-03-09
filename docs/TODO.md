@@ -36,7 +36,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 - [x] Implement SEC submissions ingestion (`CIK{cik}.json`) with form/date/accession normalization.
 - [x] Implement SEC `companyfacts` taxonomy traversal (`dei`, `us-gaap`) with missing-tag-safe parsing.
 - [x] Implement SEC `companyconcept` metric endpoint adapter with taxonomy/concept validation.
-- [ ] Add unit-aware metric extraction (`USD`, `shares`, etc.) and form-scoped filters (10-Q/10-K).
+- [x] Add unit-aware metric extraction (`USD`, `shares`, etc.) and form-scoped filters (10-Q/10-K).
 - [ ] Add tabular normalization layer for SEC payloads with accession/report-date traceability.
 - [ ] Implement multi-source retrieval surface (structured market/financial + web/news) with provenance metadata.
 - [ ] Add provider adapter error envelopes and response-shape normalization for all external connectors.
