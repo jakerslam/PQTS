@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StreamTurnPreview } from "@/components/stream/stream-turn-preview";
 import { ToolEventRenderer } from "@/components/tool-renderers/tool-event-renderer";
 import { getRegisteredToolTypes } from "@/lib/tools/registry";
 
@@ -43,6 +44,7 @@ export default function DashboardHomePage() {
           payload: { sample: true },
         }}
       />
+      <StreamTurnPreview />
     </section>
   );
 }
