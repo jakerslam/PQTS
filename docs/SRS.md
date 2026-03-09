@@ -2048,3 +2048,61 @@ Source context:
 - Runtime shall expose a metrics endpoint compatible with Prometheus scraping.
 - Metrics shall cover execution health, risk-state transitions, and strategy-level performance counters.
 - System shall include importable Grafana dashboard templates aligned with exposed metric names.
+
+## 42. Web App Architecture Requirements (March 9, 2026)
+
+These requirements define the primary product web-stack direction for PQTS.
+
+### WA-1 Primary Backend Framework
+
+- Product-facing web APIs shall be implemented with Python `FastAPI` as the primary backend service framework.
+- Backend shall expose typed OpenAPI contracts for all external HTTP endpoints.
+- Backend shall support async request handling for low-latency market/status surfaces.
+
+### WA-2 Primary Frontend Framework
+
+- Product-facing web UI shall be implemented with `Next.js` and TypeScript.
+- Frontend shall consume backend APIs via versioned REST and WebSocket interfaces.
+- Frontend shall include production-grade routing, auth-aware layouts, and error boundaries.
+
+### WA-3 Streamlit Role Boundary
+
+- Existing Streamlit dashboard shall remain supported for internal ops, diagnostics, and rapid prototyping.
+- Streamlit shall not be the long-term primary customer-facing application surface.
+- Any critical production UX workflows migrated to Next.js shall preserve parity checks against current Streamlit outputs during transition.
+
+### WA-4 API and Streaming Contracts
+
+- Web app backend shall provide REST endpoints for snapshots/history and WebSocket channels for live updates.
+- Streaming channels shall cover at minimum orders, fills, positions, PnL, risk state, and incident/kill-switch events.
+- API contracts shall enforce explicit schema versioning and backward-compatibility policy.
+
+### WA-5 Data and Session Architecture
+
+- Postgres shall be used as the primary relational application store for web app state/history.
+- Redis shall be used for cache/session/rate-limit primitives and short-lived coordination state.
+- Web app persistence changes shall preserve existing immutable execution/audit ledger guarantees.
+
+### WA-6 AuthN/AuthZ and Security
+
+- Web app shall implement authenticated access with role-based authorization controls.
+- Sensitive endpoints shall enforce least-privilege access and audit logging of privileged actions.
+- Session, token, and secret handling shall comply with existing security policy and secret-management requirements.
+
+### WA-7 Reliability and Operability
+
+- Web app services shall expose health/readiness endpoints and structured error telemetry.
+- API and streaming surfaces shall include latency/error SLO instrumentation.
+- Failure of non-critical web modules shall degrade gracefully without compromising core risk controls.
+
+### WA-8 Frontend Quality and Testing
+
+- Frontend shall include automated unit/integration tests for critical operator workflows.
+- End-to-end smoke coverage shall validate login, dashboard load, live stream subscription, and key action paths.
+- UI release changes shall be linked to reproducible build artifacts and commit provenance.
+
+### WA-9 Migration and Compatibility
+
+- Migration from current script/Streamlit surfaces to FastAPI/Next.js shall be incremental and non-breaking.
+- Existing CLI/script operational workflows shall remain supported until replacement workflows are production-certified.
+- Architecture docs and developer onboarding docs shall remain synchronized with migration state.
