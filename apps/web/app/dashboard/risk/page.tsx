@@ -1,4 +1,5 @@
 import { getRiskState } from "@/lib/api/client";
+import { OperatorActionPanel } from "@/components/operator/operator-action-panel";
 
 export default async function RiskPage() {
   const risk = await getRiskState().catch(() => null);
@@ -29,6 +30,7 @@ export default async function RiskPage() {
           This panel is wired to current risk state and will expand with streaming incidents in PQTS-033.
         </p>
       </article>
+      <OperatorActionPanel />
     </section>
   );
 }
