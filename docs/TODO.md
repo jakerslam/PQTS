@@ -45,7 +45,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 
 - [x] Implement Bayesian probability update engine with persisted prior/evidence/posterior metadata.
 - [x] Implement cross-market dependency graph + logical constraint checks + violation alerts.
-- [ ] Build calibration surface pipeline and mispricing diagnostics (bucket/regime based).
+- [x] Build calibration surface pipeline and mispricing diagnostics (bucket/regime based).
 - [ ] Implement uncertainty-adjusted Kelly sizing with caps and minimum-edge gates.
 - [ ] Implement VWAP/TWAP/depth-aware execution slicing and execution quality telemetry.
 - [ ] Add orderbook sequence-gap detection and deterministic resync/recovery logic.
