@@ -58,7 +58,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 
 - [x] Create `apps/web` Next.js + TypeScript app scaffold with API client/env wiring.
 - [x] Build authenticated dashboard shell (navigation, auth-aware routing, error boundaries).
-- [ ] Implement first production pages: portfolio overview, orders/fills tape, risk/alerts panel.
+- [x] Implement first production pages: portfolio overview, orders/fills tape, risk/alerts panel.
 - [ ] Add tool-aware UI registry mapping tool type → loading component + final component + fallback renderer.
 - [ ] Implement stream-event orchestrator for LLM token stream + tool lifecycle events.
 - [ ] Implement optimistic user-turn rendering with rollback/error reconciliation.
