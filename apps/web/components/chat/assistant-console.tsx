@@ -16,6 +16,10 @@ export function AssistantConsole() {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [lastSubmitted, setLastSubmitted] = useState<{
+    text: string;
+    timestampMs: number;
+  } | null>(null);
 
   const sendingCount = useMemo(
     () => turns.filter((turn) => turn.status === "pending").length,
@@ -25,6 +29,13 @@ export function AssistantConsole() {
   async function submitTurn() {
     const content = input.trim();
     if (!content || isSending) {
+      return;
+    }
+    if (
+      lastSubmitted &&
+      lastSubmitted.text === content &&
+      Date.now() - lastSubmitted.timestampMs < 8000
+    ) {
       return;
     }
 
@@ -50,6 +61,7 @@ export function AssistantConsole() {
     setInput("");
     setTurns((prev) => [...prev, userTurn, assistantOptimistic]);
     setIsSending(true);
+    setLastSubmitted({ text: content, timestampMs: Date.now() });
 
     try {
       const response = await fetch("/api/assistant/turn", {
@@ -130,6 +142,16 @@ export function AssistantConsole() {
         <textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") {
+              return;
+            }
+            if (event.shiftKey) {
+              return;
+            }
+            event.preventDefault();
+            void submitTurn();
+          }}
           rows={4}
           placeholder="Ask for a risk summary..."
         />
