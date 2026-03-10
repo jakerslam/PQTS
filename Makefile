@@ -2,8 +2,9 @@ SHELL := /bin/bash
 PYTHON ?= python3
 VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
+PY_RUN := $(if $(wildcard $(VENV_PY)),$(VENV_PY),$(PYTHON))
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site governance-check paper-6m nightly-review run-mode docker-up test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site governance-check paper-6m nightly-review run-mode native bench-exec docker-up test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -70,6 +71,14 @@ nightly-review:
 
 run-mode:
 	$(VENV_PY) scripts/run_mode_entrypoint.py --print-plan
+
+native:
+	$(PY_RUN) -m pip install maturin
+	$(PY_RUN) -m maturin build --manifest-path native/hotpath/Cargo.toml --release -i $(PY_RUN)
+	$(PY_RUN) -m pip install --force-reinstall native/hotpath/target/wheels/pqts_hotpath-*.whl
+
+bench-exec:
+	$(PY_RUN) scripts/benchmark_execution_latency.py --orders 500 --target-p95-ms 200 --out-dir results/native_benchmarks
 
 docker-up:
 	docker compose up --build

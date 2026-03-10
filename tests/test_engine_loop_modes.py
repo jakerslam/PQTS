@@ -6,6 +6,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -110,3 +111,35 @@ def test_tick_loop_runs_strategy_every_tick_even_without_market_change(tmp_path)
     assert counters["updates"] == 3
     assert counters["strategies"] == 3
     assert counters["risk"] == 3
+
+
+def test_engine_applies_low_latency_profile_defaults_when_loop_overrides_missing(tmp_path):
+    config = _base_engine_config("event_driven")
+    config["runtime"].pop("loop", None)
+    config["runtime"]["performance"] = {"profile": "low_latency"}
+    config["runtime"]["state_path"] = str(tmp_path / "perf_state.json")
+    config_path = tmp_path / "perf_profile.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    engine = TradingEngine(str(config_path))
+
+    assert engine.performance_profile == "low_latency"
+    assert engine.loop_tick_interval_seconds == pytest.approx(0.05)
+    assert engine.loop_poll_interval_seconds == pytest.approx(0.01)
+    assert engine.loop_idle_sleep_seconds == pytest.approx(0.02)
+
+
+def test_engine_rejects_required_native_hotpath_when_unavailable(tmp_path, monkeypatch):
+    config = _base_engine_config("event_driven")
+    config["runtime"]["performance"] = {
+        "profile": "low_latency",
+        "require_native_hotpath": True,
+    }
+    config["runtime"]["state_path"] = str(tmp_path / "native_required_state.json")
+    config_path = tmp_path / "native_required.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+
+    monkeypatch.setattr("core.engine.native_available", lambda: False)
+
+    with pytest.raises(RuntimeError, match="require_native_hotpath"):
+        TradingEngine(str(config_path))

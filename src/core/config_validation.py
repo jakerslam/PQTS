@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping
 
+from core.performance_profile import ALLOWED_PERFORMANCE_PROFILES
+
 
 @dataclass(frozen=True)
 class ConfigValidationIssue:
@@ -81,6 +83,35 @@ def validate_engine_config(config: Mapping[str, Any]) -> List[ConfigValidationIs
             )
         )
     elif isinstance(runtime, Mapping):
+        performance = runtime.get("performance", {})
+        if performance and not isinstance(performance, Mapping):
+            issues.append(
+                ConfigValidationIssue(
+                    key="runtime.performance",
+                    message="runtime.performance must be a mapping when provided",
+                )
+            )
+        elif isinstance(performance, Mapping):
+            profile = str(performance.get("profile", "balanced")).strip().lower() or "balanced"
+            if profile not in set(ALLOWED_PERFORMANCE_PROFILES):
+                issues.append(
+                    ConfigValidationIssue(
+                        key="runtime.performance.profile",
+                        message=(
+                            "runtime.performance.profile must be one of "
+                            + ",".join(ALLOWED_PERFORMANCE_PROFILES)
+                        ),
+                    )
+                )
+            require_native = performance.get("require_native_hotpath", False)
+            if not isinstance(require_native, bool):
+                issues.append(
+                    ConfigValidationIssue(
+                        key="runtime.performance.require_native_hotpath",
+                        message="runtime.performance.require_native_hotpath must be boolean",
+                    )
+                )
+
         autopilot = runtime.get("autopilot", {})
         if autopilot and not isinstance(autopilot, Mapping):
             issues.append(

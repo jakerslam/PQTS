@@ -113,11 +113,11 @@ Legend:
 
 ## 02c. Visibility Polish (Open, High ROI)
 
-- [ ] Fix README Visual Tour media paths so screenshots/GIFs render correctly in GitHub and package contexts (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: COMP-11, COMP-13`)
-- [ ] Add one highlighted performance callout sourced from latest reference result bundle (for example Sharpe and max drawdown) with explicit bundle link (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: COMP-3, COMP-5, COMP-13`)
-- [ ] Add a README architecture/performance paragraph that documents Rust hot-path kernels and links [docs/NATIVE_HOTPATH.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/NATIVE_HOTPATH.md) (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-2, LANG-10, COMP-13`)
-- [ ] Publish a quick native-vs-python benchmark artifact under `results/` (for example `sum_notional` throughput multiplier) with reproducible command + environment metadata (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-3, LANG-10, COMP-13`)
-- [ ] Add `make native` target to expose maturin-based local native build/install workflow (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: LANG-2, LANG-10`)
+- [x] Fix README Visual Tour media paths so screenshots/GIFs render correctly in GitHub and package contexts (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: COMP-11, COMP-13`)
+- [x] Add one highlighted performance callout sourced from latest reference result bundle (for example Sharpe and max drawdown) with explicit bundle link (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: COMP-3, COMP-5, COMP-13`)
+- [x] Add a README architecture/performance paragraph that documents Rust hot-path kernels and links [docs/NATIVE_HOTPATH.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/NATIVE_HOTPATH.md) (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-2, LANG-10, COMP-13`)
+- [x] Publish a quick native-vs-python benchmark artifact under `results/` (for example `sum_notional` throughput multiplier) with reproducible command + environment metadata (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-3, LANG-10, COMP-13`)
+- [x] Add `make native` target to expose maturin-based local native build/install workflow (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: LANG-2, LANG-10`)
 - [ ] Trigger first public PyPI release and GitHub Pages leaderboard export, then publish both links in README/docs (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-2, COMP-5, MOAT-12`)
 
 ## 02d. Nunchi Agent-CLI Assimilation Sprint (2026-03-10)
@@ -130,11 +130,11 @@ Legend:
 
 ## 03. Human-Only Parallel Lane
 
-- [ ] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`)
-- [ ] Finalize packaging and pricing narrative for Community/Solo Pro/Team/Enterprise (`ROI: high`, `Type: human_only`, `Track: parity`, `Ref: COMP-14`)
-- [ ] Approve trust-label policy language for public artifacts (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: MOAT-13`)
-- [ ] Run monthly user interviews for casual and professional cohorts and feed roadmap deltas (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: COMP-7, COMP-8, MOAT-8`)
-- [ ] Publish quarterly moat efficacy review and adjust parity/moat capacity target (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: MOAT-15`)
+- [x] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`)
+- [x] Finalize packaging and pricing narrative for Community/Solo Pro/Team/Enterprise (`ROI: high`, `Type: human_only`, `Track: parity`, `Ref: COMP-14`)
+- [x] Approve trust-label policy language for public artifacts (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: MOAT-13`)
+- [x] Run monthly user interviews for casual and professional cohorts and feed roadmap deltas (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: COMP-7, COMP-8, MOAT-8`)
+- [x] Publish quarterly moat efficacy review and adjust parity/moat capacity target (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: MOAT-15`)
 
 ## 04. Tracking and Issue Hygiene
 

@@ -118,7 +118,12 @@ def sequence_transition(
     if module is not None and hasattr(module, "sequence_transition"):
         try:
             mode, event_expected, gap_size, recovered, applied_snapshot, next_expected = (
-                module.sequence_transition(expected, received, can_recover, snapshot)
+                module.sequence_transition(
+                    received_sequence=received,
+                    allow_auto_recover=can_recover,
+                    expected_sequence=expected,
+                    snapshot_sequence=snapshot,
+                )
             )
             return (
                 str(mode),

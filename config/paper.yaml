@@ -292,6 +292,9 @@ notifications:
 # RUNTIME
 # ============================================
 runtime:
+  performance:
+    profile: balanced
+    require_native_hotpath: false
   tenant:
     plan: enterprise
     tier_policy_path: config/entitlements/tier_policy.json

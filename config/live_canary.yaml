@@ -97,6 +97,9 @@ execution:
         window_seconds: 1.0
 
 runtime:
+  performance:
+    profile: low_latency
+    require_native_hotpath: true
   operator_tier: pro
   tenant:
     tenant_id: canary_internal

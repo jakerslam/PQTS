@@ -1,0 +1,29 @@
+{
+  "benchmark": {
+    "orders": 300,
+    "price": 50000.0,
+    "symbol": "BTC-USD",
+    "target_p95_ms": 200.0,
+    "venue": "binance"
+  },
+  "environment": {
+    "native_available": false,
+    "native_version": "python_fallback",
+    "platform": "macOS-26.2-arm64-arm-64bit-Mach-O",
+    "python": "3.13.1"
+  },
+  "result": {
+    "failure_count": 0,
+    "latency_ms": {
+      "avg": 19.189243629989505,
+      "max": 119.86258299998553,
+      "min": 4.5094159997915995,
+      "p50": 17.29950000003555,
+      "p95": 40.015991350128395,
+      "p99": 51.66688333998522
+    },
+    "success_count": 300,
+    "target_met": true
+  },
+  "timestamp_utc": "2026-03-10T17:50:28.571567+00:00"
+}

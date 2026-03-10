@@ -1,10 +1,18 @@
 # Pricing And Packaging
 
+Last updated: 2026-03-10 (America/Denver)
+
 ## Positioning
 PQTS is packaged as a B2B quant execution and research platform for:
 - Prop trading firms
 - Signal funds
 - Family-office systematic teams
+
+Final narrative direction (approved):
+- Community: easiest safe path to reproducible paper-trading outcomes.
+- Solo Pro: fastest path from research to controlled live canary.
+- Team: governance, promotion controls, and shared operational accountability.
+- Enterprise: compliance-grade deployment and integration depth.
 
 ## Tiers (Safety Baseline)
 1. Community (paper-only)
@@ -38,6 +46,13 @@ PQTS is packaged as a B2B quant execution and research platform for:
 - Promotion eligibility requires documented paper-readiness pass.
 - Live canary access only after hard-gate acceptance.
 - Tier capabilities are encoded in `config/entitlements/tier_policy.json`.
+
+## Public Copy Guardrails
+
+- Never market `diagnostic_only` or `unverified` outcomes as proof of live readiness.
+- Keep Community copy focused on learning + safety, not profit guarantees.
+- Keep Solo Pro/Team/Enterprise copy focused on controls, reproducibility, and governance.
+- Every quantitative claim in web/docs must link to a reproducible artifact bundle.
 
 ## Self-Serve Signup Requirements
 - Tenant onboarding with workspace key

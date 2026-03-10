@@ -51,6 +51,9 @@ logs/
 # Generated static sites
 site/
 
+# Rust build outputs
+native/hotpath/target/
+
 # IDE
 .vscode/
 .idea/

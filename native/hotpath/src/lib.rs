@@ -67,11 +67,11 @@ fn fill_metrics(
     (slip_pct * 10000.0, executed_qty / req_denom)
 }
 
-#[pyfunction]
+#[pyfunction(signature = (received_sequence, allow_auto_recover, expected_sequence=None, snapshot_sequence=None))]
 fn sequence_transition(
-    expected_sequence: Option<i64>,
     received_sequence: i64,
     allow_auto_recover: bool,
+    expected_sequence: Option<i64>,
     snapshot_sequence: Option<i64>,
 ) -> (String, i64, i64, bool, Option<i64>, i64) {
     match expected_sequence {

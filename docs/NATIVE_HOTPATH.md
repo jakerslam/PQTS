@@ -47,11 +47,27 @@ pip install maturin
 maturin develop --manifest-path native/hotpath/Cargo.toml
 ```
 
+Repository shortcut:
+
+```bash
+make native
+```
+
 ## Verification
 
 - Contract check: `python3 tools/check_native_hotpath.py`
 - Runtime check: `pytest -q tests/test_hotpath_runtime.py tests/test_microstructure_features.py tests/test_orderbook_sequence.py tests/test_event_replay.py tests/test_execution_tuning.py tests/test_market_data_resilience.py tests/test_ws_ingestion.py tests/test_shadow_stream_worker.py tests/test_smart_router_urgency_ladder.py`
+- Latency benchmark: `python3 scripts/benchmark_execution_latency.py --orders 500 --target-p95-ms 200 --out-dir results/native_benchmarks`
 
 ## Release Matrix
 
 Target matrix is tracked in `data/reports/native/release_matrix.json` and validated by `tools/check_native_hotpath.py`.
+
+## Runtime Profile for Fast Execution
+
+Live canary config enables:
+
+- `runtime.performance.profile: low_latency`
+- `runtime.performance.require_native_hotpath: true`
+
+This forces live startup to fail fast if the native hotpath wheel is not installed, preventing accidental Python-fallback operation in low-latency live mode.

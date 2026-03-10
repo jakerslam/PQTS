@@ -16,6 +16,7 @@ from analytics.ops_observability import OpsEventStore
 from core.autopilot import HumanStrategyOverride, StrategyAutopilot
 from core.autopilot_policy import enforce_autopilot_policy, resolve_autopilot_policy_pack
 from core.config_validation import validate_engine_config
+from core.hotpath_runtime import native_available
 from core.market_data_quality import DataQualityReport, MarketDataQualityMonitor
 from core.market_scope_governance import evaluate_market_scope_request, resolve_market_scope_policy
 from core.mechanism_switches import apply_mechanism_switches
@@ -25,13 +26,15 @@ from core.multi_tenant import (
     resolve_tenant_entitlements,
 )
 from core.operator_tier import resolve_operator_tier
+from core.performance_profile import resolve_runtime_performance_settings
 from core.secret_manager import SecretResolutionMetadata, hydrate_config_secrets
 from core.secrets_policy import enforce_live_secrets
 from core.strategy_contracts import validate_strategy_contract
 from core.toggle_manager import MarketStrategyToggleManager, ToggleValidationError
 from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFillModelConfig
 from execution.risk_aware_router import OrderResult, RiskAwareRouter
-from execution.smart_router import OrderRequest as RouterOrderRequest, OrderType as RouterOrderType
+from execution.smart_router import OrderRequest as RouterOrderRequest
+from execution.smart_router import OrderType as RouterOrderType
 from risk.kill_switches import RiskLimits as KillSwitchLimits
 from risk.risk_tolerance import (
     RiskToleranceProfile,
@@ -117,7 +120,25 @@ class TradingEngine:
         self._validate_config()
         self.mode = self.config.get("mode", "paper_trading")
         self.toggle_manager = MarketStrategyToggleManager(self.config)
-        runtime_cfg = self.config.get("runtime", {})
+        runtime_cfg_raw = self.config.get("runtime", {})
+        runtime_cfg = runtime_cfg_raw if isinstance(runtime_cfg_raw, dict) else {}
+        self.performance = resolve_runtime_performance_settings(runtime_cfg)
+        self.performance_profile = self.performance.profile
+        self.require_native_hotpath = self.performance.require_native_hotpath
+        self.native_hotpath_active = native_available()
+        if self.require_native_hotpath and not self.native_hotpath_active:
+            raise RuntimeError(
+                "runtime.performance.require_native_hotpath=true but native module "
+                "'pqts_hotpath' is not available. Build/install the native wheel first."
+            )
+        if (
+            self.performance_profile in {"low_latency", "ultra_low_latency"}
+            and not self.native_hotpath_active
+        ):
+            logger.warning(
+                "Low-latency profile is active without native hotpath module. "
+                "Execution will run in Python fallback mode."
+            )
         self.tenant_entitlements = resolve_tenant_entitlements(self.config)
         self.operator_tier = resolve_operator_tier(self.config)
         self.autopilot = StrategyAutopilot(runtime_cfg.get("autopilot", {}))
@@ -161,35 +182,11 @@ class TradingEngine:
         self._risk_profile_override: Optional[str] = None
         self.state_path = Path(runtime_cfg.get("state_path", "data/engine_state.json"))
         self.state_version = 1
-        loop_cfg = runtime_cfg.get("loop", {}) if isinstance(runtime_cfg, dict) else {}
-        if not isinstance(loop_cfg, dict):
-            loop_cfg = {}
-        self.loop_mode = str(
-            loop_cfg.get("mode", runtime_cfg.get("loop_mode", "event_driven"))
-        ).strip().lower()
-        if self.loop_mode not in {"event_driven", "tick"}:
-            self.loop_mode = "event_driven"
-        self.loop_tick_interval_seconds = max(
-            float(loop_cfg.get("tick_interval_seconds", runtime_cfg.get("tick_interval_seconds", 1.0))),
-            0.01,
-        )
-        self.loop_poll_interval_seconds = max(
-            float(loop_cfg.get("poll_interval_seconds", runtime_cfg.get("poll_interval_seconds", 0.05))),
-            0.01,
-        )
-        self.loop_idle_sleep_seconds = max(
-            float(loop_cfg.get("idle_sleep_seconds", runtime_cfg.get("idle_sleep_seconds", 0.10))),
-            0.01,
-        )
-        self.loop_error_backoff_seconds = max(
-            float(
-                loop_cfg.get(
-                    "error_backoff_seconds",
-                    runtime_cfg.get("error_backoff_seconds", 5.0),
-                )
-            ),
-            0.01,
-        )
+        self.loop_mode = self.performance.loop_mode
+        self.loop_tick_interval_seconds = self.performance.tick_interval_seconds
+        self.loop_poll_interval_seconds = self.performance.poll_interval_seconds
+        self.loop_idle_sleep_seconds = self.performance.idle_sleep_seconds
+        self.loop_error_backoff_seconds = self.performance.error_backoff_seconds
         self._market_signature = ""
         self.running = False
         self._load_persisted_state()
@@ -201,6 +198,12 @@ class TradingEngine:
             self.loop_tick_interval_seconds,
             self.loop_poll_interval_seconds,
             self.loop_idle_sleep_seconds,
+        )
+        logger.info(
+            "Performance profile: %s (native_hotpath_active=%s required=%s)",
+            self.performance_profile,
+            self.native_hotpath_active,
+            self.require_native_hotpath,
         )
         logger.info("Toggle state: %s", self.toggle_manager.snapshot())
         _, profile = self._effective_risk_config()

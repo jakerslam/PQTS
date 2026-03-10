@@ -41,25 +41,25 @@ PQTS is built for operational robustness first, not just strategy scripts.
 
 | Dashboard Overview | Simulation Leaderboard |
 | --- | --- |
-| ![Dashboard Overview](docs/media/dashboard_overview.png) | ![Simulation Leaderboard](docs/media/simulation_leaderboard.png) |
+| ![Dashboard Overview](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/dashboard_overview.png) | ![Simulation Leaderboard](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/simulation_leaderboard.png) |
 
 | Risk Controls | Canary Progress |
 | --- | --- |
-| ![Risk Controls](docs/media/risk_controls.png) | ![Canary Progress](docs/media/canary_progress.png) |
+| ![Risk Controls](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/risk_controls.png) | ![Canary Progress](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/canary_progress.png) |
 
 | Ops Health | Execution Pipeline |
 | --- | --- |
-| ![Ops Health](docs/media/ops_health.png) | ![Execution Pipeline](docs/media/execution_pipeline.png) |
+| ![Ops Health](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/ops_health.png) | ![Execution Pipeline](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/execution_pipeline.png) |
 
 | Architecture Layers | Performance Snapshot |
 | --- | --- |
-| ![Architecture Layers](docs/media/architecture_layers.png) | ![Performance Snapshot](docs/media/performance_snapshot.png) |
+| ![Architecture Layers](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/architecture_layers.png) | ![Performance Snapshot](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/performance_snapshot.png) |
 
 ### GIF Previews
 
 | Dashboard Pulse | Leaderboard Cycle | Risk Alert Flash |
 | --- | --- | --- |
-| ![Dashboard Pulse](docs/media/dashboard_pulse.gif) | ![Leaderboard Cycle](docs/media/leaderboard_cycle.gif) | ![Risk Alert Flash](docs/media/risk_alert_flash.gif) |
+| ![Dashboard Pulse](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/dashboard_pulse.gif) | ![Leaderboard Cycle](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/leaderboard_cycle.gif) | ![Risk Alert Flash](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/risk_alert_flash.gif) |
 
 Regenerate media assets with:
 
@@ -371,6 +371,14 @@ Access at `http://localhost:8501`
 
 ## 📈 Strategy Performance
 
+Reference callout from latest `reference` bundle:
+
+- `results/2026-03-10_reference_market_making` ([bundle](results/2026-03-10_reference_market_making/README.md), [csv](results/2026-03-10_reference_market_making/simulation_leaderboard_20260310T180000000000Z.csv))
+  - `avg_quality_score=0.25`
+  - `avg_fill_rate=0.80`
+  - `avg_reject_rate=0.20`
+  - classification: `reference`
+
 | Strategy | Timeframe | Edge |
 |----------|-----------|------|
 | Scalping | 1m, 5m | Microstructure, order flow |
@@ -392,6 +400,20 @@ PQTS now uses a canonical **modular monolith** layout:
 - `src/adapters/`: external I/O adapter descriptors/loaders
 
 Legacy packages (`src/core/`, `src/execution/`, `src/analytics/`, `src/risk/`, `src/strategies/`, etc.) remain active during migration and are wired through `src/app/`.
+
+Performance-critical execution math is offloaded to Rust hotpaths (`native/hotpath`) with
+Python fallback for portability. Live canary defaults to `runtime.performance.profile=low_latency`
+and can enforce `runtime.performance.require_native_hotpath=true` so low-latency deployments
+fail fast if native kernels are missing. Build and verify with:
+
+```bash
+make native
+make bench-exec
+```
+
+Latest benchmark artifacts are published in `results/native_benchmarks/`:
+- Python fallback run: p95 submit latency `40.02ms`
+- Native hotpath run: p95 submit latency `14.15ms`
 
 Architecture tooling:
 

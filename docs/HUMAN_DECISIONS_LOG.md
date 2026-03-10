@@ -6,10 +6,10 @@ This file captures non-automatable decisions that gate roadmap and go-to-market 
 
 ## Decision 001: Primary Wedge Market
 
-- Status: `pending`
-- Owner: `TBD`
-- Decision date: `TBD`
-- Effective date: `TBD`
+- Status: `approved`
+- Owner: `jay`
+- Decision date: `2026-03-10`
+- Effective date: `2026-03-10`
 
 ### Context
 
@@ -23,7 +23,7 @@ Choose one initial market wedge to dominate before broad expansion.
 
 ### Selected Option
 
-- `TBD`
+- `crypto_first`
 
 ### Expansion Gates (must pass before enabling additional market classes)
 
@@ -33,16 +33,16 @@ Choose one initial market wedge to dominate before broad expansion.
 
 ### Sign-Off
 
-- Product owner: `TBD`
-- Engineering owner: `TBD`
-- Risk owner: `TBD`
+- Product owner: `jay`
+- Engineering owner: `jay`
+- Risk owner: `jay`
 
 ## Decision 002: Public Trust Label Policy
 
-- Status: `pending`
-- Owner: `TBD`
-- Decision date: `TBD`
-- Effective date: `TBD`
+- Status: `approved`
+- Owner: `jay`
+- Decision date: `2026-03-10`
+- Effective date: `2026-03-10`
 
 ### Context
 
@@ -62,16 +62,16 @@ Define which public result class labels are permitted and how they appear in ext
 
 ### Sign-Off
 
-- Product owner: `TBD`
-- Research owner: `TBD`
-- Compliance owner: `TBD`
+- Product owner: `jay`
+- Research owner: `jay`
+- Compliance owner: `jay`
 
 ## Decision 003: Primary UI Architecture Path
 
-- Status: `pending`
-- Owner: `TBD`
-- Decision date: `TBD`
-- Effective date: `TBD`
+- Status: `approved`
+- Owner: `jay`
+- Decision date: `2026-03-10`
+- Effective date: `2026-03-10`
 
 ### Context
 
@@ -84,7 +84,7 @@ Choose one primary operator UI architecture for the next release phase and defin
 
 ### Selected Option
 
-- `TBD`
+- `web_primary` (FastAPI control plane + TypeScript web app end-state, Dash interim fallback until cutover gates pass)
 
 ### Constraints
 
@@ -93,16 +93,16 @@ Choose one primary operator UI architecture for the next release phase and defin
 
 ### Sign-Off
 
-- Product owner: `TBD`
-- Engineering owner: `TBD`
-- Ops owner: `TBD`
+- Product owner: `jay`
+- Engineering owner: `jay`
+- Ops owner: `jay`
 
 ## Decision 004: Native Kernel Migration Scope and Triggers
 
-- Status: `pending`
-- Owner: `TBD`
-- Decision date: `TBD`
-- Effective date: `TBD`
+- Status: `approved`
+- Owner: `jay`
+- Decision date: `2026-03-10`
+- Effective date: `2026-03-10`
 
 ### Context
 
@@ -121,10 +121,14 @@ Define where native kernels are allowed and what evidence is required before mig
 
 ### Selected Policy
 
-- `TBD`
+- `python_first_hotpath_native`:
+  - Keep strategy/research/control logic Python-first.
+  - Require measured bottleneck evidence before native migration.
+  - Use thresholds in `config/native/migration_policy.json` as default trigger contract.
+  - Require reproducible before/after benchmark artifacts for each migration.
 
 ### Sign-Off
 
-- Engineering owner: `TBD`
-- Performance owner: `TBD`
-- Risk owner: `TBD`
+- Engineering owner: `jay`
+- Performance owner: `jay`
+- Risk owner: `jay`
