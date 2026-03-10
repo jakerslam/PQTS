@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
 import hashlib
 import json
+import time
 
 import pandas as pd
 import requests
@@ -55,11 +56,15 @@ class HistoricalDataDownloader:
         self,
         output_dir: str = "data/historical",
         timeout_seconds: float = 20.0,
+        max_retries: int = 3,
+        retry_backoff_seconds: float = 0.75,
         request_json: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
     ):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeout_seconds = float(timeout_seconds)
+        self.max_retries = int(max(1, max_retries))
+        self.retry_backoff_seconds = float(max(0.0, retry_backoff_seconds))
         self._session = requests.Session()
         self._request_json_fn = request_json
 
@@ -81,9 +86,22 @@ class HistoricalDataDownloader:
         if self._request_json_fn is not None:
             return self._request_json_fn(url, params)
 
-        response = self._session.get(url, params=params, timeout=self.timeout_seconds)
-        response.raise_for_status()
-        return response.json()
+        last_exc: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = self._session.get(url, params=params, timeout=self.timeout_seconds)
+                response.raise_for_status()
+                return response.json()
+            except Exception as exc:  # pragma: no cover - defensive network path
+                last_exc = exc
+                if attempt >= self.max_retries:
+                    break
+                sleep_seconds = self.retry_backoff_seconds * (2 ** (attempt - 1))
+                if sleep_seconds > 0:
+                    time.sleep(sleep_seconds)
+        if last_exc is None:
+            raise RuntimeError("request failed without exception")
+        raise last_exc
 
     @staticmethod
     def _normalize_ohlcv(
@@ -311,6 +329,65 @@ class HistoricalDataDownloader:
         manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
 
         return path
+
+    def _dataset_paths(
+        self,
+        *,
+        venue: str,
+        symbol: str,
+        interval: str,
+        start: datetime,
+        end: datetime,
+        fmt: str,
+    ) -> tuple[Path, Path]:
+        venue_slug = str(venue).lower()
+        symbol_slug = self._slug_symbol(symbol)
+        span = f"{self._utc(start).strftime('%Y%m%d')}_{self._utc(end).strftime('%Y%m%d')}"
+        target_dir = self.output_dir / venue_slug / symbol_slug / interval
+        dataset_path = target_dir / f"{span}.{fmt}"
+        manifest_path = target_dir / f"{span}.manifest.json"
+        return dataset_path, manifest_path
+
+    def load_cached_dataset(
+        self,
+        *,
+        venue: str,
+        symbol: str,
+        interval: str,
+        start: datetime,
+        end: datetime,
+        fmt: str = "csv",
+    ) -> pd.DataFrame | None:
+        dataset_path, manifest_path = self._dataset_paths(
+            venue=venue,
+            symbol=symbol,
+            interval=interval,
+            start=start,
+            end=end,
+            fmt=fmt,
+        )
+        if not dataset_path.exists() or not manifest_path.exists():
+            return None
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        expected_hash = str(payload.get("sha256", "")).strip()
+        if not expected_hash:
+            return None
+        actual_hash = hashlib.sha256(dataset_path.read_bytes()).hexdigest()
+        if actual_hash != expected_hash:
+            return None
+
+        if dataset_path.suffix == ".parquet":
+            frame = pd.read_parquet(dataset_path)
+            if "timestamp" in frame.columns:
+                frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True)
+                frame = frame.set_index("timestamp")
+        else:
+            frame = pd.read_csv(dataset_path, parse_dates=[0], index_col=0)
+            frame.index.name = "timestamp"
+
+        if not isinstance(frame.index, pd.DatetimeIndex):
+            frame.index = pd.to_datetime(frame.index, utc=True)
+        return frame.sort_index()[["open", "high", "low", "close", "volume"]]
 
 
 def load_research_frames(data_paths: Dict[str, Path]) -> Dict[str, pd.DataFrame]:

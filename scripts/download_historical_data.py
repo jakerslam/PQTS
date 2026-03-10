@@ -41,6 +41,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--end", required=True, help="YYYY-MM-DD")
     parser.add_argument("--output-dir", default="data/historical")
     parser.add_argument("--format", choices=["csv", "parquet"], default="csv")
+    parser.add_argument(
+        "--cache-mode",
+        choices=["use", "refresh"],
+        default="use",
+        help="use=load checksum-verified cached dataset when present; refresh=always redownload",
+    )
+    parser.add_argument("--max-retries", type=int, default=3)
+    parser.add_argument("--retry-backoff-seconds", type=float, default=0.75)
     return parser.parse_args()
 
 
@@ -52,16 +60,32 @@ def main() -> int:
     if end <= start:
         raise ValueError("--end must be strictly after --start")
 
-    downloader = HistoricalDataDownloader(output_dir=args.output_dir)
+    downloader = HistoricalDataDownloader(
+        output_dir=args.output_dir,
+        max_retries=int(args.max_retries),
+        retry_backoff_seconds=float(args.retry_backoff_seconds),
+    )
 
     if args.venue in {"binance", "all"}:
         for symbol in _split_csv(args.binance_symbols):
-            frame = downloader.download_binance_ohlcv(
-                symbol=symbol,
-                interval=args.interval,
-                start=start,
-                end=end,
-            )
+            frame = None
+            if args.cache_mode == "use":
+                frame = downloader.load_cached_dataset(
+                    venue="binance",
+                    symbol=symbol,
+                    interval=args.interval,
+                    start=start,
+                    end=end,
+                    fmt=args.format,
+                )
+            cache_hit = frame is not None
+            if frame is None:
+                frame = downloader.download_binance_ohlcv(
+                    symbol=symbol,
+                    interval=args.interval,
+                    start=start,
+                    end=end,
+                )
             quality = downloader.quality_summary(frame, interval=args.interval)
             saved = downloader.save_dataset(
                 frame,
@@ -74,17 +98,30 @@ def main() -> int:
             )
             print(
                 f"binance {symbol}: rows={quality.rows} completeness={quality.completeness:.4f} "
-                f"missing={quality.missing_intervals} saved={saved}"
+                f"missing={quality.missing_intervals} cache={'hit' if cache_hit else 'miss'} "
+                f"saved={saved}"
             )
 
     if args.venue in {"coinbase", "all"}:
         for symbol in _split_csv(args.coinbase_symbols):
-            frame = downloader.download_coinbase_ohlcv(
-                product_id=symbol,
-                interval=args.interval,
-                start=start,
-                end=end,
-            )
+            frame = None
+            if args.cache_mode == "use":
+                frame = downloader.load_cached_dataset(
+                    venue="coinbase",
+                    symbol=symbol,
+                    interval=args.interval,
+                    start=start,
+                    end=end,
+                    fmt=args.format,
+                )
+            cache_hit = frame is not None
+            if frame is None:
+                frame = downloader.download_coinbase_ohlcv(
+                    product_id=symbol,
+                    interval=args.interval,
+                    start=start,
+                    end=end,
+                )
             quality = downloader.quality_summary(frame, interval=args.interval)
             saved = downloader.save_dataset(
                 frame,
@@ -97,7 +134,8 @@ def main() -> int:
             )
             print(
                 f"coinbase {symbol}: rows={quality.rows} completeness={quality.completeness:.4f} "
-                f"missing={quality.missing_intervals} saved={saved}"
+                f"missing={quality.missing_intervals} cache={'hit' if cache_hit else 'miss'} "
+                f"saved={saved}"
             )
 
     return 0

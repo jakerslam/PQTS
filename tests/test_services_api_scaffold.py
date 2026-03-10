@@ -82,3 +82,15 @@ def test_openapi_can_be_disabled() -> None:
 
     response = client.get("/openapi.json")
     assert response.status_code == 404
+
+
+def test_metrics_endpoint_exposes_prometheus_format() -> None:
+    app = create_app(_build_settings())
+    client = TestClient(app)
+
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    body = response.text
+    assert "pqts_accounts_total" in body
+    assert "pqts_orders_total" in body
+    assert "pqts_fills_total" in body

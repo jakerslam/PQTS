@@ -144,3 +144,71 @@ def test_load_research_frames_reads_csv_format(tmp_path):
     assert "BTCUSDT" in loaded
     assert len(loaded["BTCUSDT"]) == 2
     assert loaded["BTCUSDT"].index.is_monotonic_increasing
+
+
+def test_load_cached_dataset_returns_frame_when_manifest_hash_matches(tmp_path):
+    idx = pd.to_datetime(["2026-01-01T00:00:00Z", "2026-01-01T01:00:00Z"], utc=True)
+    frame = pd.DataFrame(
+        {
+            "open": [100.0, 101.0],
+            "high": [101.0, 102.0],
+            "low": [99.0, 100.0],
+            "close": [100.5, 101.5],
+            "volume": [10.0, 11.0],
+        },
+        index=idx,
+    )
+    downloader = HistoricalDataDownloader(output_dir=str(tmp_path))
+    downloader.save_dataset(
+        frame,
+        venue="binance",
+        symbol="BTCUSDT",
+        interval="1h",
+        start=_dt(2026, 1, 1, 0),
+        end=_dt(2026, 1, 2, 0),
+        fmt="csv",
+    )
+    cached = downloader.load_cached_dataset(
+        venue="binance",
+        symbol="BTCUSDT",
+        interval="1h",
+        start=_dt(2026, 1, 1, 0),
+        end=_dt(2026, 1, 2, 0),
+        fmt="csv",
+    )
+    assert cached is not None
+    assert len(cached) == 2
+
+
+def test_load_cached_dataset_returns_none_when_hash_mismatch(tmp_path):
+    idx = pd.to_datetime(["2026-01-01T00:00:00Z"], utc=True)
+    frame = pd.DataFrame(
+        {
+            "open": [100.0],
+            "high": [101.0],
+            "low": [99.0],
+            "close": [100.5],
+            "volume": [10.0],
+        },
+        index=idx,
+    )
+    downloader = HistoricalDataDownloader(output_dir=str(tmp_path))
+    saved = downloader.save_dataset(
+        frame,
+        venue="binance",
+        symbol="BTCUSDT",
+        interval="1h",
+        start=_dt(2026, 1, 1, 0),
+        end=_dt(2026, 1, 2, 0),
+        fmt="csv",
+    )
+    saved.write_text("corrupted", encoding="utf-8")
+    cached = downloader.load_cached_dataset(
+        venue="binance",
+        symbol="BTCUSDT",
+        interval="1h",
+        start=_dt(2026, 1, 1, 0),
+        end=_dt(2026, 1, 2, 0),
+        fmt="csv",
+    )
+    assert cached is None

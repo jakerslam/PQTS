@@ -27,6 +27,7 @@ from app.operator_experience import (
     list_strategy_catalog,
     recommend_risk_profile,
 )
+from strategies.plugin_sdk import scaffold_strategy_plugin
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIRST_SUCCESS_COMMANDS = {
@@ -43,6 +44,7 @@ FIRST_SUCCESS_COMMANDS = {
     "notify",
     "explain",
     "artifacts",
+    "new-strategy",
 }
 
 BACKTEST_TEMPLATE_STRATEGY_MAP = {
@@ -731,6 +733,40 @@ def _run_artifacts_latest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_new_strategy(args: argparse.Namespace) -> int:
+    name = str(args.name).strip()
+    if not name:
+        print("Strategy name is required.")
+        return 2
+
+    try:
+        payload = scaffold_strategy_plugin(
+            name=name,
+            out_root=str(args.out_dir),
+            template=str(args.template),
+            force=bool(args.force),
+        )
+    except FileExistsError as exc:
+        print(str(exc))
+        return 2
+
+    print("Strategy plugin scaffold created")
+    print("=" * 60)
+    print(f"Plugin id: {payload['plugin_id']}")
+    print(f"Directory: {payload['plugin_dir']}")
+    print(f"Manifest: {payload['manifest']}")
+    print(f"Strategy module: {payload['strategy_module']}")
+    print(f"README: {payload['readme']}")
+    _print_next_steps(
+        [
+            f"Implement signal logic in {payload['strategy_module']}",
+            f"Update metadata in {payload['manifest']}",
+            "Add tests under tests/plugins/ and run pytest.",
+        ]
+    )
+    return 0
+
+
 def build_first_success_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pqts",
@@ -944,6 +980,17 @@ def build_first_success_parser() -> argparse.ArgumentParser:
     artifacts_latest_parser.add_argument("--limit", type=int, default=10)
     artifacts_latest_parser.add_argument("--output", choices=["table", "json"], default="table")
     artifacts_latest_parser.set_defaults(handler=_run_artifacts_latest)
+
+    new_strategy_parser = subparsers.add_parser(
+        "new-strategy",
+        help="Scaffold a strategy plugin package for extension development.",
+    )
+    new_strategy_parser.add_argument("name", help="Human-readable strategy name")
+    new_strategy_parser.add_argument("--out-dir", default="plugins/strategies")
+    new_strategy_parser.add_argument("--template", default="basic")
+    new_strategy_parser.add_argument("--force", action="store_true")
+    new_strategy_parser.add_argument("--output", choices=["table", "json"], default="table")
+    new_strategy_parser.set_defaults(handler=_run_new_strategy)
 
     return parser
 

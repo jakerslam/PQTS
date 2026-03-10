@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { OnboardingAutomation, OnboardingExperience } from "@/lib/onboarding/plan";
 import { buildOnboardingPlan } from "@/lib/onboarding/plan";
+import type { OnboardingRun } from "@/lib/onboarding/run-store";
 
 const EXPERIENCE_OPTIONS: Array<{ value: OnboardingExperience; label: string }> = [
   { value: "beginner", label: "Beginner" },
@@ -21,6 +22,9 @@ export function OnboardingWizard() {
   const [automation, setAutomation] = useState<OnboardingAutomation>("manual");
   const [capitalUsd, setCapitalUsd] = useState<number>(5000);
   const [copyStatus, setCopyStatus] = useState<string>("");
+  const [run, setRun] = useState<OnboardingRun | null>(null);
+  const [runError, setRunError] = useState<string>("");
+  const [isExecuting, setIsExecuting] = useState<boolean>(false);
 
   const plan = useMemo(
     () =>
@@ -40,6 +44,49 @@ export function OnboardingWizard() {
       setCopyStatus("Command block copied.");
     } catch {
       setCopyStatus("Copy failed. Select and copy commands manually.");
+    }
+  };
+
+  const executePlan = async () => {
+    if (isExecuting) {
+      return;
+    }
+    setRunError("");
+    setIsExecuting(true);
+    setRun(null);
+    try {
+      const response = await fetch("/api/onboarding/execute", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          experience,
+          automation,
+          capitalUsd,
+        }),
+      });
+      if (!response.ok) {
+        setRunError("Failed to start onboarding run.");
+        setIsExecuting(false);
+        return;
+      }
+      const payload = (await response.json()) as { run: OnboardingRun };
+      setRun(payload.run);
+      const source = new EventSource(`/api/onboarding/runs/${payload.run.run_id}/stream`);
+      source.addEventListener("snapshot", (event) => {
+        const parsed = JSON.parse((event as MessageEvent).data) as OnboardingRun;
+        setRun(parsed);
+        if (parsed.status === "completed" || parsed.status === "failed") {
+          setIsExecuting(false);
+          source.close();
+        }
+      });
+      source.onerror = () => {
+        source.close();
+        setIsExecuting(false);
+      };
+    } catch {
+      setRunError("Failed to start onboarding run.");
+      setIsExecuting(false);
     }
   };
 
@@ -105,8 +152,36 @@ export function OnboardingWizard() {
         <button type="button" onClick={handleCopy}>
           Copy commands
         </button>
+        <button type="button" disabled={isExecuting} onClick={executePlan}>
+          {isExecuting ? "Executing..." : "Run first success"}
+        </button>
         {copyStatus ? <span style={{ color: "var(--muted)", fontSize: "0.9rem" }}>{copyStatus}</span> : null}
       </div>
+      {runError ? (
+        <p style={{ margin: 0, color: "#c1121f" }}>{runError}</p>
+      ) : null}
+
+      {run ? (
+        <article className="card" style={{ display: "grid", gap: 8 }}>
+          <h3 style={{ margin: 0 }}>Run Progress: {run.run_id}</h3>
+          <p style={{ margin: 0, color: "var(--muted)" }}>Status: {run.status}</p>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {run.steps.map((step) => (
+              <li key={step.id}>
+                <strong>{step.status.toUpperCase()}</strong> - <code>{step.command}</code>
+                {step.artifact_path ? (
+                  <span style={{ color: "var(--muted)" }}>{" -> "}{step.artifact_path}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          {run.artifacts.length > 0 ? (
+            <p style={{ margin: 0, color: "var(--muted)" }}>
+              Artifacts: {run.artifacts.join(", ")}
+            </p>
+          ) : null}
+        </article>
+      ) : null}
 
       <ul style={{ margin: 0, paddingLeft: 18 }}>
         {plan.notes.map((note) => (

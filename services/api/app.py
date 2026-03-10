@@ -8,6 +8,7 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.responses import PlainTextResponse
 
 from .auth import APIIdentity, build_token_store, require_admin, require_identity, require_operator
 from .cache import APICache, get_cache
@@ -20,6 +21,30 @@ from .state import APIRuntimeStore, StreamHub
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _render_prometheus_metrics(store: APIRuntimeStore) -> str:
+    lines: list[str] = [
+        "# HELP pqts_accounts_total Number of tracked accounts.",
+        "# TYPE pqts_accounts_total gauge",
+        f"pqts_accounts_total {len(store.accounts)}",
+        "# HELP pqts_orders_total Total orders by account.",
+        "# TYPE pqts_orders_total gauge",
+    ]
+    for account_id in sorted(store.accounts.keys()):
+        orders = len(store.orders.get(account_id, []))
+        fills = len(store.fills.get(account_id, []))
+        incidents = len(store.risk_incidents.get(account_id, []))
+        risk = store.risk_states.get(account_id)
+        kill_switch = 1 if (risk and risk.kill_switch_active) else 0
+        pnl_rows = store.pnl_snapshots.get(account_id, [])
+        latest_net = float(pnl_rows[-1].net_pnl) if pnl_rows else 0.0
+        lines.append(f'pqts_orders_total{{account_id="{account_id}"}} {orders}')
+        lines.append(f'pqts_fills_total{{account_id="{account_id}"}} {fills}')
+        lines.append(f'pqts_risk_incidents_total{{account_id="{account_id}"}} {incidents}')
+        lines.append(f'pqts_kill_switch_active{{account_id="{account_id}"}} {kill_switch}')
+        lines.append(f'pqts_net_pnl_usd{{account_id="{account_id}"}} {latest_net:.6f}')
+    return "\n".join(lines) + "\n"
 
 
 def create_app(settings: APISettings | None = None) -> FastAPI:
@@ -122,6 +147,12 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
     @app.get("/readyz", tags=["health"])
     def readyz(request: Request) -> dict[str, Any]:
         return _ready_payload(request)
+
+    @app.get("/metrics", include_in_schema=False)
+    def metrics(request: Request) -> PlainTextResponse:
+        _ = request
+        payload = _render_prometheus_metrics(app.state.store)
+        return PlainTextResponse(content=payload, media_type="text/plain; version=0.0.4")
 
     @app.get("/v1/auth/me", tags=["auth"])
     def auth_me(
