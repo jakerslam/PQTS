@@ -29,6 +29,20 @@ python3 scripts/run_simulation_suite.py --markets crypto,equities,forex --strate
 | `results/2026-03-09_crypto_funding_arbitrage_short` | 1 | `simulation_leaderboard_20260309T180749741503Z.csv` | `0.00 / 0.00 / 1.00 / 2.00` |
 | `results/2026-03-09_multi_market_market_making_short` | 3 | `simulation_leaderboard_20260309T180750584558Z.csv` | `0.00 / 0.00 / 1.00 / 2.00` (crypto, equities, forex) |
 
+## Monthly Automated Report Pipeline
+
+Use the monthly generator to publish machine-readable and human-readable benchmark packs:
+
+```bash
+python3 scripts/generate_monthly_report.py --month 2026-03 --results-dir results --out-dir data/reports/monthly
+```
+
+Generated artifacts:
+- `data/reports/monthly/2026-03/monthly_report_2026-03.json`
+- `data/reports/monthly/2026-03/monthly_report_2026-03.html`
+- `data/reports/monthly/2026-03/monthly_report_2026-03.pdf`
+- `data/reports/monthly/2026-03/monthly_report_2026-03_equity_curve.svg`
+
 ## Notes
 
 - These are deterministic smoke baselines for reproducibility and regression detection.
