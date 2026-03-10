@@ -3039,3 +3039,86 @@ Observed source links:
 - Packaging model shall include a paper-only community lane and preserve risk/promotion gates across all paid lanes.
 - Live-trading enablement in any tier shall require completion of paper-readiness checks and explicit operator acknowledgment.
 - Tier capabilities shall be encoded in entitlement policy files rather than ad hoc UI-only gating.
+
+## 56. Additional Requirements from Language and Stack Direction Assessment (March 10, 2026)
+
+These requirements are derived from an architecture/language direction assessment focused on balancing casual-user accessibility and professional depth.
+
+Observed source links:
+- `https://raw.githubusercontent.com/jakerslam/PQTS/main/pyproject.toml`
+- `https://github.com/jakerslam/PQTS/blob/main/src/dashboard/app.py`
+- `https://github.com/jakerslam/PQTS/blob/main/services/api/app.py`
+- `https://nautilustrader.io/docs/latest/developer_guide/`
+- `https://raw.githubusercontent.com/jakerslam/PQTS/main/docker-compose.yml`
+- `https://github.com/jakerslam/PQTS/blob/main/src/execution/microstructure_features.py`
+
+### LANG-1 Python-First, Not Python-Only Architecture Policy
+
+- System shall keep Python as the primary user-facing language for strategy, research, orchestration, and API composition.
+- System shall avoid full-platform rewrites into a single native language when user-facing productivity and ecosystem leverage would regress.
+- Architecture roadmap shall explicitly reserve native-language modules for performance-critical kernels only.
+
+### LANG-2 Native Kernel Boundary for Hot Path
+
+- Performance-critical execution kernels shall be implemented in a native module boundary (Rust-first target) exposed to Python.
+- Native kernel modules shall be packaged as installable Python extensions with reproducible build tooling.
+- Native boundary contracts shall be typed and versioned to prevent drift between Python orchestrators and native kernels.
+
+### LANG-3 Native Migration Trigger Criteria
+
+- Migration from Python to native implementation shall require measured trigger evidence (latency/throughput/cost bottleneck) rather than speculative optimization.
+- Numeric vectorizable kernels shall be evaluated with JIT acceleration before native rewrite.
+- Stateful streaming kernels (orderbook sequencing, replay, deterministic routing/fill engines) shall be prioritized for native migration when trigger thresholds are met.
+
+### LANG-4 Research Data Plane Standard
+
+- Research data plane shall support Arrow-native columnar storage and compute-friendly local formats for reproducible analysis.
+- Local-first research workflows shall support Parquet-backed datasets with SQL analytics execution for casual and pro users.
+- Data-plane adapters shall preserve schema/version metadata required for benchmark comparability and replay.
+
+### LANG-5 API and Configuration Contract Hardening
+
+- API payloads, strategy manifests, and runtime config surfaces shall be validated through typed schema models rather than ad hoc dict parsing.
+- Contract validation errors shall fail fast with actionable diagnostics at boundary ingress.
+- Contract schema evolution shall be versioned and compatibility-tested in CI.
+
+### LANG-6 UI Surface Coherence Requirement
+
+- Product shall converge to one primary operator UI architecture per release phase and avoid dual-framework control-plane ambiguity.
+- Runtime and deployment manifests shall not launch mismatched UI runtimes against incompatible app entrypoints.
+- UI convergence plan shall include explicit deprecation milestones for legacy surfaces with parity gates.
+
+### LANG-7 FastAPI-Centered Control Plane
+
+- Control-plane APIs (health/readiness/auth/session/event routes) shall remain centered on the canonical FastAPI service.
+- UI surfaces shall consume a shared API contract rather than bypassing control-plane policy enforcement.
+- WebSocket and streaming contracts shall remain consistent across UI clients and automation agents.
+
+### LANG-8 Storage-Tier Policy
+
+- Local/casual analysis workflows shall default to file-backed analytical storage optimized for quick setup and portability.
+- Operational state (identity, sessions, entitlements, audit trails, reconciliation metadata) shall remain in transactional stores with explicit schema governance.
+- High-volume telemetry-specific stores shall be introduced only when measured workload evidence exceeds current-store thresholds.
+
+### LANG-9 Engine-Loop and Dashboard Responsiveness SLOs
+
+- Runtime shall define explicit cycle-time and UI-refresh SLO targets by mode (research, paper, live) and track them as first-class telemetry.
+- Performance claims for execution responsiveness shall reference measured SLO compliance windows.
+- Architecture changes intended for latency reduction shall include before/after benchmark evidence.
+
+### LANG-10 Interop Packaging and Distribution
+
+- Native extension modules shall be distributed through standard Python packaging workflows compatible with the project release pipeline.
+- Build matrix for native components shall publish platform artifacts required by supported Python versions.
+- Release metadata shall include native module build provenance and compatibility information.
+
+### LANG-11 UI Migration Safety
+
+- UI migration (for example legacy dashboard to web app) shall preserve operator-critical workflows and risk controls through parity tests.
+- Migration cutover shall be blocked if parity checks fail on key metrics, incident controls, or operator actions.
+- Legacy UI retirement shall only occur after staged stabilization windows and documented rollback paths.
+
+### LANG-12 Source Reliability and Claim Handling
+
+- Public stack-performance claims (for example sub-millisecond or “institutional speed”) shall be labeled `unverified` unless backed by reproducible benchmark artifacts.
+- Requirements adopted from comparative stack commentary shall emphasize measurable system contracts, not language-brand claims.

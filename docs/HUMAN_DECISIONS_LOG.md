@@ -65,3 +65,66 @@ Define which public result class labels are permitted and how they appear in ext
 - Product owner: `TBD`
 - Research owner: `TBD`
 - Compliance owner: `TBD`
+
+## Decision 003: Primary UI Architecture Path
+
+- Status: `pending`
+- Owner: `TBD`
+- Decision date: `TBD`
+- Effective date: `TBD`
+
+### Context
+
+Choose one primary operator UI architecture for the next release phase and define deprecation policy for secondary surfaces.
+
+### Options
+
+- `web_primary` (TypeScript web app + FastAPI control plane)
+- `dash_primary_interim` (Dash-only interim while web app matures)
+
+### Selected Option
+
+- `TBD`
+
+### Constraints
+
+- Must avoid dual-framework ambiguity for core operator workflows.
+- Must preserve risk/incident controls and parity with control-plane contracts.
+
+### Sign-Off
+
+- Product owner: `TBD`
+- Engineering owner: `TBD`
+- Ops owner: `TBD`
+
+## Decision 004: Native Kernel Migration Scope and Triggers
+
+- Status: `pending`
+- Owner: `TBD`
+- Decision date: `TBD`
+- Effective date: `TBD`
+
+### Context
+
+Define where native kernels are allowed and what evidence is required before migrating Python modules.
+
+### Candidate Kernel Domains
+
+- orderbook sequencing
+- deterministic event replay
+- routing/fill hot path
+
+### Trigger Policy
+
+- JIT-first for vectorizable numeric kernels.
+- Native migration only after measured bottleneck evidence exceeds approved thresholds.
+
+### Selected Policy
+
+- `TBD`
+
+### Sign-Off
+
+- Engineering owner: `TBD`
+- Performance owner: `TBD`
+- Risk owner: `TBD`

@@ -42,3 +42,10 @@ This file tracks tasks that cannot be reliably automated and require direct huma
 - Own pricing-page and website messaging updates so tier language matches actual entitlements and safety constraints.
 - Produce and maintain plain-language onboarding narratives/tutorial scripts for Studio users (non-technical-first audience).
 - Conduct periodic user interviews (casual and professional cohorts) and convert findings into prioritization decisions.
+
+## P0 Language and UI Direction Decisions
+
+- Approve and record the Python-first/not-Python-only architecture policy (including target native-kernel scope).
+- Decide and sign off the single primary UI path for the next release phase (web app end-state and interim fallback policy).
+- Approve native-migration trigger thresholds (when to use JIT, when to move kernels to Rust, and what evidence is required).
+- Approve storage-tier escalation policy (when/if to introduce additional telemetry stores beyond current operational stack).
