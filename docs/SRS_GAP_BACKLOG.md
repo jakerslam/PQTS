@@ -4,69 +4,21 @@ Auto-generated from SRS coverage. Non-implemented requirements are grouped by pr
 
 ## P0
 
-Count: **24**
+Count: **0**
 
 | ID | Prefix | Status | Requirement |
 |---|---|---|---|
-| AC-1 | AC | unmapped | Backtest Readiness |
-| AC-2 | AC | unmapped | Paper-Trade Readiness |
-| AC-3 | AC | unmapped | Promotion Gate |
-| BF-1 | BF | unmapped | Runtime Configuration and Boot Controls |
-| BF-2 | BF | unmapped | Market/Strategy Control Plane |
-| BF-3 | BF | unmapped | Mandatory Order and Risk Pipeline |
-| BF-4 | BF | unmapped | Market Data and Reliability Controls |
-| BF-5 | BF | unmapped | Research, Simulation, and Ops Automation |
-| BF-6 | BF | unmapped | Security, Compliance, and Data Governance |
-| FR-1 | FR | unmapped | Market Probability Normalization |
-| FR-2 | FR | unmapped | Fair Probability Estimation |
-| FR-3 | FR | unmapped | Underdog Mispricing Signal |
-| FR-4 | FR | unmapped | Profitability Gate Integration |
-| FR-5 | FR | unmapped | Position Sizing |
-| FR-6 | FR | unmapped | Portfolio Constraints |
-| FR-7 | FR | unmapped | Exit and Lifecycle Rules |
-| FR-8 | FR | unmapped | Telemetry and Attribution |
-| NFR-1 | NFR | unmapped | Latency |
-| NFR-2 | NFR | unmapped | Reliability |
-| NFR-3 | NFR | unmapped | Determinism |
-| RV-1 | RV | unmapped | Core Control Plane |
-| RV-2 | RV | unmapped | Execution and Risk Overlay |
-| RV-3 | RV | unmapped | Runtime Integrity and Security |
-| RV-4 | RV | unmapped | Simulation and Ops Flow |
 
 ## P1
 
-Count: **24**
+Count: **0**
 
 | ID | Prefix | Status | Requirement |
 |---|---|---|---|
-| COMP-10 | COMP | partial | Wedge-First Market Scope Governance |
-| COMP-14 | COMP | partial | Tiering Model Safety Baseline |
-| COMP-7 | COMP | partial | Studio (Casual) UX Contract |
-| COMP-8 | COMP | partial | Core (Professional) UX Contract |
-| LANG-3 | LANG | partial | Native Migration Trigger Criteria |
-| LANG-6 | LANG | partial | UI Surface Coherence Requirement |
-| MOAT-13 | MOAT | partial | Public Trust Classifications and Evidence Gates |
-| MOAT-15 | MOAT | partial | Moat-vs-Parity Roadmap Governance |
-| MOAT-8 | MOAT | partial | Single Strategy Object Across Casual and Pro Surfaces |
-| XR-1 | XR | unmapped | Short-Cycle Binary Arbitrage Scanner |
-| XR-2 | XR | unmapped | Legging/Execution Safety for Two-Leg Trades |
-| XR-3 | XR | unmapped | Venue Universe and Market-Type Configuration |
-| XR-4 | XR | unmapped | Micro-Edge Throughput Accounting |
-| XR-5 | XR | unmapped | Optional Asymmetric Single-Leg Mode |
-| XR-6 | XR | unmapped | Automation Security Hardening (Linked Setup Thread) |
-| XR-7 | XR | unmapped | Provenance and Confidence Handling |
-| ZQ-1 | ZQ | unmapped | Split-Plane Architecture (Analysis vs Execution) |
-| ZQ-2 | ZQ | unmapped | Short-Cycle Feature Evaluation Loop |
-| ZQ-3 | ZQ | unmapped | Latency and Throughput SLOs for HFT Path |
-| ZQ-4 | ZQ | unmapped | Kelly-Constrained Position Sizing |
-| ZQ-5 | ZQ | unmapped | High-Frequency Execution Governance |
-| ZQ-6 | ZQ | unmapped | Cross-Market Expansion Controls |
-| ZQ-7 | ZQ | unmapped | Weather/Event-Market Exogenous Data Integration (Optional) |
-| ZQ-8 | ZQ | unmapped | External Performance Claim Handling |
 
 ## P2
 
-Count: **349**
+Count: **348**
 
 | ID | Prefix | Status | Requirement |
 |---|---|---|---|
@@ -77,7 +29,6 @@ Count: **349**
 | AHF-2 | AHF | unmapped | Strategy Flow Templates and Versioned Persistence |
 | AHF-3 | AHF | unmapped | Execution Run Registry with Lifecycle Status |
 | AHF-4 | AHF | unmapped | Per-Cycle Session Telemetry for Continuous Modes |
-| AHF-5 | AHF | unmapped | Server-Sent Event Streaming for Operator UX |
 | AHF-6 | AHF | unmapped | Per-Agent Model Routing Overrides |
 | AHF-7 | AHF | unmapped | Deterministic Trade Feasibility Pre-Checks |
 | AHF-8 | AHF | unmapped | Integrated Long/Short + Margin Accounting Model |
@@ -139,7 +90,6 @@ Count: **349**
 | DXR-3 | DXR | unmapped | Context Overflow Recovery and Memory Flush |
 | DXR-4 | DXR | unmapped | Provider-Routed LLM Layer |
 | DXR-5 | DXR | unmapped | Conditional Tool Registry and Failover |
-| DXR-6 | DXR | unmapped | Skill Package Interface (SKILL.md) |
 | DXR-7 | DXR | unmapped | Structured Evaluation Harness |
 | DXR-8 | DXR | unmapped | Messaging Channel Gateway with Access Policies |
 | FAUI-1 | FAUI | unmapped | Tool-Aware Generative UI Rendering Contract |
@@ -249,6 +199,7 @@ Count: **349**
 | LLE-7 | LLE | unmapped | Tolerance-Banded Regression Accuracy |
 | LLE-8 | LLE | unmapped | Confusion-Matrix-Native Classification Scoring |
 | LLE-9 | LLE | unmapped | Dataset Factory + Local Cache Strategy |
+| NCLI-6 | NCLI | unmapped | Source Reliability and Claim Handling |
 | NS-1 | NS | unmapped | Market-Universe Pre-Filter Gate |
 | NS-2 | NS | unmapped | Ensemble-Confidence Fire Rule |
 | NS-3 | NS | unmapped | Independent Risk-Validator Quorum |

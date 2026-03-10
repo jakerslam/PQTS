@@ -128,6 +128,14 @@ Legend:
 - [x] Add deployment run-mode environment contract and validation gates (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: NCLI-4`)
 - [x] Standardize autonomous memory/journal/judge artifacts and promotion linkage (`ROI: medium`, `Type: engineering`, `Track: moat`, `Ref: NCLI-5`)
 
+## 02e. Core/P1 SRS Closure Sprint (2026-03-10)
+
+- [x] Implement underdog-value strategy primitives for probability normalization, fair-probability estimation, EV-gated underdog signal filtering, Kelly-bounded sizing, lifecycle exits, and attribution telemetry with deterministic unit tests (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: FR-1, FR-2, FR-3, FR-4, FR-5, FR-6, FR-7, FR-8, NFR-3`)
+- [x] Implement explicit backtest, paper-trade, and promotion gate evaluators with contract tests for pass/fail reason codes (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: AC-1, AC-2, AC-3`)
+- [x] Implement short-cycle binary scanner primitives: bundle-edge detection, legging/unhedged safety checks, universe and interval controls, rolling micro-edge throughput accounting, optional asymmetric single-leg mode, security-hardening gate checks, and source-confidence classification (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: XR-1, XR-2, XR-3, XR-4, XR-5, XR-6, XR-7`)
+- [x] Implement split-plane analysis-to-execution payload contract, HFT latency/throughput SLO monitor, Kelly-constrained short-cycle sizing, high-frequency governance checks, cross-market expansion controls, exogenous-data freshness/quality validation, and fail-closed external claim handling (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: ZQ-1, ZQ-2, ZQ-3, ZQ-4, ZQ-5, ZQ-6, ZQ-7, ZQ-8, NFR-1, NFR-2`)
+- [x] Explicitly map and preserve baseline runtime/execution/security regression contracts already validated by the baseline matrix and required test suites (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: BF-1, BF-2, BF-3, BF-4, BF-5, BF-6, RV-1, RV-2, RV-3, RV-4`)
+
 ## 03. Human-Only Parallel Lane
 
 - [x] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`)
