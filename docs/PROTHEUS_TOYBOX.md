@@ -5,11 +5,11 @@ This repository can be positioned as **Tool #1 in the Protheus Toybox** with mea
 ## Launch Assets
 
 1. One-command demo:
-`python demo.py --market crypto --strat ml-ensemble --source x_launch_thread`
+`python apps/demo.py --market crypto --strat ml-ensemble --source x_launch_thread`
 2. Dashboard CTA:
 `Upgrade to Protheus` link includes UTM tags from the dashboard header.
 3. Agent handoff export:
-`demo.py` emits a governed-lane strategy blob suitable for pilot ingestion.
+`apps/demo.py` emits a governed-lane strategy blob suitable for pilot ingestion.
 4. Attribution log:
 events are appended to `data/analytics/attribution_events.jsonl`.
 
@@ -18,7 +18,7 @@ events are appended to `data/analytics/attribution_events.jsonl`.
 1. Built a quant research/execution toy with real risk gates.
 2. Multi-market simulation (crypto/equities/forex), paper-first promotion pipeline.
 3. One-command demo in ~5 minutes:
-`python demo.py --market crypto --strat ml-ensemble`
+`python apps/demo.py --market crypto --strat ml-ensemble`
 4. It exports a pilot handoff blob for agent workflows.
 5. Repo: https://github.com/jakerslam/pqts
 
@@ -36,4 +36,3 @@ Do not post fabricated returns. Use only demo output and reproducible reports.
 2. Clickthrough intent: count `source` values containing `utm_source=pqts_dashboard`.
 3. Handoff adoption: number of generated `handoff_blob_*.json`.
 4. Funnel quality: ratio of demo runs that achieve `promotion_decision=promote_to_live_canary`.
-

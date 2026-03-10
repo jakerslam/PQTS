@@ -60,7 +60,7 @@ This pack implements the next utility/revenue steps for enterprise quant operato
 
 ## 10) Product UX + funnel analytics
 
-- Demo presets and upgrade-intent tracking in `demo.py`
+- Demo presets and upgrade-intent tracking in `apps/demo.py`
 - Funnel summary module and script:
   - `analytics/funnel.py`
   - `scripts/funnel_report.py`

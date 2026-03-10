@@ -23,6 +23,7 @@ nav:
   - 5-Minute Quickstart: QUICKSTART_5_MIN.md
   - Architecture Diagram: ARCHITECTURE_DIAGRAM.md
   - Architecture: ARCHITECTURE.md
+  - Repository Structure: REPO_STRUCTURE.md
   - Benchmarks: BENCHMARKS.md
   - Official Integrations: OFFICIAL_INTEGRATIONS.md
   - Notifications: NOTIFICATIONS.md

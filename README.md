@@ -120,9 +120,9 @@ Docs site (GitHub Pages): `https://jakerslam.github.io/pqts/`
 ```bash
 make demo
 # or:
-python demo.py --market crypto --strat ml-ensemble --source x_launch_thread
+python apps/demo.py --market crypto --strat ml-ensemble --source x_launch_thread
 # optional:
-# python demo.py --market crypto --risk-profile aggressive
+# python apps/demo.py --market crypto --risk-profile aggressive
 ```
 
 The demo runs a deterministic paper-simulation slice, emits:
@@ -134,8 +134,8 @@ The demo runs a deterministic paper-simulation slice, emits:
 Preset launch paths:
 
 ```bash
-python demo.py --preset casual --source quickstart
-python demo.py --preset pro --source quant_desk --track-upgrade-intent
+python apps/demo.py --preset casual --source quickstart
+python apps/demo.py --preset pro --source quant_desk --track-upgrade-intent
 python scripts/funnel_report.py
 ```
 
@@ -328,9 +328,12 @@ python tools/scaffold_module.py order_intelligence --requires data,signals --pro
 
 Detailed rules and migration notes: `docs/ARCHITECTURE.md`
 
+Repository layout guide: `docs/REPO_STRUCTURE.md`
+
 ## 📚 Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Repository Structure](docs/REPO_STRUCTURE.md)
 - [Codex Compliance](docs/CODEX_COMPLIANCE.md)
 - [Implementation Direction](docs/IMPLEMENTATION_DIRECTION.md)
 - [SRS](docs/SRS.md)
@@ -365,10 +368,10 @@ Detailed rules and migration notes: `docs/ARCHITECTURE.md`
 
 ## 🤝 Project Governance
 
-- [Contributing Guide](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
-- [Security Policy](SECURITY.md)
-- [Support](SUPPORT.md)
+- [Contributing Guide](.github/CONTRIBUTING.md)
+- [Code of Conduct](.github/CODE_OF_CONDUCT.md)
+- [Security Policy](.github/SECURITY.md)
+- [Support](.github/SUPPORT.md)
 - [Changelog](CHANGELOG.md)
 - [Citation](CITATION.cff)
 

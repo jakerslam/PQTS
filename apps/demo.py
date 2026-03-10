@@ -13,7 +13,7 @@ from typing import Any, Dict, List
 
 import yaml
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 if SRC.exists():
     src_str = str(SRC)

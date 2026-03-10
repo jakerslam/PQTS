@@ -12,7 +12,7 @@ setup-lock:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)" --lock
 
 demo:
-	$(VENV_PY) demo.py --market crypto --strat ml-ensemble --source make_demo
+	$(VENV_PY) apps/demo.py --market crypto --strat ml-ensemble --source make_demo
 
 sim-suite:
 	$(VENV_PY) scripts/run_simulation_suite.py --markets crypto,equities,forex --strategies market_making,funding_arbitrage,cross_exchange --cycles-per-scenario 60 --readiness-every 20
@@ -61,8 +61,8 @@ test:
 	$(VENV_PY) -m pytest -q
 
 lint:
-	$(VENV_PY) -m black --check src/core src/execution src/risk src/analytics src/markets demo.py
-	$(VENV_PY) -m isort --check-only src/core src/execution src/risk src/analytics src/markets demo.py
+	$(VENV_PY) -m black --check src/core src/execution src/risk src/analytics src/markets apps/demo.py
+	$(VENV_PY) -m isort --check-only src/core src/execution src/risk src/analytics src/markets apps/demo.py
 	$(VENV_PY) -m ruff check src/core src/execution src/risk src/analytics src/markets --select E9,F63,F7,F82
 	$(VENV_PY) -m flake8 src/core src/execution src/risk src/analytics src/markets --count --select=E9,F63,F7,F82 --show-source --statistics
 

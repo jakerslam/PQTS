@@ -11,7 +11,7 @@ Repo: https://github.com/jakerslam/pqts
 ## Post 2
 
 One-command demo:
-`python demo.py --market crypto --strat ml-ensemble --source x_launch_thread`
+`python apps/demo.py --market crypto --strat ml-ensemble --source x_launch_thread`
 
 Outputs:
 - report in `data/reports/`
@@ -28,4 +28,3 @@ No fake returns, only reproducible simulation + readiness metrics.
 
 Protheus-native workflow: export a governed-lane blob and hand it to an agent pilot.
 Standalone works; governed agent pilot improves research-to-promotion loop.
-

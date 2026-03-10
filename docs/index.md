@@ -20,6 +20,7 @@ See [5-Minute Quickstart](QUICKSTART_5_MIN.md).
 - Simulation telemetry: [SIMULATION_TELEMETRY.md](SIMULATION_TELEMETRY.md)
 - Requirements baseline: [SRS.md](SRS.md)
 - Benchmark methodology: [BENCHMARKS.md](BENCHMARKS.md)
+- Repository layout: [REPO_STRUCTURE.md](REPO_STRUCTURE.md)
 
 ## Public Leaderboard
 
