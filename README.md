@@ -158,6 +158,17 @@ python scripts/run_exchange_certification.py --venues binance,coinbase,alpaca,oa
 python scripts/enforce_data_retention.py --root data --max-age-days 365 --max-total-files 10000
 ```
 
+Six-month paper-trading harness (monthly slices + aggregate report):
+
+```bash
+python3 scripts/run_paper_6m_harness.py --months 6 --cycles-per-month 12 --sleep-seconds 0
+# or:
+make paper-6m
+```
+
+Artifacts are written under `data/reports/paper_6m/`, including one consolidated
+`paper_6m_harness_<timestamp>.json` report.
+
 World-class ops checklist (all 10 steps, one command):
 
 ```bash
