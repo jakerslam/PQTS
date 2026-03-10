@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -42,6 +43,18 @@ class SecretPolicyIssue:
     def to_dict(self) -> Dict[str, str]:
         return {
             "key": str(self.key),
+            "message": str(self.message),
+        }
+
+
+@dataclass(frozen=True)
+class SecretExposureIssue:
+    secret_name: str
+    message: str
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "secret_name": str(self.secret_name),
             "message": str(self.message),
         }
 
@@ -154,3 +167,46 @@ def enforce_live_secrets(
         return
     messages = "; ".join(f"{issue.key}: {issue.message}" for issue in issues)
     raise RuntimeError(f"Live secret policy failed: {messages}")
+
+
+def sanitize_secrets_for_logging(payload: Any) -> Any:
+    """Recursively redact secret-like keys for safe logging/output rendering."""
+    if isinstance(payload, Mapping):
+        redacted: Dict[str, Any] = {}
+        for key, value in payload.items():
+            key_token = str(key)
+            if _is_secret_key(key_token):
+                redacted[key_token] = "***REDACTED***"
+            else:
+                redacted[key_token] = sanitize_secrets_for_logging(value)
+        return redacted
+    if isinstance(payload, Sequence) and not isinstance(payload, (str, bytes, bytearray)):
+        return [sanitize_secrets_for_logging(item) for item in payload]
+    return payload
+
+
+def detect_secret_exposure(
+    payload: Any,
+    *,
+    known_secret_values: Mapping[str, str],
+    min_length: int = 6,
+) -> List[SecretExposureIssue]:
+    """Detect accidental secret leakage by scanning payload text for known secret values."""
+    try:
+        serialized = json.dumps(payload, sort_keys=True, default=str)
+    except TypeError:
+        serialized = str(payload)
+
+    issues: List[SecretExposureIssue] = []
+    for secret_name, secret_value in known_secret_values.items():
+        token = str(secret_value or "")
+        if len(token) < int(min_length):
+            continue
+        if token in serialized:
+            issues.append(
+                SecretExposureIssue(
+                    secret_name=str(secret_name),
+                    message="secret value appears in serialized payload output",
+                )
+            )
+    return issues

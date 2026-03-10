@@ -88,7 +88,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 - [x] Add API/web SLO instrumentation and dashboards (latency, error rate, availability).
 - [x] Add health endpoints and deployment profiles with explicit concurrency and graceful shutdown controls.
 - [x] Add event-stream backbone hardening (durable events, replay support for incident forensics).
-- [ ] Add secrets management policy (rotation cadence, environment gating, non-exposure checks).
+- [x] Add secrets management policy (rotation cadence, environment gating, non-exposure checks).
 - [ ] Add release gating with build provenance artifact upload/verification.
 - [ ] Add frontend/backend contract tests for graph node events and tool renderer mapping completeness.
 - [ ] Add migration parity checks between Streamlit and Next.js outputs for key metrics.
