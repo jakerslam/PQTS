@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import io
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -16,8 +18,32 @@ from difflib import unified_diff
 from pathlib import Path
 from typing import Sequence
 
+from analytics.notifications import NotificationChannels, NotificationDispatcher
+from app.operator_experience import (
+    explain_block_reason,
+    explain_strategy,
+    latest_paths,
+    list_risk_profiles,
+    list_strategy_catalog,
+    recommend_risk_profile,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-FIRST_SUCCESS_COMMANDS = {"init", "demo", "backtest", "paper", "skills"}
+FIRST_SUCCESS_COMMANDS = {
+    "init",
+    "demo",
+    "backtest",
+    "paper",
+    "skills",
+    "doctor",
+    "quickstart",
+    "strategies",
+    "risk",
+    "status",
+    "notify",
+    "explain",
+    "artifacts",
+}
 
 BACKTEST_TEMPLATE_STRATEGY_MAP = {
     "momentum": "trend_following",
@@ -406,6 +432,305 @@ def _run_paper_start(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_doctor(args: argparse.Namespace) -> int:
+    workspace = Path(args.workspace).expanduser().resolve()
+    config_path = Path(args.config).expanduser()
+    if not config_path.is_absolute():
+        config_path = (REPO_ROOT / config_path).resolve()
+
+    required_dirs = [
+        workspace / "data" / "reports",
+        workspace / "data" / "analytics",
+        workspace / "data" / "tca" / "simulation",
+    ]
+    if bool(args.fix):
+        for path in required_dirs:
+            path.mkdir(parents=True, exist_ok=True)
+
+    checks: list[dict[str, object]] = []
+
+    py_ok = sys.version_info >= (3, 11)
+    checks.append(
+        {
+            "name": "python_version",
+            "ok": py_ok,
+            "required": True,
+            "detail": platform.python_version(),
+        }
+    )
+    checks.append(
+        {
+            "name": "config_exists",
+            "ok": config_path.exists(),
+            "required": True,
+            "detail": str(config_path),
+        }
+    )
+    checks.append(
+        {
+            "name": "repo_layout",
+            "ok": (REPO_ROOT / "src").exists() and (REPO_ROOT / "scripts").exists(),
+            "required": True,
+            "detail": str(REPO_ROOT),
+        }
+    )
+    checks.append(
+        {
+            "name": "workspace_env",
+            "ok": (workspace / ".env").exists() or (workspace / ".env.example").exists(),
+            "required": False,
+            "detail": str(workspace / ".env"),
+        }
+    )
+    checks.append(
+        {
+            "name": "docker_available",
+            "ok": shutil.which("docker") is not None,
+            "required": False,
+            "detail": str(shutil.which("docker") or "missing"),
+        }
+    )
+    checks.append(
+        {
+            "name": "make_available",
+            "ok": shutil.which("make") is not None,
+            "required": False,
+            "detail": str(shutil.which("make") or "missing"),
+        }
+    )
+    checks.append(
+        {
+            "name": "data_dirs_ready",
+            "ok": all(path.exists() for path in required_dirs),
+            "required": False,
+            "detail": str(workspace / "data"),
+        }
+    )
+
+    print("PQTS Doctor Report")
+    print("=" * 60)
+    for row in checks:
+        status = "PASS" if bool(row["ok"]) else "FAIL"
+        req = "required" if bool(row["required"]) else "optional"
+        print(f"[{status}] {row['name']} ({req}) -> {row['detail']}")
+
+    failed_required = [row for row in checks if bool(row["required"]) and not bool(row["ok"])]
+    if failed_required:
+        print("\nDoctor result: failed required checks.")
+        return 1
+    print("\nDoctor result: environment is ready for onboarding flows.")
+    return 0
+
+
+def _run_quickstart(args: argparse.Namespace) -> int:
+    workspace = Path(args.workspace).expanduser().resolve()
+    report_root = Path(args.report_root).expanduser().resolve()
+    commands = [
+        ["init", "--workspace", str(workspace)],
+        ["demo", "--out-dir", str(report_root / "demo"), "--cycles", str(args.demo_cycles)],
+        ["backtest", "momentum", "--out-dir", str(report_root / "backtest"), "--cycles", str(args.backtest_cycles)],
+        ["paper", "start", "--out-dir", str(report_root / "paper"), "--cycles", str(args.paper_cycles)],
+    ]
+
+    print("Quickstart Plan")
+    print("=" * 60)
+    for index, row in enumerate(commands, start=1):
+        print(f"{index}. pqts {' '.join(row)}")
+
+    if not bool(args.execute):
+        print("\nDry-run only. Re-run with --execute to run full pipeline.")
+        return 0
+
+    for row in commands:
+        command = [_python(), str(REPO_ROOT / "main.py"), *row]
+        rc = _run_command(command, cwd=REPO_ROOT)
+        if rc != 0:
+            print(f"Quickstart halted at: pqts {' '.join(row)} (exit={rc})")
+            return rc
+    print("\nQuickstart execution completed.")
+    return 0
+
+
+def _run_strategies_list(_args: argparse.Namespace) -> int:
+    print("Strategy Catalog")
+    print("=" * 60)
+    for row in list_strategy_catalog():
+        print(
+            f"{row.key:20s} | {row.audience:8s} | {row.complexity:12s} | "
+            f"{','.join(row.markets)}"
+        )
+    return 0
+
+
+def _run_strategies_explain(args: argparse.Namespace) -> int:
+    entry = explain_strategy(args.strategy)
+    if entry is None:
+        print(f"Unknown strategy: {args.strategy}")
+        return 2
+    print(f"{entry.label} ({entry.key})")
+    print("=" * 60)
+    print(f"Audience: {entry.audience}")
+    print(f"Complexity: {entry.complexity}")
+    print(f"Markets: {', '.join(entry.markets)}")
+    print(f"Summary: {entry.summary}")
+    print(f"Why it matters: {entry.why_it_matters}")
+    return 0
+
+
+def _run_risk_list(_args: argparse.Namespace) -> int:
+    print("Risk Profiles")
+    print("=" * 60)
+    for row in list_risk_profiles():
+        print(
+            f"{row.key:14s} | audience={row.audience:8s} | max_notional={row.max_notional_pct:.2%} | "
+            f"drawdown_guardrail={row.drawdown_guardrail_pct:.2%}"
+        )
+    return 0
+
+
+def _run_risk_recommend(args: argparse.Namespace) -> int:
+    profile = recommend_risk_profile(
+        experience=str(args.experience),
+        capital_usd=float(args.capital_usd),
+        automation=str(args.automation),
+    )
+    print("Recommended Risk Profile")
+    print("=" * 60)
+    print(f"Profile: {profile.key}")
+    print(f"Audience: {profile.audience}")
+    print(f"Max notional: {profile.max_notional_pct:.2%}")
+    print(f"Drawdown guardrail: {profile.drawdown_guardrail_pct:.2%}")
+    print(f"Reason: {profile.summary}")
+    return 0
+
+
+def _run_status_reports(args: argparse.Namespace) -> int:
+    reports_dir = Path(args.reports_dir).expanduser().resolve()
+    rows = latest_paths(
+        [
+            "**/simulation_suite_*.json",
+            "**/paper_campaign_*.json",
+            "**/paper_6m_harness_*.json",
+            "**/monthly_report_*.md",
+        ],
+        root=reports_dir,
+    )[: int(args.limit)]
+    print(f"Latest reports in {reports_dir}")
+    print("=" * 60)
+    if not rows:
+        print("No report artifacts found.")
+        return 0
+    for path in rows:
+        print(path)
+    return 0
+
+
+def _run_status_leaderboard(args: argparse.Namespace) -> int:
+    reports_dir = Path(args.reports_dir).expanduser().resolve()
+    rows = latest_paths(["**/simulation_leaderboard_*.csv"], root=reports_dir)
+    if not rows:
+        print("No simulation leaderboard CSV found.")
+        return 0
+    leaderboard = rows[0]
+    print(f"Leaderboard: {leaderboard}")
+    print("=" * 60)
+    with leaderboard.open("r", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for idx, row in enumerate(reader, start=1):
+            if idx > int(args.top):
+                break
+            strategy = str(row.get("strategy", "n/a"))
+            market = str(row.get("market", "n/a"))
+            quality = float(row.get("avg_quality_score", 0.0))
+            print(f"{idx}. {strategy:20s} | {market:10s} | quality={quality:.4f}")
+    return 0
+
+
+def _run_status_readiness(args: argparse.Namespace) -> int:
+    path = Path(args.gap_backlog).expanduser().resolve()
+    if not path.exists():
+        print(f"Missing backlog file: {path}")
+        return 1
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    counts: dict[str, int] = {"P0": 0, "P1": 0, "P2": 0}
+    for idx, line in enumerate(lines):
+        token = line.strip()
+        if token in {"## P0", "## P1", "## P2"} and idx + 2 < len(lines):
+            count_line = lines[idx + 2].strip()
+            if count_line.startswith("Count: **") and count_line.endswith("**"):
+                counts[token.removeprefix("## ").strip()] = int(
+                    count_line.removeprefix("Count: **").removesuffix("**")
+                )
+    print("SRS Gap Readiness")
+    print("=" * 60)
+    for key in ("P0", "P1", "P2"):
+        print(f"{key}: {counts[key]}")
+    if counts["P0"] > 0:
+        return 2
+    if counts["P1"] > 0:
+        return 1
+    return 0
+
+
+def _run_notify_test(args: argparse.Namespace) -> int:
+    channel = str(args.channel).strip().lower()
+    message = str(args.message).strip()
+    if channel == "stdout":
+        print(f"[NOTIFY:{channel}] {message}")
+        return 0
+
+    channels = NotificationChannels(
+        discord_webhook_url=str(args.discord_webhook or os.getenv("PQTS_DISCORD_WEBHOOK_URL", "")),
+        telegram_bot_token=str(args.telegram_token or os.getenv("PQTS_TELEGRAM_BOT_TOKEN", "")),
+        telegram_chat_id=str(args.telegram_chat_id or os.getenv("PQTS_TELEGRAM_CHAT_ID", "")),
+    )
+    dispatcher = NotificationDispatcher(
+        channels,
+        dedupe_ttl_seconds=1,
+        min_interval_seconds=0,
+        redis_url="",
+    )
+    payload = dispatcher.dispatch(message, event_key=f"notify_test:{channel}:{_utc_stamp()}")
+    attempts = payload.get("attempts", [])
+    selected = [row for row in attempts if str(row.get("channel")) == channel]
+    if not selected:
+        print(f"Channel not configured: {channel}")
+        return 2
+    row = selected[0]
+    ok = bool(row.get("ok")) and bool(row.get("sent"))
+    print(json.dumps(row, sort_keys=True))
+    return 0 if ok else 1
+
+
+def _run_explain_block(args: argparse.Namespace) -> int:
+    reason = str(args.reason).strip()
+    explanation = explain_block_reason(reason)
+    print(f"{reason}: {explanation}")
+    return 0
+
+
+def _run_artifacts_latest(args: argparse.Namespace) -> int:
+    root = Path(args.root).expanduser().resolve()
+    rows = latest_paths(
+        [
+            "**/template_run_*.json",
+            "**/template_run_diff_*.diff",
+            "**/simulation_suite_*.json",
+            "**/paper_campaign_*.json",
+        ],
+        root=root,
+    )[: int(args.limit)]
+    print(f"Latest artifacts in {root}")
+    print("=" * 60)
+    if not rows:
+        print("No artifacts found.")
+        return 0
+    for path in rows:
+        print(path)
+    return 0
+
+
 def build_first_success_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pqts",
@@ -487,6 +812,138 @@ def build_first_success_parser() -> argparse.ArgumentParser:
     skills_urls_parser.add_argument("--repo-base-url", default=_default_repo_base_url())
     skills_urls_parser.add_argument("--output", choices=["table", "json"], default="table")
     skills_urls_parser.set_defaults(handler=_run_skills_urls)
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Run environment and workspace preflight checks.",
+    )
+    doctor_parser.add_argument("--workspace", default=".")
+    doctor_parser.add_argument("--config", default="config/paper.yaml")
+    doctor_parser.add_argument("--fix", action="store_true")
+    doctor_parser.add_argument("--output", choices=["table", "json"], default="table")
+    doctor_parser.set_defaults(handler=_run_doctor)
+
+    quickstart_parser = subparsers.add_parser(
+        "quickstart",
+        help="Generate or execute a full beginner-to-paper quickstart plan.",
+    )
+    quickstart_parser.add_argument("--workspace", default=".")
+    quickstart_parser.add_argument("--report-root", default="data/reports/quickstart")
+    quickstart_parser.add_argument("--demo-cycles", type=int, default=4)
+    quickstart_parser.add_argument("--backtest-cycles", type=int, default=8)
+    quickstart_parser.add_argument("--paper-cycles", type=int, default=8)
+    quickstart_parser.add_argument("--execute", action="store_true")
+    quickstart_parser.add_argument("--output", choices=["table", "json"], default="table")
+    quickstart_parser.set_defaults(handler=_run_quickstart)
+
+    strategies_parser = subparsers.add_parser(
+        "strategies",
+        help="List and explain strategy templates for beginner/pro users.",
+    )
+    strategies_subparsers = strategies_parser.add_subparsers(dest="strategies_action", required=True)
+
+    strategies_list_parser = strategies_subparsers.add_parser("list", help="List strategy catalog.")
+    strategies_list_parser.add_argument("--output", choices=["table", "json"], default="table")
+    strategies_list_parser.set_defaults(handler=_run_strategies_list)
+
+    strategies_explain_parser = strategies_subparsers.add_parser(
+        "explain",
+        help="Explain one strategy in plain language.",
+    )
+    strategies_explain_parser.add_argument("strategy")
+    strategies_explain_parser.add_argument("--output", choices=["table", "json"], default="table")
+    strategies_explain_parser.set_defaults(handler=_run_strategies_explain)
+
+    risk_parser = subparsers.add_parser(
+        "risk",
+        help="List and recommend risk profiles by operator context.",
+    )
+    risk_subparsers = risk_parser.add_subparsers(dest="risk_action", required=True)
+
+    risk_list_parser = risk_subparsers.add_parser("list", help="List risk profile catalog.")
+    risk_list_parser.add_argument("--output", choices=["table", "json"], default="table")
+    risk_list_parser.set_defaults(handler=_run_risk_list)
+
+    risk_recommend_parser = risk_subparsers.add_parser(
+        "recommend",
+        help="Recommend a risk profile for user experience + capital.",
+    )
+    risk_recommend_parser.add_argument("--experience", default="beginner")
+    risk_recommend_parser.add_argument("--capital-usd", type=float, default=5_000.0)
+    risk_recommend_parser.add_argument("--automation", choices=["manual", "hybrid", "auto"], default="manual")
+    risk_recommend_parser.add_argument("--output", choices=["table", "json"], default="table")
+    risk_recommend_parser.set_defaults(handler=_run_risk_recommend)
+
+    status_parser = subparsers.add_parser(
+        "status",
+        help="Inspect latest reports, leaderboard snapshots, and SRS readiness.",
+    )
+    status_subparsers = status_parser.add_subparsers(dest="status_action", required=True)
+
+    status_reports_parser = status_subparsers.add_parser("reports", help="Show latest report artifacts.")
+    status_reports_parser.add_argument("--reports-dir", default="data/reports")
+    status_reports_parser.add_argument("--limit", type=int, default=8)
+    status_reports_parser.add_argument("--output", choices=["table", "json"], default="table")
+    status_reports_parser.set_defaults(handler=_run_status_reports)
+
+    status_leaderboard_parser = status_subparsers.add_parser(
+        "leaderboard",
+        help="Show top rows from latest simulation leaderboard CSV.",
+    )
+    status_leaderboard_parser.add_argument("--reports-dir", default="data/reports")
+    status_leaderboard_parser.add_argument("--top", type=int, default=5)
+    status_leaderboard_parser.add_argument("--output", choices=["table", "json"], default="table")
+    status_leaderboard_parser.set_defaults(handler=_run_status_leaderboard)
+
+    status_readiness_parser = status_subparsers.add_parser(
+        "readiness",
+        help="Summarize P0/P1/P2 SRS gap counts.",
+    )
+    status_readiness_parser.add_argument("--gap-backlog", default="docs/SRS_GAP_BACKLOG.md")
+    status_readiness_parser.add_argument("--output", choices=["table", "json"], default="table")
+    status_readiness_parser.set_defaults(handler=_run_status_readiness)
+
+    notify_parser = subparsers.add_parser(
+        "notify",
+        help="Send a test notification to stdout/telegram/discord.",
+    )
+    notify_subparsers = notify_parser.add_subparsers(dest="notify_action", required=True)
+    notify_test_parser = notify_subparsers.add_parser("test", help="Send test notification.")
+    notify_test_parser.add_argument(
+        "--channel",
+        choices=["stdout", "telegram", "discord"],
+        default="stdout",
+    )
+    notify_test_parser.add_argument("--message", default="[PQTS TEST] Notifications channel check.")
+    notify_test_parser.add_argument("--discord-webhook", default="")
+    notify_test_parser.add_argument("--telegram-token", default="")
+    notify_test_parser.add_argument("--telegram-chat-id", default="")
+    notify_test_parser.add_argument("--output", choices=["table", "json"], default="table")
+    notify_test_parser.set_defaults(handler=_run_notify_test)
+
+    explain_parser = subparsers.add_parser(
+        "explain",
+        help="Explain common system gate outcomes in plain language.",
+    )
+    explain_subparsers = explain_parser.add_subparsers(dest="explain_action", required=True)
+    explain_block_parser = explain_subparsers.add_parser(
+        "block",
+        help="Explain one block reason code.",
+    )
+    explain_block_parser.add_argument("reason")
+    explain_block_parser.add_argument("--output", choices=["table", "json"], default="table")
+    explain_block_parser.set_defaults(handler=_run_explain_block)
+
+    artifacts_parser = subparsers.add_parser(
+        "artifacts",
+        help="Inspect latest generated artifacts.",
+    )
+    artifacts_subparsers = artifacts_parser.add_subparsers(dest="artifacts_action", required=True)
+    artifacts_latest_parser = artifacts_subparsers.add_parser("latest", help="List latest artifacts.")
+    artifacts_latest_parser.add_argument("--root", default="data")
+    artifacts_latest_parser.add_argument("--limit", type=int, default=10)
+    artifacts_latest_parser.add_argument("--output", choices=["table", "json"], default="table")
+    artifacts_latest_parser.set_defaults(handler=_run_artifacts_latest)
 
     return parser
 

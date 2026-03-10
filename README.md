@@ -158,6 +158,23 @@ pqts backtest momentum
 pqts paper start
 ```
 
+Operator UX commands (beginner + pro):
+
+```bash
+pqts doctor --fix
+pqts quickstart
+pqts quickstart --execute
+pqts strategies list
+pqts strategies explain underdog_value
+pqts risk recommend --experience beginner --capital-usd 5000 --automation manual
+pqts status reports
+pqts status leaderboard
+pqts status readiness
+pqts explain block net_ev_non_positive
+pqts artifacts latest --root data
+pqts notify test --channel stdout
+```
+
 These commands now emit template artifacts and config diffs under the selected output directory:
 
 - `template_run_<timestamp>.json`

@@ -4,7 +4,7 @@ VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 PY_RUN := $(if $(wildcard $(VENV_PY)),$(VENV_PY),$(PYTHON))
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site governance-check paper-6m nightly-review run-mode native bench-exec docker-up test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site governance-check paper-6m nightly-review run-mode native bench-exec docker-up doctor onboard status test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -14,6 +14,17 @@ setup-lock:
 
 demo:
 	$(VENV_PY) apps/demo.py --market crypto --strat ml-ensemble --source make_demo
+
+doctor:
+	$(VENV_PY) main.py doctor --fix
+
+onboard:
+	$(VENV_PY) main.py quickstart --execute
+
+status:
+	$(VENV_PY) main.py status reports
+	$(VENV_PY) main.py status leaderboard
+	$(VENV_PY) main.py status readiness
 
 sim-suite:
 	$(VENV_PY) scripts/run_simulation_suite.py --markets crypto,equities,forex --strategies market_making,funding_arbitrage,cross_exchange --cycles-per-scenario 60 --readiness-every 20

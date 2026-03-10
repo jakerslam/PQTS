@@ -137,6 +137,10 @@ Legend:
 - [x] Explicitly map and preserve baseline runtime/execution/security regression contracts already validated by the baseline matrix and required test suites (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: BF-1, BF-2, BF-3, BF-4, BF-5, BF-6, RV-1, RV-2, RV-3, RV-4`)
 - [x] Consolidate overlapping math/runtime modules into primitive base + compatibility facades (shared Kelly core, funding-arb adapter, regime-detector adapter, artifact cleanup target) to reduce duplicate logic while preserving import stability (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-5, LANG-6, COMP-6, COMP-9`)
 
+## 02f. Top-20 UX/Pro ROI Execution (2026-03-10)
+
+- [x] Execute top-20 command-surface ROI package for beginner/pro parity (doctor+quickstart orchestration, strategy/risk catalogs, report/leaderboard/readiness status surfaces, block-reason explainers, artifacts inspection, notify channel checks, and matching Makefile entrypoints) (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-7, COMP-8, COMP-9, COMP-11, COMP-12, COMP-14, LANG-7, MOAT-12`)
+
 ## 03. Human-Only Parallel Lane
 
 - [x] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`)
