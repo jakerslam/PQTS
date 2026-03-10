@@ -25,13 +25,13 @@ Legend:
 
 ### P0 Trust and Reproducibility Baseline
 
-- [ ] Implement golden dataset/version governance checks (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-4`)
-- [ ] Implement reference strategy pack standard and baseline diffing (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-5`, `Depends: COMP-4`)
-- [ ] Enforce claim-evidence linting in docs/reports/benchmark pages (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-13`, `Depends: COMP-4, COMP-5`)
-- [ ] Add official integration index and CI freshness validation (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-1`)
-- [ ] Standardize CLI machine output/error contracts and exit-code behavior (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-9`)
-- [ ] Ship read-only-first + guided authenticated setup docs flow (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-10`)
-- [ ] Add wallet-mode example packs + CI smoke tests (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-11`, `Depends: PMKT-10`)
+- [x] Implement golden dataset/version governance checks (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-4`)
+- [x] Implement reference strategy pack standard and baseline diffing (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-5`, `Depends: COMP-4`)
+- [x] Enforce claim-evidence linting in docs/reports/benchmark pages (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-13`, `Depends: COMP-4, COMP-5`)
+- [x] Add official integration index and CI freshness validation (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-1`)
+- [x] Standardize CLI machine output/error contracts and exit-code behavior (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-9`)
+- [x] Ship read-only-first + guided authenticated setup docs flow (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-10`)
+- [x] Add wallet-mode example packs + CI smoke tests (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-11`, `Depends: PMKT-10`)
 - [ ] Promote at least one benchmark scenario from `diagnostic_only` to `reference` (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-3`, `Depends: COMP-4, COMP-5`)
 
 ### P1 Product Coherence and Surface Contracts
@@ -44,11 +44,11 @@ Legend:
 
 ### P2 Venue Adapter Hardening
 
-- [ ] Implement explicit read-only vs authenticated client states (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-2`)
-- [ ] Implement signature-type + funder binding contracts (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-3`, `Depends: PMKT-2`)
-- [ ] Implement API credential lifecycle and audit logging (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-4`, `Depends: PMKT-2`)
-- [ ] Add approval/allowance preflight blocking controls (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-5`, `Depends: PMKT-3`)
-- [ ] Standardize canonical order lifecycle and batch operation schema (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-6`, `Depends: PMKT-2`)
+- [x] Implement explicit read-only vs authenticated client states (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-2`)
+- [x] Implement signature-type + funder binding contracts (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-3`, `Depends: PMKT-2`)
+- [x] Implement API credential lifecycle and audit logging (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-4`, `Depends: PMKT-2`)
+- [x] Add approval/allowance preflight blocking controls (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-5`, `Depends: PMKT-3`)
+- [x] Standardize canonical order lifecycle and batch operation schema (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-6`, `Depends: PMKT-2`)
 - [ ] Harden websocket coverage, reconnect, and disconnect safety controls (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-7`, `Depends: PMKT-6`)
 - [ ] Add local/remote signer interface + builder-mode scopes (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: PMKT-8`, `Depends: PMKT-4`)
 - [ ] Add non-custodial hybrid settlement invariants and typed-signature checks (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: PMKT-12`)

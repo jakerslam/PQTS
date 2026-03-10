@@ -47,8 +47,19 @@ def _bundle_with_suite(root: Path, name: str, created_at: str) -> Path:
     return bundle
 
 
+def _seed_dataset_manifest(bundle: Path, dataset_version: str) -> None:
+    payload = {
+        "schema_version": "1",
+        "dataset_version": dataset_version,
+        "generated_at": "2026-03-09T00:00:00+00:00",
+        "sources": [{"name": "sim", "type": "synthetic"}],
+    }
+    (bundle / "dataset_manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
 def test_build_benchmark_provenance_record_has_required_fields(tmp_path: Path) -> None:
     bundle = _bundle_with_suite(tmp_path, "2026-03-09_bundle_a", "2026-03-09T00:00:00+00:00")
+    _seed_dataset_manifest(bundle, "dataset-2026-03-v1")
 
     record = build_benchmark_provenance_record(
         bundle_dir=bundle,
@@ -63,6 +74,21 @@ def test_build_benchmark_provenance_record_has_required_fields(tmp_path: Path) -
     assert record.environment_hash
     assert record.scenario_count == 1
     assert "simulation_suite_20260309T000000000000Z.json" in record.artifact_hashes
+    assert "dataset_manifest.json" in record.artifact_hashes
+
+
+def test_build_benchmark_provenance_record_uses_manifest_version_when_no_override(tmp_path: Path) -> None:
+    bundle = _bundle_with_suite(tmp_path, "2026-03-09_bundle_a", "2026-03-09T00:00:00+00:00")
+    _seed_dataset_manifest(bundle, "dataset-2026-03-v2")
+
+    record = build_benchmark_provenance_record(
+        bundle_dir=bundle,
+        strategy_version="abc123",
+        dataset_version=None,
+    )
+
+    assert record is not None
+    assert record.dataset_version == "dataset-2026-03-v2"
 
 
 def test_merge_and_write_benchmark_provenance_log_deduplicates(tmp_path: Path) -> None:

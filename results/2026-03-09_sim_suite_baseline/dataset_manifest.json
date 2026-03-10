@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "dataset_version": "dataset-2026-03-smoke-v1",
+  "generated_at": "2026-03-09T18:30:00+00:00",
+  "sources": [
+    {
+      "name": "pqts_simulation_engine",
+      "type": "synthetic",
+      "config": "config/paper.yaml"
+    }
+  ],
+  "notes": "Deterministic smoke dataset manifest for baseline reproducibility."
+}

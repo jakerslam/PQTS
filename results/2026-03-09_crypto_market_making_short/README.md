@@ -19,12 +19,18 @@ python3 scripts/run_simulation_suite.py --markets crypto --strategies market_mak
 - `simulation_leaderboard_20260309T180748902916Z.csv`
 - `metrics_chart.svg`
 - `config_paper_snapshot.yaml`
+- `dataset_manifest.json`
 - `simulation_events.jsonl`
 - `tca/` (per-run execution telemetry)
 
 ## Key Metrics
 
 - `crypto/market_making`: quality=0.00, fill=0.00, reject=1.00, priority=2.00
+
+## Claim Classification
+
+- Claim class: `diagnostic_only`
+- Evidence source: `simulation_suite_20260309T180748902916Z.json` + `simulation_leaderboard_20260309T180748902916Z.csv`
 
 ## Notes
 

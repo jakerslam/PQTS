@@ -1,6 +1,12 @@
 """External I/O adapter layer for canonical PQTS architecture."""
 
 from adapters.market_data import load_adapter_module
+from adapters.prediction_market_client import (
+    APICredentials,
+    AuthContext,
+    ClientStateError,
+    PredictionMarketClientContract,
+)
 from adapters.provider_contracts import (
     ProviderErrorEnvelope,
     ProviderResponseEnvelope,
@@ -15,7 +21,11 @@ from adapters.retrieval_surface import (
 
 __all__ = [
     "AdapterDescriptor",
+    "APICredentials",
+    "AuthContext",
+    "ClientStateError",
     "MultiSourceRetrievalSurface",
+    "PredictionMarketClientContract",
     "ProviderErrorEnvelope",
     "ProviderResponseEnvelope",
     "RetrievalRecord",

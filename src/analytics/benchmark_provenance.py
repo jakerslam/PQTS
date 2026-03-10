@@ -97,9 +97,23 @@ def _discover_month_bundles(results_dir: Path, month: str) -> List[Path]:
     return bundles
 
 
-def _resolve_dataset_version(payload: Mapping[str, Any], bundle_name: str, fallback: str | None) -> str:
+def _resolve_dataset_version(
+    payload: Mapping[str, Any],
+    bundle_name: str,
+    fallback: str | None,
+    bundle_dir: Path,
+) -> str:
     if fallback:
         return str(fallback)
+    manifest_path = bundle_dir / "dataset_manifest.json"
+    if manifest_path.exists() and manifest_path.is_file():
+        try:
+            manifest = _load_json(manifest_path)
+            token = manifest.get("dataset_version")
+            if token:
+                return str(token)
+        except Exception:
+            pass
     for key in ("dataset_version", "dataset_id", "dataset_manifest", "dataset"):
         value = payload.get(key)
         if value:
@@ -132,6 +146,7 @@ def _build_artifact_hashes(bundle_dir: Path, payload: Mapping[str, Any], suite_f
 
     for name in (
         "config_paper_snapshot.yaml",
+        "dataset_manifest.json",
         "simulation_events.jsonl",
         "metrics_chart.svg",
         "quality_reject_chart.svg",
@@ -188,7 +203,7 @@ def build_benchmark_provenance_record(
         bundle_name=path.name,
         bundle_path=str(path),
         strategy_version=str(strategy_version),
-        dataset_version=_resolve_dataset_version(payload, path.name, dataset_version),
+        dataset_version=_resolve_dataset_version(payload, path.name, dataset_version, path),
         environment_hash=environment_hash,
         run_timestamp=_resolve_run_timestamp(payload),
         generated_at=datetime.now(timezone.utc).isoformat(),

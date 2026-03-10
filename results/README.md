@@ -28,5 +28,7 @@ Example:
 All current bundles contain:
 - run command in per-bundle `README.md`
 - config snapshot (`config_paper_snapshot.yaml`)
+- dataset manifest (`dataset_manifest.json`)
 - metrics outputs (`simulation_suite_*.json`, `simulation_leaderboard_*.csv`)
 - at least one chart artifact (`metrics_chart.svg` or `quality_reject_chart.svg`)
+- claim classification + evidence links in per-bundle `README.md`

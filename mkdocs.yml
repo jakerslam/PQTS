@@ -24,6 +24,7 @@ nav:
   - Architecture Diagram: ARCHITECTURE_DIAGRAM.md
   - Architecture: ARCHITECTURE.md
   - Benchmarks: BENCHMARKS.md
+  - Official Integrations: OFFICIAL_INTEGRATIONS.md
   - Notifications: NOTIFICATIONS.md
   - PyPI Publishing: PYPI_PUBLISHING.md
   - Simulation Telemetry: SIMULATION_TELEMETRY.md

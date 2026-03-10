@@ -62,6 +62,29 @@ Each provenance row records:
 - `environment_hash` (deterministic hash of runtime+artifact fingerprint)
 - `run_timestamp` (benchmark run timestamp from bundle metadata)
 
+## Result Bundle Governance and Reference Pack Diffing
+
+Validate bundle governance constraints and generate reference-pack artifacts:
+
+```bash
+python3 tools/check_result_bundle_governance.py --results-dir results --index-out data/reports/reference_packs/index.json --diff-out data/reports/reference_packs/diff.json
+```
+
+Generated artifacts:
+- `data/reports/reference_packs/index.json` (canonical strategy-pack index)
+- `data/reports/reference_packs/diff.json` (latest-vs-previous delta by market/strategy)
+
+Validation rules include:
+- required bundle artifacts (`README.md`, `config_paper_snapshot.yaml`, `dataset_manifest.json`, `simulation_suite_*.json`, `simulation_leaderboard_*.csv`)
+- dataset-manifest schema checks
+- minimum reference-pack count gate
+
+Claim-evidence gate:
+
+```bash
+python3 tools/check_claim_evidence.py
+```
+
 ## Notes
 
 - These are deterministic smoke baselines for reproducibility and regression detection.

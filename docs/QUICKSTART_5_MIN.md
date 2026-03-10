@@ -39,3 +39,21 @@ This runs a bounded paper campaign with risk-safe defaults and writes snapshots 
 pqts run config/paper.yaml --show-toggles
 docker compose up --build
 ```
+
+## 6) Read-Only First + Wallet Mode Progression
+
+Read-only planning path (no wallet/secrets required):
+
+```bash
+python3 examples/wallet_modes/run_example.py --mode eoa --dry-run --output json
+python3 examples/wallet_modes/run_example.py --mode proxy --dry-run --output json
+python3 examples/wallet_modes/run_example.py --mode safe --dry-run --output json
+```
+
+Authenticated readiness checks (after env setup):
+
+```bash
+python3 examples/wallet_modes/run_example.py --mode eoa --output json
+python3 examples/wallet_modes/run_example.py --mode proxy --output json
+python3 examples/wallet_modes/run_example.py --mode safe --output json
+```

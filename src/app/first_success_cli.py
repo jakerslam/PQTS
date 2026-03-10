@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import io
+import json
 import shutil
 import subprocess
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Sequence
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIRST_SUCCESS_COMMANDS = {"init", "demo", "backtest", "paper"}
@@ -231,6 +233,7 @@ def build_first_success_parser() -> argparse.ArgumentParser:
 
     init_parser = subparsers.add_parser("init", help="Initialize a safe local workspace.")
     init_parser.add_argument("--workspace", default=".")
+    init_parser.add_argument("--output", choices=["table", "json"], default="table")
     init_parser.set_defaults(handler=_run_init)
 
     demo_parser = subparsers.add_parser(
@@ -246,6 +249,7 @@ def build_first_success_parser() -> argparse.ArgumentParser:
     demo_parser.add_argument("--out-dir", default="data/reports/demo")
     demo_parser.add_argument("--telemetry-log", default="data/analytics/simulation_events.jsonl")
     demo_parser.add_argument("--tca-dir", default="data/tca/simulation")
+    demo_parser.add_argument("--output", choices=["table", "json"], default="table")
     demo_parser.set_defaults(handler=_run_demo)
 
     backtest_parser = subparsers.add_parser(
@@ -262,6 +266,7 @@ def build_first_success_parser() -> argparse.ArgumentParser:
     backtest_parser.add_argument("--out-dir", default="data/reports/backtest")
     backtest_parser.add_argument("--telemetry-log", default="data/analytics/simulation_events.jsonl")
     backtest_parser.add_argument("--tca-dir", default="data/tca/simulation")
+    backtest_parser.add_argument("--output", choices=["table", "json"], default="table")
     backtest_parser.set_defaults(handler=_run_backtest)
 
     paper_parser = subparsers.add_parser(
@@ -276,6 +281,7 @@ def build_first_success_parser() -> argparse.ArgumentParser:
     paper_parser.add_argument("--symbols", default="")
     paper_parser.add_argument("--risk-profile", default="balanced")
     paper_parser.add_argument("--out-dir", default="data/reports/paper")
+    paper_parser.add_argument("--output", choices=["table", "json"], default="table")
     paper_parser.set_defaults(handler=_run_paper_start)
 
     return parser
@@ -288,4 +294,31 @@ def run_first_success_cli(argv: Sequence[str]) -> int:
     if handler is None:
         parser.print_help()
         return 2
-    return int(handler(args))
+    output_mode = str(getattr(args, "output", "table")).strip().lower()
+    if output_mode != "json":
+        return int(handler(args))
+
+    stdout_buffer = io.StringIO()
+    try:
+        with redirect_stdout(stdout_buffer):
+            return_code = int(handler(args))
+        payload = {
+            "ok": return_code == 0,
+            "command": str(getattr(args, "command", "")),
+            "return_code": int(return_code),
+            "stdout": [line for line in stdout_buffer.getvalue().splitlines() if line.strip()],
+        }
+        if return_code != 0:
+            payload["error"] = "command_failed"
+        print(json.dumps(payload, sort_keys=True))
+        return return_code
+    except Exception as exc:
+        payload = {
+            "ok": False,
+            "command": str(getattr(args, "command", "")),
+            "return_code": 2,
+            "error": str(exc),
+            "stdout": [line for line in stdout_buffer.getvalue().splitlines() if line.strip()],
+        }
+        print(json.dumps(payload, sort_keys=True))
+        return 2

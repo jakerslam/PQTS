@@ -112,6 +112,30 @@ jobs:
             --required docs/required_public_links.txt \
             --timeout 12
 
+      - name: Official integration index freshness checks (gating)
+        run: |
+          python3 tools/check_official_integrations.py \
+            --index config/integrations/official_integrations.json \
+            --max-age-days 45
+
+      - name: Benchmark bundle governance checks (gating)
+        run: |
+          python3 tools/check_result_bundle_governance.py \
+            --results-dir results \
+            --index-out data/reports/reference_packs/index.json \
+            --diff-out data/reports/reference_packs/diff.json \
+            --min-reference-packs 3 \
+            --validate-only
+
+      - name: Claim evidence checks (gating)
+        run: python3 tools/check_claim_evidence.py
+
+      - name: Wallet-mode example smoke checks (gating)
+        run: |
+          python3 examples/wallet_modes/run_example.py --mode eoa --dry-run --output json
+          python3 examples/wallet_modes/run_example.py --mode proxy --dry-run --output json
+          python3 examples/wallet_modes/run_example.py --mode safe --dry-run --output json
+
   static_analysis:
     name: Bandit and Mypy (non-gating)
     needs: [verify_workflow_raw, verify_dependency_lock]

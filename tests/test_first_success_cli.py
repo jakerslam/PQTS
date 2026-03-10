@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -61,3 +62,35 @@ def test_paper_start_invokes_paper_campaign(monkeypatch: pytest.MonkeyPatch) -> 
     assert "run_paper_campaign.py" in " ".join(command)
     assert "--cycles" in command
     assert "3" in command
+
+
+def test_first_success_cli_json_output_success(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / ".env.example").write_text("EXAMPLE=1\n", encoding="utf-8")
+    rc = first_success_cli.run_first_success_cli(
+        ["init", "--workspace", str(tmp_path), "--output", "json"]
+    )
+    assert rc == 0
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.strip()]
+    payload = json.loads(lines[-1])
+    assert payload["ok"] is True
+    assert payload["command"] == "init"
+    assert int(payload["return_code"]) == 0
+    assert isinstance(payload["stdout"], list)
+
+
+def test_first_success_cli_json_output_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def fake_run(command: list[str], *, cwd: Path | None = None) -> int:
+        return 9
+
+    monkeypatch.setattr(first_success_cli, "_run_command", fake_run)
+    rc = first_success_cli.run_first_success_cli(["demo", "--output", "json"])
+    assert rc == 9
+    lines = [line for line in capsys.readouterr().out.splitlines() if line.strip()]
+    payload = json.loads(lines[-1])
+    assert payload["ok"] is False
+    assert payload["command"] == "demo"
+    assert int(payload["return_code"]) == 9
+    assert payload["error"] == "command_failed"

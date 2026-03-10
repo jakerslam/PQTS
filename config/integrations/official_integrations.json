@@ -1,0 +1,52 @@
+[
+  {
+    "id": "polymarket-py-clob-client",
+    "provider": "Polymarket",
+    "repo_url": "https://github.com/Polymarket/py-clob-client",
+    "surface": "sdk",
+    "owner": "integration-team",
+    "status": "active",
+    "last_reviewed": "2026-03-10",
+    "notes": "Python CLOB client for read-only and authenticated workflows."
+  },
+  {
+    "id": "polymarket-rs-clob-client",
+    "provider": "Polymarket",
+    "repo_url": "https://github.com/Polymarket/rs-clob-client",
+    "surface": "sdk",
+    "owner": "integration-team",
+    "status": "active",
+    "last_reviewed": "2026-03-10",
+    "notes": "Rust CLOB client with typed auth states and websocket features."
+  },
+  {
+    "id": "polymarket-cli",
+    "provider": "Polymarket",
+    "repo_url": "https://github.com/Polymarket/polymarket-cli",
+    "surface": "cli",
+    "owner": "integration-team",
+    "status": "active",
+    "last_reviewed": "2026-03-10",
+    "notes": "Official command-line surface for market data and order flows."
+  },
+  {
+    "id": "polymarket-examples",
+    "provider": "Polymarket",
+    "repo_url": "https://github.com/Polymarket/examples",
+    "surface": "examples",
+    "owner": "integration-team",
+    "status": "active",
+    "last_reviewed": "2026-03-10",
+    "notes": "Wallet-mode example implementations for proxy and safe flows."
+  },
+  {
+    "id": "polymarket-ctf-exchange",
+    "provider": "Polymarket",
+    "repo_url": "https://github.com/Polymarket/ctf-exchange",
+    "surface": "contracts",
+    "owner": "integration-team",
+    "status": "active",
+    "last_reviewed": "2026-03-10",
+    "notes": "CTF exchange contracts for hybrid matching and on-chain settlement."
+  }
+]

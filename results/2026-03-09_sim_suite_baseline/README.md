@@ -31,6 +31,7 @@ python3 scripts/run_simulation_suite.py \
 - `simulation_leaderboard_20260309T175723522900Z.csv`
 - `quality_reject_chart.svg`
 - `config_paper_snapshot.yaml`
+- `dataset_manifest.json`
 
 ## Key Metrics
 
@@ -38,5 +39,10 @@ python3 scripts/run_simulation_suite.py \
 - `avg_fill_rate`: 0.0
 - `avg_reject_rate`: 1.0
 - `optimization_priority`: 2.0
+
+## Claim Classification
+
+- Claim class: `diagnostic_only`
+- Evidence source: `simulation_suite_20260309T175723522900Z.json` + `simulation_leaderboard_20260309T175723522900Z.csv`
 
 This baseline is intentionally retained as a deterministic reference point for future improvements.
