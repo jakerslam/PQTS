@@ -35,7 +35,12 @@ def test_health_endpoint_returns_service_payload() -> None:
     assert payload["service"] == "PQTS API Test"
     assert payload["version"] == "9.9.9"
     assert payload["environment"] == "test"
+    assert payload["runtime_controls"]["workers"] == 1
     assert "timestamp" in payload
+
+    alias = client.get("/healthz")
+    assert alias.status_code == 200
+    assert alias.json()["status"] == "ok"
 
 
 def test_ready_endpoint_includes_dependency_shape() -> None:
@@ -53,6 +58,12 @@ def test_ready_endpoint_includes_dependency_shape() -> None:
     assert payload["dependencies"]["redis"]["configured"] is True
     assert payload["dependencies"]["database"]["reachable"] in {True, False}
     assert payload["dependencies"]["redis"]["reachable"] in {True, False}
+    assert payload["runtime_controls"]["limit_concurrency"] >= 1
+    assert payload["shutdown_in_progress"] is False
+
+    alias = client.get("/readyz")
+    assert alias.status_code == 200
+    assert alias.json()["status"] == "ready"
 
 
 def test_openapi_enabled_by_default() -> None:

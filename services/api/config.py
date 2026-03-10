@@ -26,9 +26,41 @@ class APISettings:
     auth_tokens: str = ""
     write_rate_limit_per_minute: int = 120
     read_rate_limit_per_minute: int = 600
+    deployment_profile: str = "dev"
+    workers: int = 1
+    limit_concurrency: int = 256
+    keepalive_timeout_seconds: int = 5
+    graceful_shutdown_timeout_seconds: int = 30
+
+    @staticmethod
+    def _profile_defaults(profile: str) -> dict[str, int]:
+        token = str(profile or "dev").strip().lower()
+        defaults = {
+            "dev": {
+                "workers": 1,
+                "limit_concurrency": 256,
+                "keepalive_timeout_seconds": 5,
+                "graceful_shutdown_timeout_seconds": 30,
+            },
+            "canary": {
+                "workers": 2,
+                "limit_concurrency": 384,
+                "keepalive_timeout_seconds": 8,
+                "graceful_shutdown_timeout_seconds": 45,
+            },
+            "production": {
+                "workers": 4,
+                "limit_concurrency": 1024,
+                "keepalive_timeout_seconds": 10,
+                "graceful_shutdown_timeout_seconds": 60,
+            },
+        }
+        return defaults.get(token, defaults["dev"])
 
     @classmethod
     def from_env(cls) -> "APISettings":
+        profile = os.getenv("PQTS_API_DEPLOYMENT_PROFILE", cls.deployment_profile).strip().lower()
+        profile_defaults = cls._profile_defaults(profile)
         return cls(
             service_name=os.getenv("PQTS_API_NAME", cls.service_name),
             service_version=os.getenv("PQTS_API_VERSION", cls.service_version),
@@ -44,5 +76,34 @@ class APISettings:
             ),
             read_rate_limit_per_minute=int(
                 os.getenv("PQTS_API_READ_RPM", str(cls.read_rate_limit_per_minute))
+            ),
+            deployment_profile=profile,
+            workers=max(int(os.getenv("PQTS_API_WORKERS", str(profile_defaults["workers"]))), 1),
+            limit_concurrency=max(
+                int(
+                    os.getenv(
+                        "PQTS_API_LIMIT_CONCURRENCY",
+                        str(profile_defaults["limit_concurrency"]),
+                    )
+                ),
+                1,
+            ),
+            keepalive_timeout_seconds=max(
+                int(
+                    os.getenv(
+                        "PQTS_API_KEEPALIVE_TIMEOUT_SECONDS",
+                        str(profile_defaults["keepalive_timeout_seconds"]),
+                    )
+                ),
+                1,
+            ),
+            graceful_shutdown_timeout_seconds=max(
+                int(
+                    os.getenv(
+                        "PQTS_API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS",
+                        str(profile_defaults["graceful_shutdown_timeout_seconds"]),
+                    )
+                ),
+                1,
             ),
         )

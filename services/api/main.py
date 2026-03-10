@@ -17,6 +17,10 @@ def run() -> None:
         host=settings.host,
         port=settings.port,
         reload=False,
+        workers=settings.workers,
+        limit_concurrency=settings.limit_concurrency,
+        timeout_keep_alive=settings.keepalive_timeout_seconds,
+        timeout_graceful_shutdown=settings.graceful_shutdown_timeout_seconds,
     )
 
 

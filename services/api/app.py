@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Annotated, Any
 from uuid import uuid4
@@ -28,12 +29,19 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
     docs_url = "/docs" if resolved.enable_openapi else None
     redoc_url = "/redoc" if resolved.enable_openapi else None
 
+    @asynccontextmanager
+    async def lifespan(app_instance: FastAPI):  # type: ignore[no-untyped-def]
+        app_instance.state.shutdown_in_progress = False
+        yield
+        app_instance.state.shutdown_in_progress = True
+
     app = FastAPI(
         title=resolved.service_name,
         version=resolved.service_version,
         openapi_url=openapi_url,
         docs_url=docs_url,
         redoc_url=redoc_url,
+        lifespan=lifespan,
     )
 
     @app.middleware("http")
@@ -52,23 +60,31 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
     app.state.store = APIRuntimeStore.bootstrap()
     app.state.stream_hub = StreamHub()
     app.state.persistence = APIPersistence.connect(resolved.database_url)
+    app.state.shutdown_in_progress = False
     if app.state.persistence is not None:
         app.state.persistence.initialize()
         app.state.persistence.seed_if_empty(app.state.store)
         app.state.persistence.hydrate_store(app.state.store)
 
-    @app.get("/health", tags=["health"])
-    def health(request: Request) -> dict[str, Any]:
+    runtime_controls = {
+        "deployment_profile": resolved.deployment_profile,
+        "workers": resolved.workers,
+        "limit_concurrency": resolved.limit_concurrency,
+        "keepalive_timeout_seconds": resolved.keepalive_timeout_seconds,
+        "graceful_shutdown_timeout_seconds": resolved.graceful_shutdown_timeout_seconds,
+    }
+
+    def _health_payload(request: Request) -> dict[str, Any]:
         return with_correlation(request, {
             "status": "ok",
             "service": resolved.service_name,
             "version": resolved.service_version,
             "environment": resolved.environment,
+            "runtime_controls": runtime_controls,
             "timestamp": _utc_now_iso(),
         })
 
-    @app.get("/ready", tags=["health"])
-    def ready(request: Request) -> dict[str, Any]:
+    def _ready_payload(request: Request) -> dict[str, Any]:
         database_configured = bool(resolved.database_url)
         dependencies = {
             "database": {
@@ -81,13 +97,31 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
             },
         }
         return with_correlation(request, {
-            "status": "ready",
+            "status": "ready" if not bool(app.state.shutdown_in_progress) else "draining",
             "service": resolved.service_name,
             "version": resolved.service_version,
             "environment": resolved.environment,
             "dependencies": dependencies,
+            "runtime_controls": runtime_controls,
+            "shutdown_in_progress": bool(app.state.shutdown_in_progress),
             "timestamp": _utc_now_iso(),
         })
+
+    @app.get("/health", tags=["health"])
+    def health(request: Request) -> dict[str, Any]:
+        return _health_payload(request)
+
+    @app.get("/healthz", tags=["health"])
+    def healthz(request: Request) -> dict[str, Any]:
+        return _health_payload(request)
+
+    @app.get("/ready", tags=["health"])
+    def ready(request: Request) -> dict[str, Any]:
+        return _ready_payload(request)
+
+    @app.get("/readyz", tags=["health"])
+    def readyz(request: Request) -> dict[str, Any]:
+        return _ready_payload(request)
 
     @app.get("/v1/auth/me", tags=["auth"])
     def auth_me(
