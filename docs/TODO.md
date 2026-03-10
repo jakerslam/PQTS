@@ -91,7 +91,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 - [x] Add secrets management policy (rotation cadence, environment gating, non-exposure checks).
 - [x] Add release gating with build provenance artifact upload/verification.
 - [x] Add frontend/backend contract tests for graph node events and tool renderer mapping completeness.
-- [ ] Add migration parity checks between Streamlit and Next.js outputs for key metrics.
+- [x] Add migration parity checks between Streamlit and Next.js outputs for key metrics.
 - [ ] Document Streamlit deprecation milestones once parity is green.
 
 ## 07. Benchmarking and Publication (`P2`)
