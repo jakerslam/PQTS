@@ -1,6 +1,6 @@
 # PQTS Humans-Only Work
 
-Last updated: 2026-03-09 (America/Denver)
+Last updated: 2026-03-10 (America/Denver)
 
 This file tracks tasks that cannot be reliably automated and require direct human ownership.
 
@@ -27,3 +27,17 @@ This file tracks tasks that cannot be reliably automated and require direct huma
 - Execute strategic outreach (influencer engagement, issue/PR response discipline, good-first-issue curation).
 - Create professional branding assets (logo + one-page site) that link docs, results, and onboarding.
 - Arrange external code review/audit once sustained paper results are available.
+
+## P0 Comparative Positioning + Product Decisions
+
+- Own and maintain the public competitor comparison narrative (PQTS vs QuantConnect/NautilusTrader/QuantRocket/Freqtrade/Hummingbot/vectorbt/Backtrader) with dated evidence notes.
+- Make and document the wedge-market decision (for example crypto-first) and approve the market-expansion gate criteria before broadening scope.
+- Review and sign off benchmark-report commentary before publication so public claims match reproducible evidence.
+- Define the external trust posture: what metrics are labeled `reference`, `diagnostic_only`, or `unverified` in public-facing copy.
+
+## P1 Packaging, Pricing, and Onboarding Narrative
+
+- Finalize human-facing packaging copy for Community, Solo Pro, Team, and Enterprise lanes.
+- Own pricing-page and website messaging updates so tier language matches actual entitlements and safety constraints.
+- Produce and maintain plain-language onboarding narratives/tutorial scripts for Studio users (non-technical-first audience).
+- Conduct periodic user interviews (casual and professional cohorts) and convert findings into prioritization decisions.

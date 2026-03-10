@@ -2106,3 +2106,936 @@ These requirements define the primary product web-stack direction for PQTS.
 - Migration from current script/Streamlit surfaces to FastAPI/Next.js shall be incremental and non-breaking.
 - Existing CLI/script operational workflows shall remain supported until replacement workflows are production-certified.
 - Architecture docs and developer onboarding docs shall remain synchronized with migration state.
+
+## 43. Additional Requirements from External Repository (virattt/dexter, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and README:
+- `https://github.com/virattt/dexter`
+- `https://raw.githubusercontent.com/virattt/dexter/main/README.md`
+
+### DXR-1 Agent Scratchpad Audit Trail
+
+- System shall persist per-run append-only scratchpad logs in JSONL format capturing at minimum: initial query, tool calls (arguments + raw result), and reasoning/decision notes.
+- Scratchpad files shall include deterministic run identifiers and timestamps to support incident replay and debugging.
+- Scratchpad schema shall support safe parsing of structured tool outputs while preserving raw payload fidelity.
+
+### DXR-2 Anti-Loop Tool Execution Controls
+
+- Agent orchestration shall enforce configurable per-tool soft call limits and query-similarity warnings to reduce retry loops.
+- System shall surface loop-risk warnings to the orchestrator before additional tool invocations.
+- Orchestrator shall support graceful continuation (warn-first) rather than hard-fail blocking for first-limit breaches.
+
+### DXR-3 Context Overflow Recovery and Memory Flush
+
+- Agent runtime shall enforce token-context thresholds with automatic overflow recovery actions.
+- Overflow recovery shall include selective oldest-result pruning with configurable keep-count and bounded retry attempts.
+- System shall support optional memory-flush summarization for long runs and emit explicit events when context is compacted.
+
+### DXR-4 Provider-Routed LLM Layer
+
+- LLM subsystem shall support multi-provider routing (cloud and local) behind a single abstraction layer.
+- Runtime shall support provider-specific fast-model selection for lightweight sub-tasks while preserving a default high-reasoning model for critical tasks.
+- Provider routing failures shall use classified retry/backoff and non-retryable error escalation paths.
+
+### DXR-5 Conditional Tool Registry and Failover
+
+- Tool registry shall support conditional inclusion based on environment capability and key availability.
+- Search/data tools shall support ordered fallback chains (primary source -> secondary source -> tertiary source) with explicit provenance on the selected source.
+- System prompt/tool metadata shall be generated from registry descriptors to keep runtime behavior and documentation synchronized.
+
+### DXR-6 Skill Package Interface (SKILL.md)
+
+- System shall support workflow skills packaged as `SKILL.md` modules with metadata and executable instructions.
+- Skill discovery shall support built-in and project-level skill directories with precedence/override rules.
+- Skill metadata shall be exposed to orchestration prompts while full instructions are loaded on invocation.
+
+### DXR-7 Structured Evaluation Harness
+
+- System shall provide an evaluation runner over curated finance/market question datasets with support for full-run and sampled-run modes.
+- Evaluation shall support LLM-as-judge scoring with structured output schema and per-example comments.
+- Eval UI/CLI shall stream progress and running metrics and persist run metadata for experiment comparisons.
+
+### DXR-8 Messaging Channel Gateway with Access Policies
+
+- System shall support chat-channel gateways beyond Discord/Telegram, including policy-driven direct-message and group-message modes.
+- Channel ingress shall enforce explicit allowlists and mention-based triggers for group contexts.
+- Gateway credentials, policy config, and debug logs shall be separated from core runtime state with secure local storage paths.
+
+## 44. Additional Requirements from External Repository (financial-datasets/web-crawler, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and README:
+- `https://github.com/financial-datasets/web-crawler`
+- `https://raw.githubusercontent.com/financial-datasets/web-crawler/main/README.md`
+
+### WCR-1 Multi-Source Search Adapter Framework
+
+- Research ingestion shall support pluggable search adapters with a shared normalized result schema (`title`, `url`, `published_date`, `source`).
+- Search adapters shall execute concurrently with bounded per-source result caps.
+- Adapter failures/timeouts shall degrade gracefully without aborting aggregate search output.
+
+### WCR-2 Recency-Normalized Aggregation
+
+- Aggregated search output shall be globally sorted by normalized timestamp with timezone normalization rules.
+- Search aggregation shall preserve source attribution for every result.
+- Output contracts shall be stable JSON structures suitable for downstream automation.
+
+### WCR-3 Canonical URL Resolution
+
+- Ingestion shall resolve wrapped/redirected news links into canonical destination URLs before downstream parsing.
+- Canonicalization shall include source-specific decoders where needed (for example news feed redirect wrappers).
+- Fallback behavior shall preserve original URLs when canonical resolution fails.
+
+### WCR-4 Robust JS-Heavy Page Parsing Pipeline
+
+- Parser subsystem shall support JavaScript-rendered pages via headless-browser rendering fallback.
+- Parsing flow shall include consent/overlay dismissal attempts, lazy-content autoscroll, and readability-focused main-content extraction.
+- Parser shall fall back through semantic selectors to full-body extraction when high-quality article parsing fails.
+
+### WCR-5 Link Graph Extraction Capability
+
+- Parser subsystem shall support extraction of normalized absolute links from rendered pages for citation expansion and crawl traversal.
+- Link filtering shall drop non-navigational targets (for example `javascript:`, `mailto:`, fragment-only).
+- Link extraction shall deduplicate and return sorted outputs for deterministic downstream behavior.
+
+### WCR-6 Resource and Session Controls for Ingestion
+
+- Search/parsing clients shall use explicit timeout budgets, connection-pool limits, and per-host concurrency bounds.
+- Ingestion services shall support async context-managed session lifecycle to prevent socket/session leaks.
+- Runtime shall support user-agent/header policies configurable by source connector.
+
+### WCR-7 Parse Output Quality Contract
+
+- Parsed document outputs shall include at minimum `url`, `title`, `content`, and `content_length`.
+- Parsers shall normalize whitespace and encoding artifacts before emitting content payloads.
+- Parsing jobs shall emit explicit failure modes/errors for unsupported or blocked pages.
+
+### WCR-8 Real-Site Integration Test Coverage
+
+- Test suite shall include integration tests against representative real-world financial/news pages for both link extraction and content extraction.
+- Integration tests shall assert minimum extraction-quality thresholds (non-empty content, minimum link counts).
+- Tests that depend on external network sources shall be isolated and explicitly labeled in CI.
+
+## 45. Additional Requirements from External Repository (financial-datasets/llm-evaluations, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and experiment packs:
+- `https://github.com/financial-datasets/llm-evaluations`
+- `https://raw.githubusercontent.com/financial-datasets/llm-evaluations/main/README.md`
+
+### LLE-1 Task-Specific Evaluation Packs (Classification + Regression)
+
+- System shall support evaluation packs by task family, including at minimum binary risk classification and numeric financial-value regression tasks.
+- Each evaluation pack shall define task-specific prompt templates, dataset schema, output schema, and scoring logic.
+- Evaluation packs shall remain independently runnable and comparable under a shared results contract.
+
+### LLE-2 Strict Structured Output Contract for Model Judgments
+
+- Evaluation runs shall require model outputs through strict structured function/tool-call schemas (no free-form parse dependence for primary scoring fields).
+- Structured outputs shall be validated against typed schemas before scoring.
+- Invalid or missing structured responses shall be recorded as explicit failed predictions with reason codes.
+
+### LLE-3 Provider-Parity Tool Calling Layer
+
+- Multi-provider evaluation runtime shall normalize tool/function-calling semantics across model providers while preserving provider-specific transport formats.
+- Runtime shall keep one canonical logical tool schema per task and derive provider-specific definitions from that canonical schema.
+- Provider adapters shall expose normalized prediction objects for downstream scoring irrespective of provider API differences.
+
+### LLE-4 Cost and Latency as First-Class Evaluation Metrics
+
+- Every prediction record shall include token-cost estimate and wall-clock duration.
+- Aggregate reports shall include per-model average cost and average duration alongside quality metrics.
+- Model ranking views shall support cost-quality and latency-quality tradeoff comparisons, not quality-only ranking.
+
+### LLE-5 Dual Artifact Output (Metrics + Raw Predictions)
+
+- Evaluation runs shall emit at least two timestamped artifacts:
+  - aggregated metrics summary,
+  - raw per-sample prediction records for manual audit.
+- Raw prediction artifacts shall include model, ticker/entity ID, ground truth, predicted value/label, and reasoning trace fields.
+- Artifact naming shall be deterministic and machine-ingestable for longitudinal benchmarking.
+
+### LLE-6 Best-Model Selection per Metric Family
+
+- Evaluation subsystem shall compute best-model winners per relevant metric family rather than a single global winner.
+- For classification tasks, best-model selection shall include accuracy and F1 winners.
+- For regression tasks, best-model selection shall include low-error winners (for example MAE/RMSE) and tolerance-based accuracy winners.
+
+### LLE-7 Tolerance-Banded Regression Accuracy
+
+- Regression scoring shall include percentage-within-error-band metrics (for example within 5%, 10%, and 20% of ground truth).
+- Scoring shall include safeguards for zero-denominator cases in percentage-based error metrics.
+- Regression outputs shall include MAE, MSE/RMSE, MAPE, and R² in a unified report contract.
+
+### LLE-8 Confusion-Matrix-Native Classification Scoring
+
+- Classification scoring shall include full confusion-matrix breakdown (TP, FP, TN, FN) in addition to accuracy, precision, recall, and F1.
+- Metric computation shall be robust to low-sample and degenerate-class distributions.
+- Reports shall expose both absolute counts and normalized rates for diagnostic review.
+
+### LLE-9 Dataset Factory + Local Cache Strategy
+
+- Evaluation datasets shall support factory-style construction with optional local JSON caching for reproducibility and rerun speed.
+- When cache exists, dataset loaders shall prefer cached snapshots unless explicit refresh is requested.
+- Dataset metadata shall include sample counts and label/feature coverage summaries.
+
+### LLE-10 Hypothesis-Driven Financial Label Construction
+
+- Risk-label datasets shall support configurable rule/filter templates used to generate positive/negative classes from financial metrics.
+- Label-construction rules shall be versioned and persisted with dataset artifacts so benchmark labels are reproducible.
+- System shall record source metric snapshots used to assign each label for auditability.
+
+### LLE-11 Hierarchical Financial Extraction Workflow (XBRL-Oriented)
+
+- Numeric extraction benchmarks shall support hierarchical resolution policies:
+  - direct tag extraction,
+  - formula-based computation,
+  - controlled imputation fallback.
+- Prediction artifacts shall include method used, formula/tag provenance, reasoning text, and confidence level.
+- Scoring shall permit method-level diagnostics to identify where extraction pipelines fail (direct vs formula vs imputation).
+
+## 46. Additional Requirements from External Repository (virattt/ai-hedge-fund, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and web/backend architecture:
+- `https://github.com/virattt/ai-hedge-fund`
+- `https://raw.githubusercontent.com/virattt/ai-hedge-fund/main/README.md`
+
+### AHF-1 Runtime-Composable Agent Graphs
+
+- System shall support runtime composition of decision workflows from graph nodes/edges rather than fixed hardcoded pipelines.
+- Graph composition shall support multiple analyst nodes feeding shared or dedicated risk/portfolio manager nodes.
+- Runtime shall support stable mapping between UI graph node IDs and executable agent functions.
+
+### AHF-2 Strategy Flow Templates and Versioned Persistence
+
+- System shall persist strategy workflow definitions (nodes, edges, viewport/layout metadata, and config data) as versioned flow artifacts.
+- System shall support template-marked flows for reuse, duplication, and modification without mutating originals.
+- Flow search/list APIs shall provide lightweight summaries separate from full graph payload retrieval.
+
+### AHF-3 Execution Run Registry with Lifecycle Status
+
+- System shall persist execution runs per strategy flow with explicit lifecycle statuses (`IDLE`, `IN_PROGRESS`, `COMPLETE`, `ERROR`).
+- Run records shall include request payload snapshots, result payloads, error messages, and start/complete timestamps.
+- Runs shall include monotonically increasing per-flow run numbers for ordered auditability.
+
+### AHF-4 Per-Cycle Session Telemetry for Continuous Modes
+
+- System shall support sub-run cycle records for continuous/advisory modes, including cycle-level analyst signals, decisions, and portfolio snapshots.
+- Cycle telemetry shall include execution counters (LLM calls, market/API calls) and estimated cost fields.
+- Cycle records shall capture trigger context (for example manual, scheduled, market-event).
+
+### AHF-5 Server-Sent Event Streaming for Operator UX
+
+- API layer shall stream execution progress via SSE for both one-shot decision runs and multi-day backtests.
+- Streaming protocol shall emit typed events for start, progress updates, errors, and completion payloads.
+- Streaming execution shall support client-disconnect detection and cooperative cancellation of in-flight tasks.
+
+### AHF-6 Per-Agent Model Routing Overrides
+
+- Requests shall support per-agent model/provider overrides with fallback to global model defaults.
+- Agent model routing shall match unique graph node IDs while also supporting base-agent-key fallback mapping.
+- Runtime shall preserve provider-specific model constraints while normalizing the execution contract across agents.
+
+### AHF-7 Deterministic Trade Feasibility Pre-Checks
+
+- Portfolio decisioning shall include deterministic action-feasibility computation prior to LLM action selection.
+- Feasibility layer shall enforce action allowlists and max quantities from cash, margin, and position constraints.
+- System shall pre-fill forced-hold decisions when no valid trade action is feasible, reducing unnecessary LLM calls.
+
+### AHF-8 Integrated Long/Short + Margin Accounting Model
+
+- Portfolio state model shall support concurrent long and short books per symbol with separate cost bases and realized PnL ledgers.
+- Short lifecycle shall explicitly track per-position and aggregate margin usage, release, and cover-cost accounting.
+- Portfolio valuation shall compute net liquidation value from cash + longs - shorts with exposure decomposition.
+
+### AHF-9 Volatility and Correlation-Aware Position Limits
+
+- Risk layer shall compute position limits from volatility-adjusted base sizing and correlation-based concentration multipliers.
+- Risk output shall include explanatory diagnostics (volatility metrics, correlation stats, applied multipliers, and remaining limit).
+- Risk limits shall degrade safely under missing market data with explicit fallback assumptions.
+
+### AHF-10 Hybrid Signal Fabric with Reasoning Artifacts
+
+- System shall support combining deterministic quantitative signal engines with selective LLM classification where source data is incomplete.
+- Signal aggregation shall emit structured reasoning payloads including component metrics, weights, and final signal/confidence.
+- Runtime shall cap selective LLM enrichment calls (for example partial-article sentiment backfills) for cost control.
+
+### AHF-11 Backtest Progression with Benchmark Context
+
+- Backtest engine shall support business-day iterative simulation with configurable lookback windows and daily decision/execution loops.
+- Backtest reporting shall include benchmark-relative performance context (for example buy-and-hold baseline return series).
+- Engine shall support partial-result recovery/reporting on interruption for long-running simulations.
+
+### AHF-12 API Key Vault Operations for Multi-Provider Runtime
+
+- System shall support API-key CRUD operations by provider with activate/deactivate semantics and last-used tracking.
+- Runtime requests without inline keys shall support automatic hydration from managed key storage.
+- Key-management responses shall provide summary-safe views that avoid exposing secrets by default.
+
+## 47. Additional Requirements from External Repository (virattt/openbb-financialdatasets-backend, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and backend integration patterns:
+- `https://github.com/virattt/openbb-financialdatasets-backend`
+- `https://raw.githubusercontent.com/virattt/openbb-financialdatasets-backend/main/README.md`
+
+### OBBFD-1 Deterministic API-Key Resolution Precedence
+
+- Data-connector request handling shall resolve provider credentials in strict precedence order: request-header override first, environment default second.
+- Protected endpoints shall return explicit `401` responses with remediation guidance when no credential source is available.
+- Auth telemetry shall record credential source used (header vs env) without logging raw secrets.
+
+### OBBFD-2 UI-Boot Degraded Mode for Option Endpoints
+
+- UI-critical option endpoints shall support degraded-mode responses when provider auth or upstream data is unavailable.
+- Degraded-mode responses shall return deterministic empty/default option payloads instead of transport/server exceptions.
+- Frontend contracts shall distinguish degraded option responses from successful upstream-backed responses.
+
+### OBBFD-3 Decorator-Driven Widget Registry Contract
+
+- API layer shall support metadata decorators that co-locate endpoint logic and widget registration metadata.
+- System shall auto-build a widgets catalog endpoint from registered metadata without manual duplicate declarations.
+- Widget registry validation shall enforce unique endpoint/widget IDs and required metadata fields at startup.
+
+### OBBFD-4 Declarative Workspace/App Manifest Endpoint
+
+- Backend shall expose a declarative app/workspace manifest endpoint (apps/tabs/layout/state metadata) consumed by the dashboard shell.
+- Manifest schema shall support tab definitions, layout coordinates, default parameter values, and table/chart view state.
+- Manifest contract shall be versioned for backward compatibility across frontend releases.
+
+### OBBFD-5 Financial Table Normalization + Transposition Layer
+
+- Financial statement/metric payload normalization shall support transposing provider-native records into metric-row, period-column table format.
+- Normalization shall canonicalize period date formats and maintain deterministic metric ordering for reproducible diffs and tests.
+- Transformation layer shall apply consistent numeric formatting and omit provider-specific noise fields from UI responses.
+
+### OBBFD-6 Standardized Parameter Options Endpoints
+
+- Parameter option endpoints shall return consistent `{label, value}` objects for symbols, investors, and other selector domains.
+- Options responses shall support deterministic sort ordering and user-friendly label normalization.
+- Option endpoints shall define fallback seeds for essential selectors so strategy UIs remain usable during provider outages.
+
+### OBBFD-7 Provider Proxy Reliability Envelope
+
+- Upstream provider proxy endpoints shall propagate meaningful status codes while wrapping errors in a consistent PQTS error schema.
+- Provider adapters shall implement timeout and retry policy controls for idempotent read endpoints.
+- Runtime shall emit provider latency and upstream-failure telemetry for connector-level SLO monitoring.
+
+### OBBFD-8 Health and Deployment SLO Integration
+
+- Service shall expose a `/health` endpoint designed for orchestrator and CI smoke-check integration.
+- Deployment profiles shall define explicit concurrency thresholds, graceful shutdown timeout, and automatic rollback/start-stop controls.
+- Runtime configuration shall support container-first deployment targets with stable default service ports.
+
+### OBBFD-9 Real-Time Subscription Session Registry (Optional Module)
+
+- Real-time modules shall maintain connection and subscription registries keyed by session/connection ID.
+- Subscription lifecycle shall include deterministic cleanup on disconnect to prevent orphan session state.
+- Real-time streaming contracts shall support multi-symbol subscription updates under bounded connection limits.
+
+## 48. Additional Requirements from External Repository (czyssrs/FinQA, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and benchmark design:
+- `https://github.com/czyssrs/FinQA`
+- `https://raw.githubusercontent.com/czyssrs/FinQA/master/README.md`
+
+### FINQA-1 Two-Stage Retrieval-to-Reasoning Pipeline Contract
+
+- Quant reasoning workflows shall support an explicit two-stage architecture: evidence retrieval first, executable reasoning program generation second.
+- Stage boundaries shall be materialized as versioned intermediate artifacts so each stage can be trained, tested, and swapped independently.
+- End-to-end inference mode shall support orchestration across both stages without bypassing stage-level audit logs.
+
+### FINQA-2 Unified Multi-Source Evidence Model (Text + Table)
+
+- Evidence model shall represent both narrative text segments and table rows under one retrieval contract.
+- Evidence references shall use stable typed IDs (for example `text_i`, `table_j`) that are preserved through ranking, conversion, and evaluation.
+- QA/trade-decision artifacts shall preserve raw source context plus retrieved evidence provenance.
+
+### FINQA-3 Retrieval Quality Metrics with Top-K Recall Reporting
+
+- Retriever evaluation shall report top-k evidence recall metrics (including at least top-3 and top-N configured values) against annotated supporting facts.
+- Retrieval outputs shall persist both shortlisted items and full ranked lists for error analysis.
+- Metrics shall be computed per example and aggregated corpus-wide for leaderboard comparability.
+
+### FINQA-4 Context Packing Under Token/Length Budgets
+
+- Generator input builder shall enforce configurable evidence-count and token-length budgets when assembling retrieved context.
+- Context packing shall preserve deterministic source ordering (narrative pre-text, table evidence, narrative post-text) to reduce nondeterministic behavior.
+- Training mode shall guarantee inclusion of gold evidence before adding highest-scoring negatives within remaining budget.
+
+### FINQA-5 Executable Program DSL for Numeric Reasoning
+
+- Reasoning subsystem shall support an executable DSL for arithmetic/comparison and table-aggregation operations.
+- Program runtime shall support constants and intermediate step references (for example step-pointer tokens) with strict syntax validation.
+- Program outputs shall terminate with explicit end-of-program token conventions for deterministic decoding/evaluation.
+
+### FINQA-6 Dual Accuracy Regime: Execution vs Program Equivalence
+
+- Evaluation shall report both execution accuracy (final numeric/boolean result correctness) and program accuracy (symbolic equivalence to reference program).
+- Program equivalence checks shall support algebraic simplification so mathematically equivalent operation sequences are treated as correct.
+- Evaluation shall produce error bundles containing source, prediction, and execution traces for failed examples.
+
+### FINQA-7 Blind-Test Benchmark Governance
+
+- Benchmark design shall include public validation/test sets and at least one private/blind test split for anti-overfitting governance.
+- Private test execution mode shall run full pipeline inference without access to intermediate gold annotations.
+- Submission/output formats for public and private evaluation shall be strictly schema-validated before scoring.
+
+### FINQA-8 Leakage-Resistant Data Transformation Controls
+
+- Table-to-text and context-normalization transforms shall be treated as versioned, test-covered components due to leakage risk.
+- Dataset preprocessing shall include regression tests that detect label leakage, schema drift, and positive/negative formatting inconsistencies.
+- Changes to preprocessing functions shall require benchmark reruns and explicit result version bumps.
+
+### FINQA-9 Program Representation Compatibility (Sequential + Nested)
+
+- Reasoning module shall support both sequential and nested program representations with deterministic conversion utilities.
+- Evaluation tooling shall correctly normalize both representations before execution and symbolic-equivalence checks.
+- Artifact schema shall persist canonical and representation-specific program forms for reproducibility.
+
+### FINQA-10 Prediction Artifact Standardization for External Leaderboards
+
+- Prediction export format shall be standardized as ID-keyed program token lists suitable for external leaderboard ingestion.
+- Export validators shall enforce token grammar, required terminal token, and deterministic ordering across runs.
+- Benchmark outputs shall include machine-readable summaries of retrieval and reasoning metrics in addition to raw predictions.
+
+## 49. Additional Requirements from External Post (k1rallik + linked RohOnChain breakdown, March 9, 2026)
+
+These requirements are distilled from the referenced post and the article link it points to:
+- `https://x.com/k1rallik/status/2030957511260491994`
+- `https://x.com/RohOnChain/status/2029998336837890193`
+
+### PMDESK-1 Layered Desk Runtime Separation
+
+- System architecture shall separate research/modeling, execution, risk control, and platform operations into independent runtime modules.
+- Module boundaries shall be enforced through explicit interfaces so each layer can be tested and deployed independently.
+- Runtime telemetry shall report per-layer health and latency to localize failures rapidly.
+
+### PMDESK-2 Bayesian Probability Update Engine
+
+- Probability engine shall support continuous Bayesian posterior updates from multi-source evidence streams.
+- Model layer shall persist prior, evidence, posterior, and confidence metadata for every market update cycle.
+- Update pipeline shall support configurable evidence weighting and source reliability calibration.
+
+### PMDESK-3 Cross-Market Dependency Graph Enforcement
+
+- System shall represent related markets in a dependency graph and enforce logical probability constraints between connected contracts.
+- Constraint engine shall emit actionable arbitrage/consistency alerts when relationships are violated.
+- Graph checks shall run pre-trade and post-trade with auditable violation records.
+
+### PMDESK-4 Calibration Surface and Bias Diagnostics
+
+- Research subsystem shall maintain calibration surfaces mapping quoted probabilities to realized outcome frequencies by regime/bucket.
+- Diagnostics shall flag persistent mispricing patterns (for example longshot or favorite bias) and feed strategy parameter updates.
+- Calibration reports shall be versioned and published as reproducible artifacts.
+
+### PMDESK-5 Uncertainty-Adjusted Kelly Sizing
+
+- Position-sizing engine shall support Kelly-based allocation adjusted by model uncertainty (for example edge-variance penalty).
+- Sizing policy shall include hard caps, fractional-Kelly controls, and minimum-edge thresholds before order generation.
+- Every position decision shall persist sizing inputs (edge, uncertainty factor, cap applied, final size) for auditability.
+
+### PMDESK-6 Microstructure-Aware Execution Algorithms
+
+- Execution subsystem shall support order-slicing algorithms (VWAP/TWAP and depth-aware variants) to minimize market impact.
+- Execution quality monitoring shall track slippage vs target benchmark and time-to-fill per order slice.
+- Local orderbook state shall include sequence-gap detection and deterministic recovery on stream desynchronization.
+
+### PMDESK-7 Informed-Flow and Liquidity Kill Switches
+
+- Risk engine shall compute informed-flow/liquidity stress indicators (including VPIN-style metrics) in real time.
+- Configurable thresholds shall trigger automated protective actions (widen quotes, reduce size, or withdraw quotes).
+- Trigger events shall generate operator alerts and immutable incident records with metric snapshots.
+
+### PMDESK-8 Portfolio Risk Guardrails (VaR + Drawdown)
+
+- Portfolio risk shall include rolling VaR estimates, drawdown tracking, and scenario stress checks across active books.
+- System shall automatically gate new risk when drawdown or VaR limits breach configured thresholds.
+- Risk controls shall fail safe on missing inputs by reducing exposure rather than continuing at prior risk levels.
+
+### PMDESK-9 Cross-Venue Price Discovery and Latency Arb Module
+
+- Data layer shall ingest and normalize prices/odds across multiple venues for shared-event contracts.
+- Strategy layer shall detect and score temporary cross-venue dislocations after fee, latency, and settlement-cost adjustments.
+- Execution planner shall support hedged two-leg routing with venue-specific collateral/liquidity constraints.
+
+### PMDESK-10 On-Chain Settlement-Aware Monitoring
+
+- For on-chain venues, system shall support mempool/block-event monitoring relevant to market state transitions and resolution flow.
+- Settlement-aware controls shall tighten risk or accelerate exits as resolution state uncertainty increases.
+- Blockchain integration shall support self-hosted or managed RPC endpoints with health and failover monitoring.
+
+### PMDESK-11 Event-Driven Data Backbone Requirements
+
+- Platform shall support an event-driven ingestion backbone with durable stream semantics for market, order, and risk events.
+- Time-series storage shall preserve high-frequency orderbook/trade snapshots with replay capability for backtests and incident forensics.
+- Caching layer shall provide low-latency state retrieval while maintaining consistency guarantees for execution-critical paths.
+
+### PMDESK-12 Infrastructure and Reliability Baseline
+
+- Deployment architecture shall be containerized with orchestrator-native autoscaling and zero-downtime rollout controls.
+- Secrets and key material shall be managed via dedicated secret-management services with rotation policies.
+- Production SLO targets shall include explicit uptime and latency objectives, plus alerting on objective breaches.
+
+## 50. Additional Requirements from External Repository (virattt/financial-agent-ui, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and UI-agent integration patterns:
+- `https://github.com/virattt/financial-agent-ui`
+- `https://raw.githubusercontent.com/virattt/financial-agent-ui/main/README.md`
+
+### FAUI-1 Tool-Aware Generative UI Rendering Contract
+
+- Agent runtime shall emit structured tool-call metadata with stable tool type identifiers consumable by the frontend.
+- Frontend shall maintain a registry mapping each supported tool type to both loading-state and final-state UI components.
+- Unknown tool types shall degrade to a safe generic renderer rather than breaking the chat UI.
+
+### FAUI-2 Stream-Event-Driven Chat Orchestration
+
+- Chat interface shall stream model token chunks incrementally while preserving final message integrity.
+- Tool invocation lifecycle shall be event-driven: show loading UI at tool-call detection, then atomically replace with final rendered output.
+- Client runtime shall persist terminal event outputs into conversation history for follow-up turns.
+
+### FAUI-3 Remote Runnable API Boundary
+
+- Frontend shall communicate with the agent backend through a single remote runnable endpoint with explicit input/output schemas.
+- Input contract shall support role-tagged chat message history plus current user prompt.
+- Output contract shall support both direct natural-language answers and structured tool-result payloads.
+
+### FAUI-4 Graph Node Event Contract Stability
+
+- Backend graph node names and node output keys shall be treated as versioned API contracts for frontend event handlers.
+- Contract changes shall require synchronized frontend/backend updates and compatibility tests.
+- Event parsing shall validate node identity and payload shape before UI mutation.
+
+### FAUI-5 Strongly Typed Tool Argument Schemas
+
+- Every tool shall define explicit typed argument schemas, including defaults and domain constraints.
+- Financial query tools shall use constrained enumerations for line-item fields to reduce invalid/ambiguous requests.
+- Tool schemas shall be reused for LLM function binding, request validation, and API documentation.
+
+### FAUI-6 Multi-Source Financial + Web Retrieval Surface
+
+- Agent tool layer shall support both structured financial data retrieval and open-web/news retrieval in one orchestration surface.
+- Tool selection policy shall prioritize structured financial endpoints for factual metrics and web retrieval for recent/contextual updates.
+- Cross-source results shall expose provenance metadata so users can distinguish dataset facts from web findings.
+
+### FAUI-7 UI-Native Data Shape Normalization
+
+- Tool responses shall be normalized into UI-native shapes for charts, tabular financials, and citation/result cards.
+- Presentation normalization shall include deterministic date formatting and numeric/currency formatting rules.
+- Normalization layer shall avoid mutating shared raw payloads used for downstream logic or audit trails.
+
+### FAUI-8 Progressive Loading Components per Tool Type
+
+- Each renderable tool shall include a dedicated skeleton/loading component to preserve responsiveness during tool latency.
+- Loading components shall mirror expected final layout sufficiently to minimize reflow.
+- Tool completion shall replace placeholders in place, preserving message ordering.
+
+### FAUI-9 Structured Error Envelope for Tool Failures
+
+- Tool wrappers shall return structured error envelopes for recoverable upstream/request failures instead of uncaught exceptions.
+- UI layer shall render tool errors as explicit, non-crashing message blocks with actionable remediation hints.
+- Error payloads shall include tool name, failure category, and minimal debug context without exposing secrets.
+
+### FAUI-10 Frontend/Backend Local Compose Development Contract
+
+- Development stack shall provide one-command multi-service startup with explicit frontend↔backend service wiring.
+- Runtime configuration shall externalize backend endpoint URLs via environment variables, with sensible localhost defaults.
+- Backend CORS policy shall be environment-aware and default-safe for local development origins.
+
+### FAUI-11 Agent Run Observability and Trace Correlation
+
+- Agent execution shall expose trace instrumentation hooks for model and tool calls, including run IDs and step-level timing.
+- Frontend stream event run IDs shall be correlatable with backend tracing to debug latency/errors end-to-end.
+- Observability configuration shall be environment-gated to avoid accidental production leakage of sensitive traces.
+
+### FAUI-12 Extensible Tool-and-Component Plugin Path
+
+- Adding a new tool shall follow a standard extension path: backend tool + schema, graph/tool registry, frontend component mapping.
+- Build/test checks shall verify one-to-one mapping between enabled backend tools and frontend render handlers.
+- Plugin extension workflow shall support incremental additions without rewriting core chat orchestration.
+
+## 51. Additional Requirements from External Repository (virattt/financial-datasets, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and dataset-generation architecture:
+- `https://github.com/virattt/financial-datasets`
+- `https://raw.githubusercontent.com/virattt/financial-datasets/main/README.md`
+
+### FDATA-1 Multi-Source Financial Corpus Ingestion
+
+- Dataset generation subsystem shall support ingestion from raw text lists, PDF URLs, 10-K filings, and 10-Q filings through one unified API surface.
+- Each ingestion mode shall normalize extracted text into a common downstream chunking interface.
+- Ingestion failures for one source document shall not abort batch generation for unrelated documents.
+
+### FDATA-2 SEC Filing Identity + Access Compliance
+
+- SEC filing retrieval workflows shall require explicit requester identity configuration for compliant EDGAR access.
+- Filing adapters shall validate ticker/year/quarter inputs before submitting remote requests.
+- System shall emit clear retrieval errors when no matching filing exists for the requested period.
+
+### FDATA-3 Filing Item-Scoped Extraction Controls
+
+- Filing extraction shall support optional item-scoped retrieval (for example selected 10-K/10-Q item sections) to target specific domains.
+- Item selectors shall be validated against an enumerated allowlist to prevent invalid section references.
+- Extraction outputs shall preserve requested item ordering when sections are present.
+
+### FDATA-4 Deterministic Text Cleanup Pipeline
+
+- Preprocessing shall normalize filing text by removing newline artifacts and repetitive delimiter noise before model prompting.
+- Cleanup transforms shall be deterministic and versioned to preserve dataset reproducibility across reruns.
+- Preprocessing changes shall require regeneration/version bump of dependent datasets.
+
+### FDATA-5 Token-Aware Chunking with Overlap
+
+- Dataset generator shall use token-based chunking with configurable chunk size and chunk overlap controls.
+- Chunking policy shall be shared across source types to keep prompt payload sizing behavior consistent.
+- Chunk metadata shall include chunk index and source reference fields for traceability.
+
+### FDATA-6 Question Budget Allocation Policy
+
+- Max-question targets shall be allocated across chunks/sources with deterministic base allocation and remainder distribution.
+- Generator shall stop once the global question budget is reached, even when additional chunks remain.
+- Final output shall be truncated/validated to respect the requested maximum question count.
+
+### FDATA-7 Structured LLM Function-Call Output Contract
+
+- Generation calls shall use strict function/tool schemas for dataset items (`question`, `answer`, `context`) rather than free-form text parsing.
+- Tool-call argument parsing shall validate schema compliance before dataset items are accepted.
+- Invalid or empty tool-call payloads shall be skipped with non-fatal warnings.
+
+### FDATA-8 Grounded, Standalone Q/A Quality Policy
+
+- Prompt policy shall enforce standalone question-answer generation that is fully answerable without external document references.
+- Quality checks shall reject examples that reference source-document framing (for example “according to the document” style phrasing).
+- Every dataset item shall include supporting context text sufficient to justify the answer.
+
+### FDATA-9 Provider Guardrails and Retry Strategy
+
+- Model provider routing shall enforce explicit support constraints (for example supported model families) at generator initialization time.
+- LLM request execution shall include bounded retry with exponential backoff for transient provider failures.
+- Per-chunk generation failures shall be isolated so remaining chunks continue processing.
+
+### FDATA-10 Canonical Dataset Schema and Validation
+
+- Generated outputs shall conform to a canonical typed schema for downstream training/evaluation ingestion.
+- Schema validation shall run prior to persistence/export and reject malformed items.
+- Dataset exports shall remain stable JSON-serializable objects suitable for benchmark tooling and fine-tuning pipelines.
+
+### FDATA-11 Generation Provenance and Usage Telemetry
+
+- Dataset artifacts shall persist generation provenance including model name, prompt version, source mode, and chunking parameters.
+- Generation runs shall track token usage metrics (prompt/completion) and item yield statistics.
+- Provenance metadata shall support reproducibility audits and cost/performance tuning.
+
+### FDATA-12 Synthetic Financial QA Regression Tests
+
+- Test suite shall include regression checks for parser behavior (10-K/10-Q item retrieval and filtering) and generator output constraints.
+- Integration tests shall verify end-to-end generation paths across representative source modes.
+- CI quality gates shall ensure dataset-generation changes do not silently break schema or retrieval behavior.
+
+## 52. Additional Requirements from External Repository (sullyo/fingen, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and chat-agent UI architecture:
+- `https://github.com/sullyo/fingen`
+- `https://raw.githubusercontent.com/sullyo/fingen/main/README.md`
+
+### FINGEN-1 Server-Action AI Runtime with Split UI/Model State
+
+- Chat runtime shall maintain separate AI state (canonical conversation/tool context) and UI state (render nodes) to support responsive rendering without losing model history integrity.
+- Server actions shall own authoritative message appends for both user and assistant turns.
+- State model shall include stable message IDs and role fields for reproducible replay/debugging.
+
+### FINGEN-2 Optimistic User-Turn Rendering
+
+- Frontend shall optimistically render user messages before backend completion to reduce perceived latency.
+- Optimistic updates shall preserve message ordering with eventual server-confirmed assistant/tool output append.
+- Failed request paths shall reconcile optimistic state with explicit error/rollback handling.
+
+### FINGEN-3 Unified Event Stream Handling for LLM + Tools
+
+- Runtime shall process streamed agent events and branch handling by event type (LLM token stream, tool start, tool end, run end).
+- LLM token deltas shall update incremental text streams while tool events render structured UI blocks in the same assistant turn.
+- Event handler framework shall support append-only incremental UI composition during a single run.
+
+### FINGEN-4 Tool Invocation Transparency UI
+
+- Chat UI shall expose tool invocation badges showing tool name and parsed argument payloads.
+- Tool invocation and completion states shall be visually distinct to improve operator trust/debuggability.
+- Tool argument displays shall be sanitized to avoid leaking sensitive fields.
+
+### FINGEN-5 Tool-Result-to-Widget Routing
+
+- Tool outputs shall be routed to dedicated widget renderers by tool name/type (for example chart, news carousel, financial dialog).
+- Widget routing shall include deterministic fallback behavior when output schema is missing or invalid.
+- Tool renderer contracts shall be versioned and validated against backend output schemas.
+
+### FINGEN-6 Financial Data Adapter Layer (Polygon-Style)
+
+- Data adapters shall encapsulate external market/news/financial provider calls behind typed internal functions.
+- Adapter layer shall validate provider response status and normalize payloads before returning to agent tools.
+- Adapters shall support minimal-field filtering for high-noise endpoints to reduce token/UI bloat.
+
+### FINGEN-7 Structured Tool Schemas for Agent Reliability
+
+- Agent tools shall define explicit structured schemas for required query inputs (ticker, date range, etc.).
+- Tool descriptions shall encode intent guidance so the planner selects the right tool for each query type.
+- Schema validation failures shall return user-safe errors and skip unsafe tool execution.
+
+### FINGEN-8 Message-Role Conversion Contract
+
+- Chat systems shall provide deterministic conversion between app-level message roles and framework-level message primitives.
+- Conversion logic shall preserve tool-call metadata across turns for correct multi-step reasoning continuity.
+- Unsupported role values shall fail fast with explicit errors.
+
+### FINGEN-9 Rich Markdown Rendering with Data-Oriented Components
+
+- Assistant text renderer shall support GitHub-flavored markdown, tables, lists, and code blocks with syntax rendering.
+- Citation/link rendering shall support external-link safety defaults (`noopener`, `noreferrer`).
+- Render pipeline shall handle streaming text updates without reflowing prior completed content.
+
+### FINGEN-10 Input UX Controls for High-Velocity Chat
+
+- Composer shall support Enter-to-submit and Shift+Enter newline behavior with IME-safe handling.
+- Chat UI shall include sticky input placement and optional starter prompt templates to reduce cold-start friction.
+- Input submission shall trim empty payloads and prevent duplicate sends.
+
+### FINGEN-11 Scroll Anchoring and Navigation in Streaming Chats
+
+- Chat interface shall track whether the user is at the bottom and auto-scroll only when appropriate.
+- System shall provide explicit “scroll to latest” affordances when new content arrives while the user is reading older messages.
+- Scroll logic shall use viewport/visibility signals to avoid disruptive jumps during streaming updates.
+
+### FINGEN-12 Multi-Modal Assistant Turn Composition
+
+- A single assistant turn shall support interleaving narrative text plus multiple structured artifacts (badges, charts, tables/cards).
+- Turn-composition model shall preserve deterministic ordering of emitted artifacts based on event chronology.
+- Persisted conversation history shall store a text summary of tool outputs sufficient for follow-up context.
+
+## 53. Additional Requirements from External Repository (AdamGetbags/secAPI, March 9, 2026)
+
+These requirements are derived from the referenced repository implementation and SEC endpoint usage pattern:
+- `https://github.com/AdamGetbags/secAPI`
+- `https://raw.githubusercontent.com/AdamGetbags/secAPI/main/secFilingScraper.py`
+
+### SECAPI-1 SEC-Compliant Request Identity Policy
+
+- SEC data ingestion requests shall include an explicit requester identity `User-Agent` header for compliant API access.
+- Identity configuration shall be externally configurable and required at runtime.
+- Missing identity configuration shall fail fast before outbound SEC requests.
+
+### SECAPI-2 Master Ticker-to-CIK Registry Ingestion
+
+- System shall ingest and parse the SEC company ticker master dataset (`company_tickers.json`) as a canonical issuer map.
+- Registry ingestion shall support dictionary-indexed SEC payload formats and normalize them into tabular records.
+- Registry snapshots shall expose ticker, company title, and CIK fields for downstream joins.
+
+### SECAPI-3 Canonical CIK Normalization Contract
+
+- CIK handling shall support both integer and zero-padded 10-digit string representations.
+- SEC endpoint clients shall use zero-padded CIK format when constructing submissions/XBRL URLs.
+- Normalization utilities shall be centralized to avoid inconsistent per-module formatting.
+
+### SECAPI-4 Company Submissions Metadata Pipeline
+
+- Filing metadata ingestion shall pull company submissions from `data.sec.gov/submissions/CIK{cik}.json`.
+- Recent filing collections shall be normalized to structured tabular form including accession number, form type, and report date.
+- Metadata layer shall support deterministic filtering/slicing by form class (for example 10-Q/10-K).
+
+### SECAPI-5 XBRL Company Facts Taxonomy Traversal
+
+- Fundamentals ingestion shall support `companyfacts` endpoint traversal across available taxonomies (for example `dei`, `us-gaap`).
+- Data model shall preserve taxonomy, concept name, unit family, filing form, and reporting period metadata.
+- Parsers shall handle variable concept coverage across issuers without crashing on missing tags.
+
+### SECAPI-6 Concept-Level Time-Series Endpoint Support
+
+- System shall support direct concept queries via `companyconcept` endpoint for targeted metric extraction.
+- Concept responses shall be normalized into time-series records with value, unit, form, filing, and period fields.
+- Concept extraction APIs shall validate taxonomy/concept identifiers before request execution.
+
+### SECAPI-7 Unit-Aware Metric Extraction
+
+- XBRL extraction shall be unit-aware (for example `USD`, `shares`) and preserve unit labels in downstream datasets.
+- Metric accessors shall support selecting preferred unit families while retaining alternates for auditability.
+- Unit mismatch conditions shall be surfaced explicitly rather than silently coerced.
+
+### SECAPI-8 Form-Scoped Series Derivation
+
+- Time-series builders shall support form-scoped slicing (for example 10-Q-only or 10-K-only series) for consistent comparability.
+- Derived series shall support index reset/reordering and chronological plotting/analysis workflows.
+- Form filters shall remain configurable to support custom screening sets beyond 10-Q/10-K.
+
+### SECAPI-9 Tabular Normalization for Analytics Pipelines
+
+- JSON payloads from SEC endpoints shall be convertible to stable tabular schemas suitable for analytics and plotting.
+- Normalization shall preserve accession/reporting keys to enable traceability from charted points back to filings.
+- Tabular schema evolution shall be versioned to prevent downstream pipeline breakage.
+
+### SECAPI-10 Issuer Fundamentals Discovery Utilities
+
+- System shall include issuer-level discovery helpers for enumerating available concepts before selecting metrics.
+- Discovery outputs shall expose concept namespaces and concept availability counts for strategy feature engineering.
+- Metric selection logic shall account for uneven concept availability across companies and reporting periods.
+
+## 54. Additional Requirements from External Post (Moon Dev, March 9, 2026)
+
+These requirements are derived from the referenced post describing a high-throughput indicator-to-bot research loop.
+
+Observed source links:
+- `https://x.com/MoonDevOnYT/status/2030976550360039571?s=20`
+- `https://publish.twitter.com/oembed?url=https://x.com/MoonDevOnYT/status/2030976550360039571` (retrieval fallback used to recover post text)
+- `https://fxtwitter.com/MoonDevOnYT/status/2030976550360039571` (retrieval fallback used to recover full long-form text)
+- `https://t.co/xYK2XsKb2d` (resolves to `https://twitter.com/MoonDevOnYT/status/2030976550360039571/video/1`)
+
+### TVSRC-1 Public Indicator-Script Ingestion Contract
+
+- System shall support ingestion of public community indicator scripts as research candidates with script metadata (source URL, author handle, retrieval timestamp, and revision fingerprint).
+- Script ingestion shall enforce license/terms checks and block private or non-permitted sources.
+- Candidate registry shall deduplicate scripts by canonical source identifier plus normalized code hash.
+
+### TVSRC-2 Pine-to-Python Translation Pipeline
+
+- System shall support deterministic translation of Pine-style strategy logic into executable Python strategy modules.
+- Translation workflow shall persist source script, translated module, and an explicit mapping record for key signal fields to enable audit/debug.
+- Translation failures shall be classified and routed to a retry or manual-review queue rather than silently dropped.
+
+### TVSRC-3 Translation Equivalence Validation
+
+- Before promotion, translated strategies shall pass equivalence checks against reference signal behavior on a shared historical sample window.
+- Equivalence checks shall validate entry/exit side, threshold comparisons, and position-state transitions with configurable tolerance.
+- Strategies failing equivalence validation shall be blocked from downstream optimization and live promotion.
+
+### TVSRC-4 Batch Backtest Factory for Large Candidate Sets
+
+- Research runtime shall support high-throughput batched backtests across many candidate strategies and dataset slices in one orchestrated run.
+- Each candidate backtest shall run with isolated paths/config to prevent cross-run artifact contamination.
+- Batch scheduler shall capture per-candidate run status so partial failures do not halt unrelated experiments.
+
+### TVSRC-5 Filter-Augmented Variant Expansion and Ablation
+
+- Candidate strategies shall support automatic generation of filtered variants (for example momentum/trend/flow filters) from a baseline signal rule set.
+- Evaluation shall include baseline-vs-filtered ablation outputs to quantify whether incremental filters add robust edge.
+- Promotion policy shall reject variants whose edge collapses under simple ablation or regime perturbation checks.
+
+### TVSRC-6 Composite-Score Ranking from Results Registry
+
+- System shall maintain a machine-readable results registry (`CSV/JSON`) that ranks strategies by configurable composite score.
+- Composite ranking shall include expectancy, profit factor, and risk penalties (drawdown/variance) rather than raw return only.
+- Ranking logic shall penalize statistically weak samples (for example low trade count or unstable outliers) to reduce overfit selections.
+
+### TVSRC-7 Short-Side Exit Logic Invariant Tests
+
+- Backtest/execution validation shall include invariant tests for short-side take-profit/stop-loss ordering to prevent max/min inversion bugs.
+- Invariant failures shall fail CI/test gates for affected strategy modules.
+- Bug-fix revalidations shall be logged with before/after evidence for auditability.
+
+### TVSRC-8 Coverage Pipeline for Trending/Editor-Pick Script Sources
+
+- Candidate discovery shall support scheduled crawling/refresh of trending and editor-pick script lists.
+- Discovery runs shall preserve source ranking/context metadata to support later performance attribution by discovery channel.
+- Newly discovered scripts shall enter the same standardized translation/backtest/ranking pipeline as existing candidates.
+
+### TVSRC-9 Source Reliability and Claim Handling
+
+- Public claims about extreme performance (for example very high profit factor) shall be marked `unverified` unless reproduced with trade-level artifacts, cost assumptions, and dataset/version provenance.
+- Requirements adopted from this source shall focus on reproducible workflow mechanics, not promotional performance claims.
+
+## 55. Additional Requirements from Comparative Platform Assessment (March 10, 2026)
+
+These requirements are derived from a comparative assessment against leading public quant platforms and frameworks focused on casual-user accessibility plus professional depth.
+
+Observed source links:
+- `https://www.quantconnect.com/docs/v2/cloud-platform/welcome`
+- `https://nautilustrader.io/docs/nightly/`
+- `https://www.quantrocket.com/`
+- `https://docs.freqtrade.io/en/stable/`
+- `https://vectorbt.dev/`
+- `https://hummingbot.org/docs/`
+- `https://github.com/mementum/backtrader`
+- `https://github.com/jakerslam/PQTS/blob/main/pyproject.toml`
+- `https://github.com/jakerslam/PQTS/tree/main/results/2026-03-09_sim_suite_baseline`
+- `https://github.com/jakerslam/PQTS/tree/main`
+- `https://github.com/jakerslam/PQTS/tree/main/src/execution`
+- `https://github.com/jakerslam/PQTS/blob/main/docs/QUICKSTART_5_MIN.md`
+- `https://github.com/jakerslam/PQTS/blob/main/docs/PRICING_AND_PACKAGING.md`
+
+### COMP-1 Documentation Availability and Metadata Integrity
+
+- Project metadata links (including docs URL from package metadata) shall resolve to live non-404 endpoints.
+- CI shall include link-check validation for top-level docs and packaging metadata URLs.
+- Release gating shall fail when required public documentation endpoints are unavailable.
+
+### COMP-2 Semantic Release and Distribution Credibility
+
+- Public releases shall follow semantic versioning with changelog entries and GitHub Release artifacts.
+- Package distribution workflow shall publish installable artifacts aligned to tagged releases.
+- Release metadata shall include commit SHA, build timestamp, and artifact checksums.
+
+### COMP-3 Public Benchmark Quality Gate
+
+- Public reference benchmark bundles shall include execution-quality metrics with explicit acceptance thresholds.
+- Publication gate for new reference bundles shall require non-zero fills and reject-rate below configured ceiling for designated reference scenarios.
+- If thresholds are not met, bundle publication shall be labeled `diagnostic_only` and excluded from marketing benchmark summaries.
+
+### COMP-4 Golden Dataset and Provenance Governance
+
+- Public benchmark suites shall pin versioned dataset manifests and retain immutable provenance records per run.
+- Benchmark comparisons shall require same-dataset comparability checks unless explicitly marked as cross-dataset.
+- Changes to benchmark dataset composition shall require version bump and migration note in benchmark docs.
+
+### COMP-5 Reference Strategy Pack Publication Standard
+
+- System shall maintain at least three versioned reference strategy packs with reproducible configs and result artifacts.
+- Each reference pack shall include run command, config snapshot, metrics summary, and artifact hashes.
+- Reference packs shall be regenerated on schedule and diffed against prior baseline for regression visibility.
+
+### COMP-6 One Engine, Two Product Surfaces
+
+- Architecture shall expose one canonical trading engine through two surfaces: `Studio` (casual-first) and `Core` (professional).
+- Studio and Core shall use shared execution/risk/promotion logic and shall not fork strategy semantics.
+- Surface-specific UX differences shall be implemented as adapters above common engine APIs.
+
+### COMP-7 Studio (Casual) UX Contract
+
+- Studio onboarding shall be paper-first and support guided setup without manual environment editing on first run.
+- Studio shall provide plain-language explanations for trade decisions and risk blocks (`why trade`, `why blocked`).
+- Studio shall include template-driven strategy launch and one-click paper campaign execution path.
+
+### COMP-8 Core (Professional) UX Contract
+
+- Core shall expose CLI, notebook, and API interfaces with deterministic replay and full run provenance.
+- Core shall include advanced execution analytics (for example TCA/shortfall/reconciliation) and canary promotion controls.
+- Core deployment model shall support local and hosted/on-prem parity for critical execution paths.
+
+### COMP-9 Surface Parity and Traceability
+
+- Any action available in Studio shall map to an auditable Core-equivalent command or API call.
+- UI workflows shall be able to reveal underlying code/config representation for transparency and reproducibility.
+- Event and decision identifiers shall be consistent across surfaces for cross-surface incident debugging.
+
+### COMP-10 Wedge-First Market Scope Governance
+
+- Product roadmap shall define one primary market wedge for initial dominance before multi-market expansion.
+- Expansion to additional market classes shall require passing predefined readiness gates in execution quality, reconciliation accuracy, and incident stability.
+- Scope governance shall block simultaneous broadening across multiple new market classes without gate approval.
+
+### COMP-11 First-Success CLI Path
+
+- Primary onboarding shall provide a first-success command path (`init`, `demo`, `backtest`, `paper`) with no manual virtualenv steps required in the default flow.
+- Default onboarding flow shall succeed with safe local defaults before any broker/exchange credential wiring.
+- CLI shall emit actionable next-step guidance after each onboarding command completes.
+
+### COMP-12 Template-First, Code-Optional, Code-Visible Operation
+
+- Strategy workflows shall support template-first operation for new users while preserving full code-level override paths.
+- Generated template runs shall persist the exact config/code used so users can transition from GUI/template mode to code mode without loss.
+- Any template action that mutates trading behavior shall produce a diffable configuration artifact.
+
+### COMP-13 Public Claim and Evidence Policy
+
+- Product-level performance claims shall require linked reproducible artifacts and benchmark provenance references.
+- Claims lacking reproducible evidence shall be tagged `unverified` in external-facing materials and internal docs.
+- Benchmark dashboards shall distinguish `reference`, `diagnostic_only`, and `unverified` result classes.
+
+### COMP-14 Tiering Model Safety Baseline
+
+- Packaging model shall include a paper-only community lane and preserve risk/promotion gates across all paid lanes.
+- Live-trading enablement in any tier shall require completion of paper-readiness checks and explicit operator acknowledgment.
+- Tier capabilities shall be encoded in entitlement policy files rather than ad hoc UI-only gating.
