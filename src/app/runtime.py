@@ -8,6 +8,7 @@ import sys
 from analytics.dashboard import AnalyticsDashboard
 from app.bootstrap import bootstrap_runtime
 from app.cli import apply_cli_toggles, build_arg_parser
+from app.first_success_cli import run_first_success_cli, should_use_first_success_cli
 from core.toggle_manager import ToggleValidationError
 
 
@@ -86,4 +87,10 @@ def cli_main() -> None:
 
     import asyncio
 
-    asyncio.run(main())
+    argv = list(sys.argv[1:])
+    if argv and argv[0] == "run":
+        asyncio.run(main(argv[1:]))
+        return
+    if should_use_first_success_cli(argv):
+        raise SystemExit(run_first_success_cli(argv))
+    asyncio.run(main(argv))

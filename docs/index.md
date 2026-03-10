@@ -8,10 +8,10 @@ PQTS is a production-oriented quant research and execution platform focused on:
 
 ## 5-Minute Path
 
-1. Clone and bootstrap environment
-2. Run paper config through `main.py`
-3. Launch dashboard
-4. Run simulation suite and inspect leaderboard
+1. `pqts init`
+2. `pqts demo`
+3. `pqts backtest momentum`
+4. `pqts paper start`
 
 See [5-Minute Quickstart](QUICKSTART_5_MIN.md).
 

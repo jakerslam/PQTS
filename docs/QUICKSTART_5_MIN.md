@@ -1,38 +1,41 @@
 # 5-Minute Quickstart
 
-## 1) Setup
+## 1) Install + Initialize
 
 ```bash
-git clone https://github.com/jakerslam/pqts.git
-cd pqts
-make setup
-source .venv/bin/activate
-cp .env.example .env
+pip install pqts
+pqts init
 ```
 
-## 2) Run Paper Engine
+This creates a safe local workspace (`data/`, `results/`, `logs/`) and copies `.env.example` when available.
+
+## 2) Run a Meaningful Demo
 
 ```bash
-python main.py config/paper.yaml
+pqts demo
 ```
 
-## 3) Open Dashboard
+This executes a fast deterministic simulation suite with safe defaults and writes outputs under `data/reports/demo`.
+
+## 3) Run a Template Backtest
 
 ```bash
-python -m streamlit run src/dashboard/app.py
+pqts backtest momentum
 ```
 
-Dashboard URL: `http://localhost:8501`
+This runs a template-driven simulation/backtest flow and stores artifacts in `data/reports/backtest`.
 
-## 4) Produce a Simulation Leaderboard
+## 4) Start Paper Campaign (Bounded)
 
 ```bash
-make sim-suite
-python scripts/export_simulation_leaderboard_site.py --reports-dir data/reports --output-dir site
+pqts paper start
 ```
 
-## 5) Optional Docker Launch
+This runs a bounded paper campaign with risk-safe defaults and writes snapshots to `data/reports/paper`.
+
+## 5) Legacy Runtime and Docker Paths
 
 ```bash
+pqts run config/paper.yaml --show-toggles
 docker compose up --build
 ```
