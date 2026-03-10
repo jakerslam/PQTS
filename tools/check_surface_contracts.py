@@ -18,6 +18,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--contract", default="config/surfaces/surface_contract.json")
     parser.add_argument("--compose", default="docker-compose.yml")
+    parser.add_argument("--stack-policy", default="config/language/stack_policy.json")
     return parser
 
 
@@ -39,10 +40,21 @@ def main() -> int:
 
     args = build_arg_parser().parse_args()
     payload = json.loads(Path(args.contract).read_text(encoding="utf-8"))
+    stack_policy = json.loads(Path(args.stack_policy).read_text(encoding="utf-8"))
     contract = OneEngineTwoSurfaceContract(engine_id=str(payload["engine_id"]))
     for row in payload.get("surfaces", []):
         contract.add_surface(SurfaceDescriptor(**row))
     contract_report = contract.validate()
+    expected_studio_framework = (
+        str((stack_policy.get("ui_policy", {}) or {}).get("primary_studio_framework", "")).strip().lower()
+    )
+    if expected_studio_framework:
+        actual_framework = str(contract_report.get("studio_framework", "")).strip().lower()
+        if actual_framework != expected_studio_framework:
+            raise ValueError(
+                "studio framework mismatch: "
+                f"contract={actual_framework} policy={expected_studio_framework}"
+            )
 
     mappings = [ActionMapping(**row) for row in payload.get("action_mappings", [])]
     parity_report = validate_action_parity(mappings)
@@ -66,6 +78,7 @@ def main() -> int:
                 "contract_report": contract_report,
                 "parity_report": parity_report,
                 "migration_report": migration_report,
+                "stack_policy": str(args.stack_policy),
             },
             sort_keys=True,
         )

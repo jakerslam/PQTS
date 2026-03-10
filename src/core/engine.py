@@ -16,8 +16,13 @@ from core.autopilot import HumanStrategyOverride, StrategyAutopilot
 from core.autopilot_policy import enforce_autopilot_policy, resolve_autopilot_policy_pack
 from core.config_validation import validate_engine_config
 from core.market_data_quality import DataQualityReport, MarketDataQualityMonitor
+from core.market_scope_governance import evaluate_market_scope_request, resolve_market_scope_policy
 from core.mechanism_switches import apply_mechanism_switches
-from core.multi_tenant import enforce_tenant_entitlements, resolve_tenant_entitlements
+from core.multi_tenant import (
+    enforce_live_enablement_preconditions,
+    enforce_tenant_entitlements,
+    resolve_tenant_entitlements,
+)
 from core.operator_tier import resolve_operator_tier
 from core.secret_manager import SecretResolutionMetadata, hydrate_config_secrets
 from core.secrets_policy import enforce_live_secrets
@@ -126,6 +131,7 @@ class TradingEngine:
             )
         )
         self.strict_strategy_contracts = bool(runtime_cfg.get("strict_strategy_contracts", True))
+        self.market_scope_policy = resolve_market_scope_policy(self.config)
         self.last_autopilot_decision: Dict[str, Any] = {}
         self.ops_events = OpsEventStore(
             path=str(runtime_cfg.get("ops_events_path", "data/analytics/ops_events.jsonl")),
@@ -202,6 +208,16 @@ class TradingEngine:
             raise RuntimeError(
                 f"Tenant plan '{self.tenant_entitlements.plan}' does not permit live trading."
             )
+        if self.mode in {"live", "live_trading"}:
+            live_guard = enforce_live_enablement_preconditions(
+                entitlements=self.tenant_entitlements,
+                runtime=(self.config.get("runtime", {}) or {}),
+            )
+            if not live_guard["passed"]:
+                raise RuntimeError(
+                    "Live mode blocked by tenant preconditions: "
+                    + ",".join(str(reason) for reason in live_guard["reasons"])
+                )
         self.running = True
 
         # Initialize market adapters
@@ -852,6 +868,23 @@ class TradingEngine:
 
     def set_active_markets(self, markets: List[str]):
         """Replace active market set with the provided list."""
+        runtime_cfg = self.config.get("runtime", {})
+        readiness = {}
+        if isinstance(runtime_cfg, dict):
+            raw = runtime_cfg.get("market_scope_readiness", {})
+            if isinstance(raw, dict):
+                readiness = raw
+        scope_report = evaluate_market_scope_request(
+            policy=self.market_scope_policy,
+            requested_markets=markets,
+            readiness=readiness,
+        )
+        if not scope_report["passed"]:
+            raise ToggleValidationError(
+                "Market scope policy blocked request: "
+                + ",".join(str(reason) for reason in scope_report["reasons"])
+            )
+        markets = list(scope_report["approved_markets"])
         if self.tenant_entitlements.allowed_markets is not None:
             disallowed = [
                 market

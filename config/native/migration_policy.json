@@ -1,0 +1,17 @@
+{
+  "thresholds": {
+    "latency_ms_p95": 50.0,
+    "cpu_pct": 80.0,
+    "throughput_per_sec": 100.0,
+    "min_jit_gain_pct": 20.0
+  },
+  "kernel_classes": {
+    "numeric_vectorizable": "jit_first",
+    "stateful_streaming": "native_priority"
+  },
+  "priority_modules": [
+    "orderbook_sequence",
+    "event_replay",
+    "risk_aware_router"
+  ]
+}

@@ -35,23 +35,19 @@ Count: **24**
 
 ## P1
 
-Count: **28**
+Count: **24**
 
 | ID | Prefix | Status | Requirement |
 |---|---|---|---|
-| COMP-10 | COMP | planned | Wedge-First Market Scope Governance |
-| COMP-12 | COMP | unmapped | Template-First, Code-Optional, Code-Visible Operation |
-| COMP-14 | COMP | planned | Tiering Model Safety Baseline |
-| COMP-7 | COMP | planned | Studio (Casual) UX Contract |
-| COMP-8 | COMP | planned | Core (Professional) UX Contract |
-| LANG-1 | LANG | unmapped | Python-First, Not Python-Only Architecture Policy |
-| LANG-12 | LANG | unmapped | Source Reliability and Claim Handling |
+| COMP-10 | COMP | partial | Wedge-First Market Scope Governance |
+| COMP-14 | COMP | partial | Tiering Model Safety Baseline |
+| COMP-7 | COMP | partial | Studio (Casual) UX Contract |
+| COMP-8 | COMP | partial | Core (Professional) UX Contract |
 | LANG-3 | LANG | partial | Native Migration Trigger Criteria |
 | LANG-6 | LANG | partial | UI Surface Coherence Requirement |
 | MOAT-13 | MOAT | partial | Public Trust Classifications and Evidence Gates |
 | MOAT-15 | MOAT | partial | Moat-vs-Parity Roadmap Governance |
 | MOAT-8 | MOAT | partial | Single Strategy Object Across Casual and Pro Surfaces |
-| PMKT-15 | PMKT | unmapped | Source Reliability and Claim Handling |
 | XR-1 | XR | unmapped | Short-Cycle Binary Arbitrage Scanner |
 | XR-2 | XR | unmapped | Legging/Execution Safety for Two-Leg Trades |
 | XR-3 | XR | unmapped | Venue Universe and Market-Type Configuration |

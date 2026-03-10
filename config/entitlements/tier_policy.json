@@ -1,0 +1,46 @@
+{
+  "default_plan": "enterprise",
+  "aliases": {
+    "starter": "community",
+    "pro": "solo_pro",
+    "professional": "solo_pro"
+  },
+  "plans": {
+    "community": {
+      "allowed_markets": ["crypto"],
+      "strategy_allowlist": ["trend_following", "mean_reversion", "swing_trend", "hold_carry"],
+      "min_active_strategies": 1,
+      "max_active_strategies": 3,
+      "allow_live_trading": false,
+      "requires_paper_readiness_for_live": false,
+      "requires_operator_ack_for_live": false
+    },
+    "solo_pro": {
+      "allowed_markets": ["crypto", "equities", "forex"],
+      "strategy_allowlist": null,
+      "min_active_strategies": 1,
+      "max_active_strategies": 8,
+      "allow_live_trading": true,
+      "requires_paper_readiness_for_live": true,
+      "requires_operator_ack_for_live": true
+    },
+    "team": {
+      "allowed_markets": ["crypto", "equities", "forex"],
+      "strategy_allowlist": null,
+      "min_active_strategies": 1,
+      "max_active_strategies": 24,
+      "allow_live_trading": true,
+      "requires_paper_readiness_for_live": true,
+      "requires_operator_ack_for_live": true
+    },
+    "enterprise": {
+      "allowed_markets": null,
+      "strategy_allowlist": null,
+      "min_active_strategies": 1,
+      "max_active_strategies": 64,
+      "allow_live_trading": true,
+      "requires_paper_readiness_for_live": true,
+      "requires_operator_ack_for_live": true
+    }
+  }
+}

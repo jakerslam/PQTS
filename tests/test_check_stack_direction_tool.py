@@ -48,10 +48,25 @@ native = ["maturin==1.8.7"]
         ),
         encoding="utf-8",
     )
+    stack_policy_path = tmp_path / "stack_policy.json"
+    stack_policy_path.write_text(
+        json.dumps(
+            {
+                "primary_language": "python",
+                "native_kernel_languages": ["rust"],
+                "rewrite_policy": {
+                    "allow_full_native_rewrite": False,
+                    "native_only_for_hotpath": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
 
     with pytest.raises(ValueError, match="streamlit must not be in project.dependencies"):
         check_stack_direction.validate_stack_direction(
             pyproject_path=pyproject_path,
             compose_path=compose_path,
             web_package_path=web_package_path,
+            stack_policy_path=stack_policy_path,
         )

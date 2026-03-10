@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import shutil
 import subprocess
 import sys
 from contextlib import redirect_stdout
+from datetime import datetime, timezone
+from difflib import unified_diff
 from pathlib import Path
 from typing import Sequence
 
@@ -53,6 +56,73 @@ def _print_next_steps(steps: Sequence[str]) -> None:
     print("\nNext steps:")
     for step in steps:
         print(f"  {step}")
+
+
+def _utc_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _config_fingerprint(path: Path) -> str:
+    if not path.exists():
+        return ""
+    data = path.read_bytes()
+    return hashlib.sha256(data).hexdigest()
+
+
+def _find_previous_template_artifact(out_dir: Path, *, current_path: Path) -> Path | None:
+    candidates = sorted(out_dir.glob("template_run_*.json"))
+    previous = [path for path in candidates if path != current_path]
+    return previous[-1] if previous else None
+
+
+def _write_template_run_artifacts(
+    *,
+    out_dir: Path,
+    mode: str,
+    template_name: str,
+    strategy: str,
+    config_path: Path,
+    command: list[str],
+    extra: dict[str, object] | None = None,
+) -> dict[str, str]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = _utc_stamp()
+    artifact_path = out_dir / f"template_run_{stamp}.json"
+    payload: dict[str, object] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": str(mode),
+        "template": str(template_name),
+        "resolved_strategy": str(strategy),
+        "config_path": str(config_path),
+        "config_sha256": _config_fingerprint(config_path),
+        "command": list(command),
+    }
+    if extra:
+        payload.update(extra)
+    artifact_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+    diff_path = out_dir / f"template_run_diff_{stamp}.diff"
+    previous_path = _find_previous_template_artifact(out_dir, current_path=artifact_path)
+    if previous_path is not None:
+        prev_payload = json.loads(previous_path.read_text(encoding="utf-8"))
+        old = json.dumps(prev_payload, indent=2, sort_keys=True).splitlines(keepends=True)
+        new = json.dumps(payload, indent=2, sort_keys=True).splitlines(keepends=True)
+        diff = "".join(
+            unified_diff(
+                old,
+                new,
+                fromfile=str(previous_path.name),
+                tofile=str(artifact_path.name),
+            )
+        )
+        diff_path.write_text(diff, encoding="utf-8")
+    else:
+        diff_path.write_text("", encoding="utf-8")
+
+    return {
+        "template_run_artifact": str(artifact_path),
+        "template_run_diff": str(diff_path),
+    }
 
 
 def _run_init(args: argparse.Namespace) -> int:
@@ -176,9 +246,25 @@ def _run_backtest(args: argparse.Namespace) -> int:
     rc = _run_command(command, cwd=REPO_ROOT)
     if rc != 0:
         return rc
+    artifact_refs = _write_template_run_artifacts(
+        out_dir=out_dir,
+        mode="backtest",
+        template_name=str(args.template),
+        strategy=str(strategy),
+        config_path=Path(args.config),
+        command=command,
+        extra={
+            "market": str(args.market),
+            "cycles": int(args.cycles),
+            "risk_profile": str(args.risk_profile),
+            "studio_explanation": "Template run preserves code-visible config + command artifacts.",
+        },
+    )
     _print_next_steps(
         [
             "Review outputs in data/reports/backtest/",
+            f"Template artifact: {artifact_refs['template_run_artifact']}",
+            f"Template diff: {artifact_refs['template_run_diff']}",
             "pqts paper start",
         ]
     )
@@ -213,9 +299,26 @@ def _run_paper_start(args: argparse.Namespace) -> int:
     rc = _run_command(command, cwd=REPO_ROOT)
     if rc != 0:
         return rc
+    artifact_refs = _write_template_run_artifacts(
+        out_dir=out_dir,
+        mode="paper_start",
+        template_name="paper_safe",
+        strategy="campaign",
+        config_path=Path(args.config),
+        command=command,
+        extra={
+            "cycles": int(args.cycles),
+            "notional_usd": float(args.notional_usd),
+            "risk_profile": str(args.risk_profile),
+            "studio_explanation": "Paper start is one-click and paper-first; live actions remain risk-gated.",
+            "why_blocked_hint": "If blocked, check readiness/kill-switch/profitability gate outputs in campaign report.",
+        },
+    )
     _print_next_steps(
         [
             "Inspect latest snapshot in data/reports/paper/",
+            f"Template artifact: {artifact_refs['template_run_artifact']}",
+            f"Template diff: {artifact_refs['template_run_diff']}",
             "python3 scripts/control_plane_report.py --events data/analytics/attribution_events.jsonl",
         ]
     )

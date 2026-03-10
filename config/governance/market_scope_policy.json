@@ -1,0 +1,9 @@
+{
+  "primary_wedge_market": "crypto",
+  "max_additional_markets_per_phase": 1,
+  "readiness_gates": {
+    "min_execution_quality": 0.70,
+    "min_reconciliation_accuracy": 0.97,
+    "max_open_p1_incidents": 0
+  }
+}

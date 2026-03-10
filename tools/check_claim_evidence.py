@@ -37,13 +37,16 @@ def _expand_targets(patterns: Iterable[str]) -> list[Path]:
 
 def _has_required_tags(text: str) -> bool:
     content = text.lower()
+    classes_present = {
+        "reference": "reference" in content,
+        "diagnostic_only": "diagnostic_only" in content,
+        "unverified": "unverified" in content,
+    }
     has_class = (
         "result_class" in content
         or "result class" in content
         or "claim class" in content
-        or "reference" in content
-        or "diagnostic_only" in content
-        or "unverified" in content
+        or all(classes_present.values())
     )
     has_evidence = (
         "## command" in content

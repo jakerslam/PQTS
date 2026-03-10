@@ -6,24 +6,27 @@ PQTS is packaged as a B2B quant execution and research platform for:
 - Signal funds
 - Family-office systematic teams
 
-## Tiers
-1. Launch ($599/month)
-- Paper campaign orchestration
-- Risk-aware routing and TCA persistence
-- Basic dashboards and readiness gates
-- Email support
+## Tiers (Safety Baseline)
+1. Community (paper-only)
+- Local-first onboarding and template workflows
+- Paper campaign orchestration with readiness gates
+- No live enablement
 
-2. Professional ($2,499/month)
+2. Solo Pro
 - Multi-market routing (crypto/equities/forex)
 - Reliability failover and ops alerting
-- Promotion gates (paper -> canary decisioning)
-- Priority support and onboarding
+- Live enablement only after paper-readiness + operator acknowledgment
 
-3. Enterprise (Custom)
+3. Team
+- Shared controls for promotion/canary operations
+- Expanded strategy/session envelopes and governance workflow support
+- Live enablement only after paper-readiness + operator acknowledgment
+
+4. Enterprise
 - Dedicated deployment and controls review
 - Custom integrations (OMS/exchange adapters)
 - Compliance artifacts and audit exports
-- SLA-backed support
+- Live enablement only after paper-readiness + operator acknowledgment
 
 ## Add-Ons
 - Strategy marketplace rev-share: 5-15%
@@ -34,6 +37,7 @@ PQTS is packaged as a B2B quant execution and research platform for:
 - No strategy claims without measured evidence.
 - Promotion eligibility requires documented paper-readiness pass.
 - Live canary access only after hard-gate acceptance.
+- Tier capabilities are encoded in `config/entitlements/tier_policy.json`.
 
 ## Self-Serve Signup Requirements
 - Tenant onboarding with workspace key

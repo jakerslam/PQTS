@@ -98,6 +98,19 @@ Legend:
 - [x] Add roadmap governance for parity/moat allocation and quarterly efficacy review (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: MOAT-15`)
 - [x] Add periodic competitor-source revalidation workflow (`ROI: medium`, `Type: engineering`, `Track: moat`, `Ref: MOAT-16`)
 
+## 02b. High-ROI Coverage Closure Sprint (2026-03-10)
+
+- [x] Enforce Studio casual UX contract gates in CI (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-7`)
+- [x] Enforce Core professional contract gates in CI (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-8`)
+- [x] Implement wedge-first market scope policy + runtime enforcement (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-10`)
+- [x] Persist template-run config/code artifacts and diffs for first-success workflows (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-12`)
+- [x] Encode Community/Solo Pro/Team/Enterprise tier safety policy with live preconditions (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-14`)
+- [x] Enforce Python-first stack direction via explicit policy file checks (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-1`)
+- [x] Add native migration trigger policy thresholds + priority module validation (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-3`)
+- [x] Enforce single primary UI framework coherence between stack policy and surface contracts (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-6`)
+- [x] Enforce source-reliability taxonomy for external claims and trust labels (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: LANG-12, PMKT-15, MOAT-13`)
+- [x] Enforce moat-vs-parity governance and quarterly review freshness gates (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: MOAT-15`)
+
 ## 03. Human-Only Parallel Lane
 
 - [ ] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`)

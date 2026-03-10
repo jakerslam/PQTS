@@ -45,6 +45,29 @@ def test_backtest_command_maps_template_and_invokes_suite(monkeypatch: pytest.Mo
     assert "trend_following" in command
 
 
+def test_backtest_writes_template_artifact(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fake_run(command: list[str], *, cwd: Path | None = None) -> int:
+        return 0
+
+    monkeypatch.setattr(first_success_cli, "_run_command", fake_run)
+    rc = first_success_cli.run_first_success_cli(
+        [
+            "backtest",
+            "momentum",
+            "--out-dir",
+            str(tmp_path),
+        ]
+    )
+    assert rc == 0
+    artifacts = sorted(tmp_path.glob("template_run_*.json"))
+    diffs = sorted(tmp_path.glob("template_run_diff_*.diff"))
+    assert artifacts
+    assert diffs
+    payload = json.loads(artifacts[-1].read_text(encoding="utf-8"))
+    assert payload["template"] == "momentum"
+    assert payload["resolved_strategy"] == "trend_following"
+
+
 def test_paper_start_invokes_paper_campaign(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 
@@ -62,6 +85,27 @@ def test_paper_start_invokes_paper_campaign(monkeypatch: pytest.MonkeyPatch) -> 
     assert "run_paper_campaign.py" in " ".join(command)
     assert "--cycles" in command
     assert "3" in command
+
+
+def test_paper_start_writes_template_artifact(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def fake_run(command: list[str], *, cwd: Path | None = None) -> int:
+        return 0
+
+    monkeypatch.setattr(first_success_cli, "_run_command", fake_run)
+    rc = first_success_cli.run_first_success_cli(
+        [
+            "paper",
+            "start",
+            "--out-dir",
+            str(tmp_path),
+        ]
+    )
+    assert rc == 0
+    artifacts = sorted(tmp_path.glob("template_run_*.json"))
+    assert artifacts
+    payload = json.loads(artifacts[-1].read_text(encoding="utf-8"))
+    assert payload["template"] == "paper_safe"
+    assert payload["resolved_strategy"] == "campaign"
 
 
 def test_first_success_cli_json_output_success(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

@@ -139,6 +139,18 @@ python apps/demo.py --preset pro --source quant_desk --track-upgrade-intent
 python scripts/funnel_report.py
 ```
 
+First-success template flows (code-visible artifacts + diffs):
+
+```bash
+pqts backtest momentum
+pqts paper start
+```
+
+These commands now emit template artifacts and config diffs under the selected output directory:
+
+- `template_run_<timestamp>.json`
+- `template_run_diff_<timestamp>.diff`
+
 Ops certification + retention:
 
 ```bash
@@ -150,6 +162,12 @@ World-class ops checklist (all 10 steps, one command):
 
 ```bash
 python scripts/run_world_class_ops.py --config config/paper.yaml --quick
+```
+
+Governance and contract gates (recommended before PR/release):
+
+```bash
+make governance-check
 ```
 
 Live secret validation:

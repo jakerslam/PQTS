@@ -24,6 +24,9 @@ pqts backtest momentum
 ```
 
 This runs a template-driven simulation/backtest flow and stores artifacts in `data/reports/backtest`.
+Each run also emits:
+- `template_run_<timestamp>.json`
+- `template_run_diff_<timestamp>.diff`
 
 ## 4) Start Paper Campaign (Bounded)
 
@@ -32,6 +35,7 @@ pqts paper start
 ```
 
 This runs a bounded paper campaign with risk-safe defaults and writes snapshots to `data/reports/paper`.
+Paper-start also emits template artifacts/diffs for transparent GUI->code handoff.
 
 ## 5) Legacy Runtime and Docker Paths
 
@@ -56,4 +60,10 @@ Authenticated readiness checks (after env setup):
 python3 examples/wallet_modes/run_example.py --mode eoa --output json
 python3 examples/wallet_modes/run_example.py --mode proxy --output json
 python3 examples/wallet_modes/run_example.py --mode safe --output json
+```
+
+## 7) Governance Gates (Recommended Before PR/Release)
+
+```bash
+make governance-check
 ```

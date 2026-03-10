@@ -289,7 +289,20 @@ notifications:
 # RUNTIME
 # ============================================
 runtime:
+  tenant:
+    plan: enterprise
+    tier_policy_path: config/entitlements/tier_policy.json
   operator_tier: pro
+  market_scope_policy:
+    primary_wedge_market: crypto
+    max_additional_markets_per_phase: 1
+    readiness_gates:
+      min_execution_quality: 0.70
+      min_reconciliation_accuracy: 0.97
+      max_open_p1_incidents: 0
+  live_readiness:
+    paper_ready: true
+    operator_acknowledged: true
   operator_mode_presets:
     simple_profile: casual_core
     pro_profile: pro_quant

@@ -34,6 +34,19 @@ def test_check_native_hotpath_tool_rejects_missing_symbol(tmp_path: Path, monkey
         ),
         encoding="utf-8",
     )
+    policy = tmp_path / "migration_policy.json"
+    policy.write_text(
+        json.dumps(
+            {
+                "priority_modules": [
+                    "orderbook_sequence",
+                    "event_replay",
+                    "risk_aware_router",
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -44,6 +57,8 @@ def test_check_native_hotpath_tool_rejects_missing_symbol(tmp_path: Path, monkey
             str(lib),
             "--matrix",
             str(matrix),
+            "--policy",
+            str(policy),
         ],
     )
     with pytest.raises(SystemExit, match="missing required symbols"):

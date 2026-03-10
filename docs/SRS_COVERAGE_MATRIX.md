@@ -5,11 +5,11 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 ## Summary
 
 - Total requirements: **445**
-- implemented: **44**
-- partial: **5**
-- planned: **4**
-- traced: **2**
-- unmapped: **390**
+- implemented: **48**
+- partial: **9**
+- planned: **0**
+- traced: **1**
+- unmapped: **387**
 
 ## Prefix Summary
 
@@ -21,7 +21,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | AR | 0 | 0 | 0 | 0 | 8 | 8 |
 | AX | 0 | 0 | 0 | 0 | 10 | 10 |
 | BF | 0 | 0 | 0 | 0 | 6 | 6 |
-| COMP | 9 | 0 | 4 | 1 | 0 | 14 |
+| COMP | 10 | 4 | 0 | 0 | 0 | 14 |
 | CT | 0 | 0 | 0 | 0 | 8 | 8 |
 | DK | 0 | 0 | 0 | 0 | 4 | 4 |
 | DN | 0 | 0 | 0 | 0 | 5 | 5 |
@@ -38,7 +38,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | HL | 0 | 0 | 0 | 0 | 7 | 7 |
 | HM | 0 | 0 | 0 | 0 | 7 | 7 |
 | KL | 0 | 0 | 0 | 0 | 7 | 7 |
-| LANG | 8 | 2 | 0 | 0 | 2 | 12 |
+| LANG | 10 | 2 | 0 | 0 | 0 | 12 |
 | LLE | 0 | 0 | 0 | 0 | 11 | 11 |
 | MOAT | 13 | 3 | 0 | 0 | 0 | 16 |
 | NFR | 0 | 0 | 0 | 0 | 3 | 3 |
@@ -48,7 +48,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | PH | 0 | 0 | 0 | 0 | 10 | 10 |
 | PL | 0 | 0 | 0 | 0 | 7 | 7 |
 | PMDESK | 0 | 0 | 0 | 0 | 12 | 12 |
-| PMKT | 14 | 0 | 0 | 0 | 1 | 15 |
+| PMKT | 15 | 0 | 0 | 0 | 0 | 15 |
 | PS | 0 | 0 | 0 | 0 | 7 | 7 |
 | QF | 0 | 0 | 0 | 0 | 9 | 9 |
 | RBI | 0 | 0 | 0 | 0 | 8 | 8 |
@@ -466,15 +466,15 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | COMP-4 | Golden Dataset and Provenance Governance | implemented | done | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
 | COMP-5 | Reference Strategy Pack Publication Standard | implemented | done | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
 | COMP-6 | One Engine, Two Product Surfaces | implemented | done | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
-| COMP-7 | Studio (Casual) UX Contract | planned | open | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
-| COMP-8 | Core (Professional) UX Contract | planned | open | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
+| COMP-7 | Studio (Casual) UX Contract | partial | partial | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md, tools/check_studio_contract.py |
+| COMP-8 | Core (Professional) UX Contract | partial | partial | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md, tools/check_core_professional_contract.py |
 | COMP-9 | Surface Parity and Traceability | implemented | done | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
-| COMP-10 | Wedge-First Market Scope Governance | planned | open | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
+| COMP-10 | Wedge-First Market Scope Governance | partial | partial | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md, src/core/market_scope_governance.py |
 | COMP-11 | First-Success CLI Path | implemented | done | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
-| COMP-12 | Template-First, Code-Optional, Code-Visible Operation | traced | none | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
+| COMP-12 | Template-First, Code-Optional, Code-Visible Operation | implemented | done | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md, tools/check_studio_contract.py |
 | COMP-13 | Public Claim and Evidence Policy | implemented | done | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
-| COMP-14 | Tiering Model Safety Baseline | planned | open | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md, scripts/create_comp_issues.sh |
-| LANG-1 | Python-First, Not Python-Only Architecture Policy | unmapped | none | - |
+| COMP-14 | Tiering Model Safety Baseline | partial | partial | docs/COMP_ISSUES_DRAFT.md, docs/TODO.md, scripts/create_comp_issues.sh |
+| LANG-1 | Python-First, Not Python-Only Architecture Policy | implemented | done | docs/TODO.md |
 | LANG-2 | Native Kernel Boundary for Hot Path | implemented | done | docs/TODO.md |
 | LANG-3 | Native Migration Trigger Criteria | partial | partial | docs/TODO.md |
 | LANG-4 | Research Data Plane Standard | implemented | done | docs/TODO.md |
@@ -485,7 +485,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | LANG-9 | Engine-Loop and Dashboard Responsiveness SLOs | implemented | done | docs/TODO.md |
 | LANG-10 | Interop Packaging and Distribution | implemented | done | docs/TODO.md |
 | LANG-11 | UI Migration Safety | implemented | done | docs/TODO.md |
-| LANG-12 | Source Reliability and Claim Handling | unmapped | none | - |
+| LANG-12 | Source Reliability and Claim Handling | implemented | done | docs/TODO.md, tools/check_source_reliability.py |
 | PMKT-1 | Official Integration Index | implemented | done | docs/TODO.md, tests/test_generate_srs_gap_backlog_tool.py |
 | PMKT-2 | Auth State Segmentation for Venue Clients | implemented | done | docs/TODO.md |
 | PMKT-3 | Signature-Type and Funder Address Contract | implemented | done | docs/TODO.md |
@@ -500,7 +500,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | PMKT-12 | Hybrid Matching and Non-Custodial Settlement Invariants | implemented | done | docs/TODO.md |
 | PMKT-13 | Complementary-Outcome Fee Symmetry | implemented | done | docs/TODO.md |
 | PMKT-14 | Deployment Registry and Audit Artifact Governance | implemented | done | docs/TODO.md |
-| PMKT-15 | Source Reliability and Claim Handling | unmapped | none | - |
+| PMKT-15 | Source Reliability and Claim Handling | implemented | done | docs/TODO.md, tools/check_source_reliability.py |
 | MOAT-1 | Per-Order Truth Graph | implemented | done | docs/TODO.md |
 | MOAT-2 | Live Divergence Diagnosis and Prescriptive Actions | implemented | done | docs/TODO.md |
 | MOAT-3 | Promotion OS State Machine | implemented | done | docs/TODO.md |
@@ -513,7 +513,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | MOAT-10 | Policy-Constrained Autonomous Operator | implemented | done | docs/TODO.md |
 | MOAT-11 | Incident Co-Pilot and Safe Rollback Assist | implemented | done | docs/TODO.md |
 | MOAT-12 | Proof-as-Product Artifact Pipeline | implemented | done | docs/TODO.md |
-| MOAT-13 | Public Trust Classifications and Evidence Gates | partial | partial | docs/TODO.md |
+| MOAT-13 | Public Trust Classifications and Evidence Gates | partial | partial | docs/TODO.md, tools/check_source_reliability.py |
 | MOAT-14 | Team Governance and Capital Controls | implemented | done | docs/TODO.md |
-| MOAT-15 | Moat-vs-Parity Roadmap Governance | partial | partial | docs/TODO.md |
+| MOAT-15 | Moat-vs-Parity Roadmap Governance | partial | partial | docs/TODO.md, tools/check_roadmap_governance.py |
 | MOAT-16 | Source Reliability and Claim Handling | implemented | done | docs/TODO.md |

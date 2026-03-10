@@ -19,20 +19,28 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--cargo", default="native/hotpath/Cargo.toml")
     parser.add_argument("--lib", default="native/hotpath/src/lib.rs")
     parser.add_argument("--matrix", default="data/reports/native/release_matrix.json")
+    parser.add_argument("--policy", default="config/native/migration_policy.json")
     parser.add_argument("--module", default="pqts_hotpath")
     return parser
 
 
 def main() -> int:
-    from core.native_migration import build_native_release_matrix
+    from core.native_migration import build_native_release_matrix, load_migration_policy
 
     args = build_arg_parser().parse_args()
     cargo = Path(args.cargo)
     lib = Path(args.lib)
     matrix = Path(args.matrix)
-    for path in (cargo, lib, matrix):
+    policy_path = Path(args.policy)
+    for path in (cargo, lib, matrix, policy_path):
         if not path.exists():
             raise SystemExit(f"missing required native artifact: {path}")
+
+    policy = load_migration_policy(policy_path)
+    required_priority = {"orderbook_sequence", "event_replay", "risk_aware_router"}
+    missing_priority = sorted(required_priority.difference(set(policy.priority_modules)))
+    if missing_priority:
+        raise SystemExit(f"migration policy missing priority modules: {missing_priority}")
 
     payload = json.loads(matrix.read_text(encoding="utf-8"))
     expected = build_native_release_matrix(str(args.module))
@@ -59,6 +67,7 @@ def main() -> int:
                 "validated": True,
                 "rows": len(actual_rows),
                 "module": args.module,
+                "policy": str(policy_path),
                 "required_symbols": ["sum_notional", "version"],
             },
             sort_keys=True,

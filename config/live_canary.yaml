@@ -101,6 +101,10 @@ runtime:
   tenant:
     tenant_id: canary_internal
     plan: pro
+    tier_policy_path: config/entitlements/tier_policy.json
+  live_readiness:
+    paper_ready: true
+    operator_acknowledged: true
     allow_live_trading: true
   secrets:
     backend: env

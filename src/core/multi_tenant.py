@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_TIER_POLICY_PATH = REPO_ROOT / "config" / "entitlements" / "tier_policy.json"
 
 
 @dataclass(frozen=True)
@@ -15,6 +20,8 @@ class TenantEntitlements:
     min_active_strategies: int
     max_active_strategies: int
     allow_live_trading: bool
+    requires_paper_readiness_for_live: bool = False
+    requires_operator_ack_for_live: bool = False
 
 
 @dataclass(frozen=True)
@@ -49,36 +56,111 @@ def _as_set(values: Any) -> Optional[Set[str]]:
     return out
 
 
+def _build_tenant_entitlement(*, plan: str, row: Mapping[str, Any]) -> TenantEntitlements:
+    return TenantEntitlements(
+        tenant_id=str(row.get("tenant_id", plan)).strip() or plan,
+        plan=str(plan).strip().lower(),
+        allowed_markets=_as_set(row.get("allowed_markets")),
+        strategy_allowlist=_as_set(row.get("strategy_allowlist")),
+        min_active_strategies=max(int(row.get("min_active_strategies", 1)), 1),
+        max_active_strategies=max(
+            int(row.get("max_active_strategies", 1)),
+            max(int(row.get("min_active_strategies", 1)), 1),
+        ),
+        allow_live_trading=bool(row.get("allow_live_trading", False)),
+        requires_paper_readiness_for_live=bool(row.get("requires_paper_readiness_for_live", False)),
+        requires_operator_ack_for_live=bool(row.get("requires_operator_ack_for_live", False)),
+    )
+
+
 def _default_plans() -> Dict[str, TenantEntitlements]:
-    return {
-        "starter": TenantEntitlements(
-            tenant_id="starter",
-            plan="starter",
-            allowed_markets={"crypto"},
-            strategy_allowlist={"trend_following", "mean_reversion", "swing_trend", "hold_carry"},
-            min_active_strategies=1,
-            max_active_strategies=3,
-            allow_live_trading=False,
-        ),
-        "pro": TenantEntitlements(
-            tenant_id="pro",
-            plan="pro",
-            allowed_markets={"crypto", "equities", "forex"},
-            strategy_allowlist=None,
-            min_active_strategies=1,
-            max_active_strategies=8,
-            allow_live_trading=True,
-        ),
-        "enterprise": TenantEntitlements(
-            tenant_id="enterprise",
-            plan="enterprise",
-            allowed_markets=None,
-            strategy_allowlist=None,
-            min_active_strategies=1,
-            max_active_strategies=64,
-            allow_live_trading=True,
-        ),
+    payload = {
+        "community": {
+            "allowed_markets": {"crypto"},
+            "strategy_allowlist": {"trend_following", "mean_reversion", "swing_trend", "hold_carry"},
+            "min_active_strategies": 1,
+            "max_active_strategies": 3,
+            "allow_live_trading": False,
+            "requires_paper_readiness_for_live": False,
+            "requires_operator_ack_for_live": False,
+        },
+        "solo_pro": {
+            "allowed_markets": {"crypto", "equities", "forex"},
+            "strategy_allowlist": None,
+            "min_active_strategies": 1,
+            "max_active_strategies": 8,
+            "allow_live_trading": True,
+            "requires_paper_readiness_for_live": True,
+            "requires_operator_ack_for_live": True,
+        },
+        "team": {
+            "allowed_markets": {"crypto", "equities", "forex"},
+            "strategy_allowlist": None,
+            "min_active_strategies": 1,
+            "max_active_strategies": 24,
+            "allow_live_trading": True,
+            "requires_paper_readiness_for_live": True,
+            "requires_operator_ack_for_live": True,
+        },
+        "enterprise": {
+            "allowed_markets": None,
+            "strategy_allowlist": None,
+            "min_active_strategies": 1,
+            "max_active_strategies": 64,
+            "allow_live_trading": True,
+            "requires_paper_readiness_for_live": True,
+            "requires_operator_ack_for_live": True,
+        },
     }
+    return {key: _build_tenant_entitlement(plan=key, row=value) for key, value in payload.items()}
+
+
+def _load_policy_plans(config: Mapping[str, Any]) -> tuple[Dict[str, TenantEntitlements], Dict[str, str], str]:
+    runtime = config.get("runtime", {}) if isinstance(config, Mapping) else {}
+    tenant_cfg = runtime.get("tenant", {}) if isinstance(runtime, Mapping) else {}
+    if not isinstance(tenant_cfg, Mapping):
+        tenant_cfg = {}
+
+    policy_path_raw = str(tenant_cfg.get("tier_policy_path", "")).strip()
+    policy_path = Path(policy_path_raw) if policy_path_raw else DEFAULT_TIER_POLICY_PATH
+
+    if not policy_path.exists():
+        defaults = _default_plans()
+        aliases = {
+            "starter": "community",
+            "pro": "solo_pro",
+            "professional": "solo_pro",
+        }
+        return defaults, aliases, "enterprise"
+
+    payload = json.loads(policy_path.read_text(encoding="utf-8"))
+    plans_payload = payload.get("plans", {})
+    if not isinstance(plans_payload, Mapping) or not plans_payload:
+        raise ValueError(f"tier policy has no plans: {policy_path}")
+
+    plans: Dict[str, TenantEntitlements] = {}
+    for key, row in plans_payload.items():
+        if not isinstance(row, Mapping):
+            continue
+        token = str(key).strip().lower()
+        if not token:
+            continue
+        plans[token] = _build_tenant_entitlement(plan=token, row=row)
+
+    if not plans:
+        raise ValueError(f"tier policy has no valid plan rows: {policy_path}")
+
+    alias_payload = payload.get("aliases", {})
+    aliases: Dict[str, str] = {}
+    if isinstance(alias_payload, Mapping):
+        for key, value in alias_payload.items():
+            k = str(key).strip().lower()
+            v = str(value).strip().lower()
+            if k and v:
+                aliases[k] = v
+
+    default_plan = str(payload.get("default_plan", "enterprise")).strip().lower() or "enterprise"
+    return plans, aliases, default_plan
 
 
 def resolve_tenant_entitlements(
@@ -94,25 +176,25 @@ def resolve_tenant_entitlements(
         if isinstance(raw, Mapping):
             tenant_cfg = raw
 
-    defaults = _default_plans()
-    plan = (
+    plans, aliases, default_plan = _load_policy_plans(config)
+
+    raw_plan = (
         str(
             plan_override
             or tenant_cfg.get("plan", "")
             or (runtime.get("tenant_plan", "") if isinstance(runtime, Mapping) else "")
-            or "enterprise"
+            or default_plan
         )
         .strip()
         .lower()
     )
-    if plan not in defaults:
-        supported = ", ".join(sorted(defaults.keys()))
-        raise ValueError(f"Unknown tenant plan '{plan}'. Supported: {supported}")
-    base = defaults[plan]
+    plan = aliases.get(raw_plan, raw_plan)
+    if plan not in plans:
+        supported = ", ".join(sorted(plans.keys()))
+        raise ValueError(f"Unknown tenant plan '{raw_plan}'. Supported: {supported}")
+    base = plans[plan]
 
-    tenant_id = (
-        str(tenant_id_override or tenant_cfg.get("tenant_id", "default")).strip() or "default"
-    )
+    tenant_id = str(tenant_id_override or tenant_cfg.get("tenant_id", "default")).strip() or "default"
     allowed_markets = _as_set(tenant_cfg.get("allowed_markets", base.allowed_markets))
     strategy_allowlist = _as_set(tenant_cfg.get("strategy_allowlist", base.strategy_allowlist))
     min_active = max(int(tenant_cfg.get("min_active_strategies", base.min_active_strategies)), 1)
@@ -120,6 +202,18 @@ def resolve_tenant_entitlements(
         int(tenant_cfg.get("max_active_strategies", base.max_active_strategies)), min_active
     )
     allow_live = bool(tenant_cfg.get("allow_live_trading", base.allow_live_trading))
+    require_paper = bool(
+        tenant_cfg.get(
+            "requires_paper_readiness_for_live",
+            base.requires_paper_readiness_for_live,
+        )
+    )
+    require_ack = bool(
+        tenant_cfg.get(
+            "requires_operator_ack_for_live",
+            base.requires_operator_ack_for_live,
+        )
+    )
 
     return TenantEntitlements(
         tenant_id=tenant_id,
@@ -129,7 +223,35 @@ def resolve_tenant_entitlements(
         min_active_strategies=min_active,
         max_active_strategies=max_active,
         allow_live_trading=allow_live,
+        requires_paper_readiness_for_live=require_paper,
+        requires_operator_ack_for_live=require_ack,
     )
+
+
+def enforce_live_enablement_preconditions(
+    *,
+    entitlements: TenantEntitlements,
+    runtime: Mapping[str, Any],
+) -> dict[str, Any]:
+    live_readiness = runtime.get("live_readiness", {}) if isinstance(runtime, Mapping) else {}
+    if not isinstance(live_readiness, Mapping):
+        live_readiness = {}
+
+    paper_ready = bool(live_readiness.get("paper_ready", False))
+    operator_ack = bool(live_readiness.get("operator_acknowledged", False))
+    reasons: list[str] = []
+
+    if entitlements.requires_paper_readiness_for_live and not paper_ready:
+        reasons.append("paper_readiness_required")
+    if entitlements.requires_operator_ack_for_live and not operator_ack:
+        reasons.append("operator_ack_required")
+
+    return {
+        "passed": not reasons,
+        "paper_ready": paper_ready,
+        "operator_acknowledged": operator_ack,
+        "reasons": reasons,
+    }
 
 
 def enforce_tenant_entitlements(
@@ -166,7 +288,6 @@ def enforce_tenant_entitlements(
             reasons.append("dropped_strategies_not_permitted_by_plan")
         selected_list = filtered
 
-    # Deduplicate while preserving order.
     seen = set()
     deduped: List[str] = []
     for name in selected_list:

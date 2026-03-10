@@ -1,0 +1,13 @@
+{
+  "primary_language": "python",
+  "python_surface_target_pct": 0.85,
+  "native_kernel_languages": ["rust"],
+  "rewrite_policy": {
+    "allow_full_native_rewrite": false,
+    "native_only_for_hotpath": true
+  },
+  "ui_policy": {
+    "primary_studio_framework": "dash",
+    "legacy_frameworks": ["streamlit"]
+  }
+}

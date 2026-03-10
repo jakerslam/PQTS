@@ -3,7 +3,7 @@ PYTHON ?= python3
 VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site docker-up test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site governance-check docker-up test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -53,6 +53,14 @@ scaffold-module:
 
 leaderboard-site:
 	$(VENV_PY) scripts/export_simulation_leaderboard_site.py --reports-dir data/reports --output-dir site
+
+governance-check:
+	$(VENV_PY) tools/check_studio_contract.py
+	$(VENV_PY) tools/check_core_professional_contract.py
+	$(VENV_PY) tools/check_scope_governance.py --requested-markets crypto
+	$(VENV_PY) tools/check_tier_safety_policy.py
+	$(VENV_PY) tools/check_source_reliability.py
+	$(VENV_PY) tools/check_roadmap_governance.py
 
 docker-up:
 	docker compose up --build

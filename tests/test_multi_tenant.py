@@ -24,6 +24,7 @@ def test_resolve_tenant_entitlements_defaults_to_enterprise():
 
 def test_enforce_tenant_entitlements_filters_starter_scope():
     entitlements = resolve_tenant_entitlements({"runtime": {"tenant": {"plan": "starter"}}})
+    assert entitlements.plan == "community"
     result = enforce_tenant_entitlements(
         selected=["ml", "trend_following", "mean_reversion"],
         active_markets=["crypto", "forex"],
@@ -66,7 +67,7 @@ def test_engine_autopilot_applies_tenant_enforcement(tmp_path):
     assert "ml" not in selected
     assert selected
     state = engine.get_toggle_state()
-    assert state["tenant_plan"] == "starter"
+    assert state["tenant_plan"] == "community"
     assert state["tenant_id"] == "starter_tenant"
 
 
@@ -98,4 +99,38 @@ def test_engine_start_blocks_live_mode_for_starter_plan(tmp_path):
     engine = TradingEngine(str(config_path))
 
     with pytest.raises(RuntimeError):
+        asyncio.run(engine.start())
+
+
+def test_engine_start_requires_paper_ready_and_ack_for_live_team_plan(tmp_path):
+    config = {
+        "mode": "live_trading",
+        "runtime": {
+            "tenant": {"plan": "team"},
+            "live_readiness": {
+                "paper_ready": False,
+                "operator_acknowledged": False,
+            },
+            "autopilot": {"mode": "manual"},
+        },
+        "markets": {
+            "crypto": {
+                "enabled": True,
+                "exchanges": [
+                    {
+                        "name": "binance",
+                        "api_key": "prod_key",
+                        "api_secret": "prod_secret",
+                        "symbols": ["BTCUSDT"],
+                    }
+                ],
+            }
+        },
+        "strategies": {"trend_following": {"enabled": True, "markets": ["crypto"]}},
+        "risk": {"initial_capital": 250000.0},
+    }
+    config_path = tmp_path / "team_live.yaml"
+    config_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    engine = TradingEngine(str(config_path))
+    with pytest.raises(RuntimeError, match="paper_readiness_required"):
         asyncio.run(engine.start())

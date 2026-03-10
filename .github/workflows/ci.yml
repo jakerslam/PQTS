@@ -150,8 +150,20 @@ jobs:
       - name: Stack direction validation (gating)
         run: python3 tools/check_stack_direction.py
 
+      - name: Studio UX + template contract validation (gating)
+        run: python3 tools/check_studio_contract.py
+
+      - name: Core professional contract validation (gating)
+        run: python3 tools/check_core_professional_contract.py
+
+      - name: Wedge-first scope governance validation (gating)
+        run: python3 tools/check_scope_governance.py --requested-markets crypto
+
       - name: Native hot-path contract validation (gating)
         run: python3 tools/check_native_hotpath.py
+
+      - name: Tier safety policy validation (gating)
+        run: python3 tools/check_tier_safety_policy.py
 
       - name: Public docs and metadata URL checks (gating)
         run: |
@@ -177,6 +189,12 @@ jobs:
 
       - name: Claim evidence checks (gating)
         run: python3 tools/check_claim_evidence.py
+
+      - name: Source reliability checks (gating)
+        run: python3 tools/check_source_reliability.py
+
+      - name: Roadmap governance checks (gating)
+        run: python3 tools/check_roadmap_governance.py
 
       - name: Wallet-mode example smoke checks (gating)
         run: |
