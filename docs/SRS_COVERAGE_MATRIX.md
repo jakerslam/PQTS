@@ -8,8 +8,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 - implemented: **44**
 - partial: **5**
 - planned: **4**
-- traced: **1**
-- unmapped: **391**
+- traced: **2**
+- unmapped: **390**
 
 ## Prefix Summary
 
@@ -31,7 +31,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | FDATA | 0 | 0 | 0 | 0 | 12 | 12 |
 | FINGEN | 0 | 0 | 0 | 0 | 12 | 12 |
 | FINQA | 0 | 0 | 0 | 0 | 10 | 10 |
-| FR | 0 | 0 | 0 | 0 | 8 | 8 |
+| FR | 0 | 0 | 0 | 1 | 7 | 8 |
 | GK | 0 | 0 | 0 | 0 | 9 | 9 |
 | HD | 0 | 0 | 0 | 0 | 10 | 10 |
 | HK | 0 | 0 | 0 | 0 | 10 | 10 |
@@ -72,7 +72,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 | ID | Title | Status | TODO | Evidence |
 |---|---|---|---|---|
-| FR-1 | Market Probability Normalization | unmapped | none | - |
+| FR-1 | Market Probability Normalization | traced | none | tests/test_generate_srs_gap_backlog_tool.py |
 | FR-2 | Fair Probability Estimation | unmapped | none | - |
 | FR-3 | Underdog Mispricing Signal | unmapped | none | - |
 | FR-4 | Profitability Gate Integration | unmapped | none | - |
@@ -486,7 +486,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | LANG-10 | Interop Packaging and Distribution | implemented | done | docs/TODO.md |
 | LANG-11 | UI Migration Safety | implemented | done | docs/TODO.md |
 | LANG-12 | Source Reliability and Claim Handling | unmapped | none | - |
-| PMKT-1 | Official Integration Index | implemented | done | docs/TODO.md |
+| PMKT-1 | Official Integration Index | implemented | done | docs/TODO.md, tests/test_generate_srs_gap_backlog_tool.py |
 | PMKT-2 | Auth State Segmentation for Venue Clients | implemented | done | docs/TODO.md |
 | PMKT-3 | Signature-Type and Funder Address Contract | implemented | done | docs/TODO.md |
 | PMKT-4 | API Credential Lifecycle and Rotation | implemented | done | docs/TODO.md |

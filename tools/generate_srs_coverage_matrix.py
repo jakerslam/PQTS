@@ -238,6 +238,7 @@ def main() -> int:
         srs_path.resolve(),
         md_out.resolve(),
         json_out.resolve(),
+        (Path("docs/SRS_GAP_BACKLOG.md")).resolve(),
     }
     evidence_map = build_evidence_index(root, excluded=excluded)
 
