@@ -1,3 +1,4 @@
+import React from "react";
 import type { ToolRendererProps } from "@/lib/tools/types";
 
 export function AccountSummaryToolCard({ event }: ToolRendererProps) {

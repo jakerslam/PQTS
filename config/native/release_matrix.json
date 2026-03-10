@@ -1,0 +1,35 @@
+{
+  "module": "pqts_hotpath",
+  "artifacts": [
+    {
+      "target": "manylinux_x86_64",
+      "python_version": "cp311",
+      "wheel_tag": "cp311-manylinux_x86_64"
+    },
+    {
+      "target": "manylinux_x86_64",
+      "python_version": "cp312",
+      "wheel_tag": "cp312-manylinux_x86_64"
+    },
+    {
+      "target": "macos_arm64",
+      "python_version": "cp311",
+      "wheel_tag": "cp311-macosx_11_0_arm64"
+    },
+    {
+      "target": "macos_arm64",
+      "python_version": "cp312",
+      "wheel_tag": "cp312-macosx_11_0_arm64"
+    },
+    {
+      "target": "windows_amd64",
+      "python_version": "cp311",
+      "wheel_tag": "cp311-win_amd64"
+    },
+    {
+      "target": "windows_amd64",
+      "python_version": "cp312",
+      "wheel_tag": "cp312-win_amd64"
+    }
+  ]
+}

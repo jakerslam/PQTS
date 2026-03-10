@@ -1,3 +1,4 @@
+import React from "react";
 import { AccountSummaryToolCard } from "@/components/tool-renderers/account-summary-card";
 import { OrdersTapeToolCard } from "@/components/tool-renderers/orders-tape-card";
 import { RiskStateToolCard } from "@/components/tool-renderers/risk-state-card";

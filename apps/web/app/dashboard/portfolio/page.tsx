@@ -1,9 +1,10 @@
 import { getAccountSummary, getPositions } from "@/lib/api/client";
 
 export default async function PortfolioPage() {
-  const [account, positions] = await Promise.all([getAccountSummary(), getPositions()]).catch(
-    () => [null, []],
-  );
+  const [account, positions]: [Awaited<ReturnType<typeof getAccountSummary>> | null, Awaited<ReturnType<typeof getPositions>>] =
+    await Promise.all([getAccountSummary(), getPositions()]).catch(
+      () => [null, [] as Awaited<ReturnType<typeof getPositions>>],
+    );
 
   return (
     <section style={{ display: "grid", gap: 16 }}>

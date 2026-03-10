@@ -18,7 +18,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cargo", default="native/hotpath/Cargo.toml")
     parser.add_argument("--lib", default="native/hotpath/src/lib.rs")
-    parser.add_argument("--matrix", default="data/reports/native/release_matrix.json")
+    parser.add_argument("--matrix", default="config/native/release_matrix.json")
     parser.add_argument("--policy", default="config/native/migration_policy.json")
     parser.add_argument("--module", default="pqts_hotpath")
     return parser

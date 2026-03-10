@@ -76,6 +76,7 @@ native = [
 dev = [
   "pytest==9.0.2",
   "pytest-asyncio==1.3.0",
+  "httpx==0.28.1",
   "black==26.1.0",
   "isort==8.0.1",
   "ruff==0.15.4",

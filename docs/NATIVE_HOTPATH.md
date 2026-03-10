@@ -61,7 +61,14 @@ make native
 
 ## Release Matrix
 
-Target matrix is tracked in `data/reports/native/release_matrix.json` and validated by `tools/check_native_hotpath.py`.
+Target matrix is tracked in `config/native/release_matrix.json` and validated by `tools/check_native_hotpath.py`.
+
+Regenerate or verify matrix metadata:
+
+```bash
+python3 tools/generate_native_release_matrix.py
+python3 tools/generate_native_release_matrix.py --check
+```
 
 ## Runtime Profile for Fast Execution
 

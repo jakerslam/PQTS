@@ -159,6 +159,9 @@ jobs:
       - name: Wedge-first scope governance validation (gating)
         run: python3 tools/check_scope_governance.py --requested-markets crypto
 
+      - name: Native release-matrix metadata validation (gating)
+        run: python3 tools/generate_native_release_matrix.py --check
+
       - name: Native hot-path contract validation (gating)
         run: python3 tools/check_native_hotpath.py
 
@@ -202,6 +205,33 @@ jobs:
           python3 examples/wallet_modes/run_example.py --mode proxy --dry-run --output json
           python3 examples/wallet_modes/run_example.py --mode safe --dry-run --output json
 
+  web:
+    name: Web (typecheck + vitest)
+    needs: [pr_description_contract, verify_workflow_raw, verify_dependency_lock]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Typecheck web app
+        run: npm run typecheck
+
+      - name: Run vitest
+        run: npm test
+
   static_analysis:
     name: Bandit and Mypy (non-gating)
     needs: [pr_description_contract, verify_workflow_raw, verify_dependency_lock]
@@ -237,7 +267,7 @@ jobs:
   ci_summary:
     name: CI Summary Artifact
     if: always()
-    needs: [pr_description_contract, verify_workflow_raw, verify_dependency_lock, test, lint, static_analysis]
+    needs: [pr_description_contract, verify_workflow_raw, verify_dependency_lock, test, lint, static_analysis, web]
     runs-on: ubuntu-latest
     steps:
       - name: Build summary matrix
@@ -253,6 +283,7 @@ jobs:
           | test | ${{ needs.test.result }} |
           | lint | ${{ needs.lint.result }} |
           | static_analysis | ${{ needs.static_analysis.result }} |
+          | web | ${{ needs.web.result }} |
           EOF
 
       - name: Upload summary artifact
