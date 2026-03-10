@@ -11,6 +11,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
           <nav style={{ display: "flex", gap: 12 }}>
             <Link href="/dashboard">Overview</Link>
+            <Link href="/onboarding">Onboarding</Link>
             <Link href="/dashboard/portfolio">Portfolio</Link>
             <Link href="/dashboard/execution">Execution</Link>
             <Link href="/dashboard/risk">Risk</Link>

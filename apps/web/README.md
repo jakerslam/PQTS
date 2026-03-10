@@ -12,3 +12,8 @@ npm run dev
 ```
 
 Default local URL: `http://localhost:3000`
+
+Key routes:
+
+- `/onboarding` for beginner-first CLI plan generation.
+- `/dashboard` for authenticated operator surfaces.

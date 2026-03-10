@@ -141,6 +141,12 @@ Legend:
 
 - [x] Execute top-20 command-surface ROI package for beginner/pro parity (doctor+quickstart orchestration, strategy/risk catalogs, report/leaderboard/readiness status surfaces, block-reason explainers, artifacts inspection, notify channel checks, and matching Makefile entrypoints) (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-7, COMP-8, COMP-9, COMP-11, COMP-12, COMP-14, LANG-7, MOAT-12`)
 
+## 02g. Trust-Surface Closure Sprint (2026-03-10)
+
+- [x] Enforce non-zero-fill reference bundle publication gate and generate three reproducible reference bundles with command/config/manifests (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-3, COMP-5, COMP-13`)
+- [x] Add automated reference performance renderer that syncs README callout + docs report from machine-readable summary (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: COMP-5, COMP-13, MOAT-12`)
+- [x] Add beginner-first web onboarding wizard (`/onboarding`) backed by code-visible CLI plan generation and typed tests (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: COMP-7, COMP-9, COMP-11, LANG-7`)
+
 ## 03. Human-Only Parallel Lane
 
 - [x] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`)

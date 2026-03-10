@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getAccountSummary, getRiskState } from "@/lib/api/client";
 
 export default async function HomePage() {
@@ -25,6 +26,17 @@ export default async function HomePage() {
           <p className="kpi-title">Daily PnL</p>
           <p className="kpi-value">{risk ? `$${risk.daily_pnl.toFixed(2)}` : "Unavailable"}</p>
         </article>
+      </section>
+
+      <section className="card" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0 }}>New to PQTS?</h2>
+        <p style={{ marginBottom: 0 }}>
+          Start with the guided onboarding wizard, then continue into the authenticated dashboard.
+        </p>
+        <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Link href="/onboarding">Open onboarding wizard</Link>
+          <Link href="/dashboard">Open dashboard</Link>
+        </div>
       </section>
     </main>
   );

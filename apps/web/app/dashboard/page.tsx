@@ -9,6 +9,11 @@ export default function DashboardHomePage() {
     <section style={{ display: "grid", gap: 16 }}>
       <div className="grid">
         <article className="card">
+          <h3>Onboarding</h3>
+          <p>Generate CLI-first setup plans for beginner and pro operator profiles.</p>
+          <Link href="/onboarding">Open onboarding wizard</Link>
+        </article>
+        <article className="card">
           <h3>Portfolio</h3>
           <p>Account equity, exposure, and attribution panels.</p>
           <Link href="/dashboard/portfolio">Open portfolio view</Link>
