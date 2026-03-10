@@ -115,6 +115,16 @@ Dashboard: `http://localhost:8501`
 Grafana (optional): `http://localhost:3000` (`admin` / `admin`)
 Docs site (GitHub Pages): `https://jakerslam.github.io/pqts/`
 
+## 📋 Deployment Considerations
+
+When deploying Protheus to production-like environments:
+
+- **Environment Variables**: Always copy `.env.example` to `.env` and populate with production credentials
+- **Configuration Files**: Start with `config/paper.yaml` for testing, then modify for live trading with appropriate risk limits
+- **Data Directories**: Ensure `data/` and `logs/` directories have sufficient disk space and appropriate backups
+- **Port Configuration**: The dashboard defaults to port 8050; ensure this is exposed appropriately in your environment
+- **Secret Management**: Use a secrets manager (AWS Secrets Manager, Vault, etc.) rather than storing credentials in config files for production
+
 ## ⚡ One-Command Demo
 
 ```bash

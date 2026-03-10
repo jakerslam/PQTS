@@ -7,6 +7,9 @@ mode: paper_trading
 # ============================================
 # MARKET ADAPTERS
 # ============================================
+# Note: Exchange configurations in paper trading mode connect to
+# testnet/sandbox environments. Live trading requires separate
+# credentials provisioned through the exchange's production API.
 markets:
   crypto:
     enabled: true
