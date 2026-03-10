@@ -1,0 +1,6 @@
+# Required public documentation endpoints.
+# CI and release checks fail when any listed endpoint is unreachable.
+https://github.com/jakerslam/PQTS
+https://github.com/jakerslam/PQTS/tree/main/docs
+https://github.com/jakerslam/PQTS/blob/main/docs/QUICKSTART_5_MIN.md
+https://github.com/jakerslam/PQTS/blob/main/docs/BENCHMARKS.md

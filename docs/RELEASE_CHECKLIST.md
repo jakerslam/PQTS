@@ -13,6 +13,7 @@
    ```bash
    make arch-check
    make test
+   python3 tools/check_public_links.py --pyproject pyproject.toml --required docs/required_public_links.txt
    ```
 3. Commit release prep changes.
 4. Create and push tag:

@@ -105,6 +105,13 @@ jobs:
       - name: Architecture boundary validation (gating)
         run: python3 tools/check_architecture_boundaries.py
 
+      - name: Public docs and metadata URL checks (gating)
+        run: |
+          python3 tools/check_public_links.py \
+            --pyproject pyproject.toml \
+            --required docs/required_public_links.txt \
+            --timeout 12
+
   static_analysis:
     name: Bandit and Mypy (non-gating)
     needs: [verify_workflow_raw, verify_dependency_lock]
