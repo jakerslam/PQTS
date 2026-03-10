@@ -118,7 +118,7 @@ Legend:
 - [x] Add a README architecture/performance paragraph that documents Rust hot-path kernels and links [docs/NATIVE_HOTPATH.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/NATIVE_HOTPATH.md) (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-2, LANG-10, COMP-13`)
 - [x] Publish a quick native-vs-python benchmark artifact under `results/` (for example `sum_notional` throughput multiplier) with reproducible command + environment metadata (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-3, LANG-10, COMP-13`)
 - [x] Add `make native` target to expose maturin-based local native build/install workflow (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: LANG-2, LANG-10`)
-- [x] Trigger first public PyPI release and GitHub Pages leaderboard export, then publish both links in README/docs (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-2, COMP-5, MOAT-12`, `Note: triggered via tag v0.1.0 and Pages workflow; PyPI trusted-publisher + repo Pages enablement follow-ups documented in docs/PYPI_PUBLISHING.md and docs/GITHUB_PAGES_SETUP.md`)
+- [x] Trigger first public release + GitHub Pages leaderboard export workflows, then publish links/status in README/docs (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-2, COMP-5, MOAT-12`, `Note: releases triggered via tags v0.1.0 and v0.1.1; GitHub Release succeeded, while PyPI trusted-publisher and repo Pages enablement follow-ups are documented in docs/PYPI_PUBLISHING.md and docs/GITHUB_PAGES_SETUP.md`)
 
 ## 02d. Nunchi Agent-CLI Assimilation Sprint (2026-03-10)
 

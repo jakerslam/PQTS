@@ -115,7 +115,7 @@ Dashboard: `http://localhost:8501`
 Grafana (optional): `http://localhost:3000` (`admin` / `admin`)
 Docs site (GitHub Pages): [https://jakerslam.github.io/pqts/](https://jakerslam.github.io/pqts/) (requires Pages enablement in repo settings)
 Leaderboard fallback in-repo page: [docs/leaderboard/index.html](docs/leaderboard/index.html)
-First public release: [v0.1.0](https://github.com/jakerslam/PQTS/releases/tag/v0.1.0)
+Latest release: [v0.1.1](https://github.com/jakerslam/PQTS/releases/tag/v0.1.1)
 
 ## 📋 Deployment Considerations
 
