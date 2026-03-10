@@ -79,7 +79,7 @@ Issue-ready split backlog: [docs/ISSUE_BACKLOG.md](/Users/jay/Document%20(Lcl)/C
 - [x] Add provider guardrails + bounded retry/backoff for generation calls.
 - [x] Implement two-stage retrieval→reasoning pipeline with stable evidence IDs (`text_i`, `table_j`).
 - [x] Add top-k retrieval recall reporting and full-ranked-list persistence for audits.
-- [ ] Implement executable program DSL scoring with dual metrics: execution accuracy + symbolic program equivalence.
+- [x] Implement executable program DSL scoring with dual metrics: execution accuracy + symbolic program equivalence.
 - [ ] Implement blind/private-test evaluation mode and strict submission schema validation.
 - [ ] Add leakage regression tests for preprocessing functions and prompt-output schema integrity.
 
