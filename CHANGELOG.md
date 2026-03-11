@@ -7,6 +7,12 @@ Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-03-10
+
+### Changed
+- Retry release publish after PyPI trusted-publisher setup update.
+- No product-surface changes; release is for distribution channel verification.
+
 ## [0.1.2] - 2026-03-10
 
 ### Added
