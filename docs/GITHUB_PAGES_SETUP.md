@@ -21,6 +21,10 @@ creation when repository settings permit GitHub Actions Pages deployments.
 2. Verify deployment URL appears in workflow summary.
 3. Confirm URL resolves: `https://jakerslam.github.io/PQTS/`.
 
+If repository permissions still block Pages creation, the workflow now uploads
+`docs-site-fallback` as a run artifact so docs builds remain accessible while
+owner/admin settings are being finalized.
+
 ## Fallback Artifact
 
 Until Pages is enabled, the generated leaderboard remains available in-repo:

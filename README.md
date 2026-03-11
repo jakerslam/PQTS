@@ -127,6 +127,7 @@ Prometheus (observability profile): `http://localhost:9090`
 Grafana (observability profile): `http://localhost:3000` (`admin` / `admin`)
 Docs site (GitHub Pages): [https://jakerslam.github.io/PQTS/](https://jakerslam.github.io/PQTS/)
 Leaderboard fallback in-repo page: [docs/leaderboard/index.html](docs/leaderboard/index.html)
+Workflow fallback artifact when Pages is unavailable: `docs-site-fallback` in `Publish Docs Site` runs.
 Latest release: [v0.1.5](https://github.com/jakerslam/PQTS/releases/tag/v0.1.5)
 
 ## 🌐 Web App Dashboard (Next.js)

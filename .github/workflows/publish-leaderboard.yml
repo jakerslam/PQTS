@@ -24,6 +24,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_ready: ${{ steps.configure_pages.outcome == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,17 +50,28 @@ jobs:
         run: mkdocs build --site-dir site
 
       - name: Configure GitHub Pages
+        id: configure_pages
+        continue-on-error: true
         uses: actions/configure-pages@v5
         with:
           enablement: true
 
       - name: Upload pages artifact
+        if: steps.configure_pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
+      - name: Upload docs artifact (fallback when Pages is not yet enabled)
+        if: steps.configure_pages.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site-fallback
+          path: site
+
   deploy:
     needs: build
+    if: needs.build.outputs.pages_ready == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
