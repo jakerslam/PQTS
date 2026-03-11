@@ -7,6 +7,13 @@ Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-03-10
+
+### Fixed
+- CI benchmark governance now accepts suite-backed reference bundles even when leaderboard CSV artifacts are not committed.
+- Benchmark coverage validation now uses deterministic market-to-venue fallback labels when TCA CSV artifacts are absent in CI.
+- Claim-evidence documentation now includes explicit `result_class` markers and provenance classification required by gating checks.
+
 ## [0.1.4] - 2026-03-10
 
 ### Fixed
