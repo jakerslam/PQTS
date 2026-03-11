@@ -48,19 +48,16 @@ jobs:
         run: mkdocs build --site-dir site
 
       - name: Configure GitHub Pages
-        if: ${{ vars.PQTS_PAGES_DEPLOY_ENABLED == 'true' }}
         uses: actions/configure-pages@v5
         with:
           enablement: false
 
       - name: Upload pages artifact
-        if: ${{ vars.PQTS_PAGES_DEPLOY_ENABLED == 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
   deploy:
-    if: ${{ vars.PQTS_PAGES_DEPLOY_ENABLED == 'true' }}
     needs: build
     runs-on: ubuntu-latest
     environment:
