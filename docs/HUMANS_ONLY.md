@@ -17,7 +17,7 @@ This file tracks tasks that cannot be reliably automated and require direct huma
 ## P0 Trust-Surface Decisions (From March 10 Review)
 
 - Decide release-by-release distribution truth posture: either (a) keep PyPI install path live and verified, or (b) remove/replace `pip install` claims until publication is verified.
-- Configure PyPI trusted publisher manually for `pqts` with exact OIDC claims (`owner=jakerslam`, `repo=PQTS`, `workflow=.github/workflows/release.yml`, `environment=pypi`), then trigger a new publish tag after save.
+- PyPI trusted publisher setup completed for `pqts` (`owner=jakerslam`, `repo=PQTS`, `workflow=.github/workflows/release.yml`, `environment=pypi`); first successful trusted publish shipped in `v0.1.4`.
 - Approve and enforce one canonical maturity message for the active release (`alpha`/`beta`/`stable`) and remove contradictory claims from legacy docs.
 - Decide and sign off the single primary public web surface for this release phase (Next.js vs legacy dashboard exposure) and publish transition messaging.
 - Approve whether broad multi-market marketing claims stay live or are narrowed to only currently verified integrations in the canonical index.

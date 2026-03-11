@@ -62,3 +62,23 @@ Required fix on PyPI side:
 3. Ensure environment is `pypi`.
 4. Ensure the trusted publisher is configured on the correct `pqts` PyPI project and not an adjacent/test project.
 5. Re-run publish from a new patch tag (for example `v0.1.3`) after correcting the trusted publisher entry.
+
+## 7) Resolution (2026-03-11)
+
+PyPI trusted publishing is now operational.
+
+- Successful release tag: `v0.1.4`
+- Successful workflow run: `22934922518`
+- Successful job: `publish_pypi`
+
+Additional workflow hardening applied:
+
+- `publish_pypi` now removes non-distribution files from `dist/` before upload to avoid:
+  - `InvalidDistribution: Unknown distribution format: 'SHA256SUMS.txt'`
+
+Verification:
+
+```bash
+python3 -m pip index versions pqts
+# pqts (0.1.4)
+```
