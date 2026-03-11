@@ -23,6 +23,7 @@ This file tracks tasks that cannot be reliably automated and require direct huma
 - Approve whether broad multi-market marketing claims stay live or are narrowed to only currently verified integrations in the canonical index.
 - Review and sign off benchmark narrative language so historical diagnostic bundles are contextualized correctly and not framed as reference proof.
 - Ensure Docker CLI is installed and runnable on maintainer workstations used for release validation (`docker --version`, `docker compose version`).
+- Ensure maintainer token/permissions can dispatch Actions workflows and manage Pages settings (`workflow` + repo admin scope as needed).
 
 ## P1 Growth
 
