@@ -4,7 +4,7 @@ VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 PY_RUN := $(if $(wildcard $(VENV_PY)),$(VENV_PY),$(PYTHON))
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check governance-check paper-6m paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up observability-up doctor onboard status test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check dod-audit governance-check paper-6m paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up observability-up doctor onboard status test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -93,6 +93,15 @@ assimilation-66-71-check:
 	$(PY_RUN) tools/check_assimilation_66_71_defaults.py --config config/strategy/assimilation_66_71_defaults.json
 
 unmapped-srs-check:
+	$(PY_RUN) tools/check_unmapped_srs_closure.py --defaults config/strategy/assimilation_unmapped_p2_defaults.json --todo docs/TODO.md --map docs/SRS_UNMAPPED_P2_EXECUTION_MAP.md
+
+dod-audit:
+	$(PY_RUN) tools/generate_srs_coverage_matrix.py --srs docs/SRS.md --todo docs/TODO.md --json-out data/reports/srs_coverage/srs_coverage.json --md-out docs/SRS_COVERAGE_MATRIX.md
+	$(PY_RUN) tools/audit_todo_dod.py --todo docs/TODO.md --coverage data/reports/srs_coverage/srs_coverage.json
+	$(PY_RUN) tools/generate_srs_coverage_matrix.py --srs docs/SRS.md --todo docs/TODO.md --json-out data/reports/srs_coverage/srs_coverage.json --md-out docs/SRS_COVERAGE_MATRIX.md
+	$(PY_RUN) tools/generate_srs_gap_backlog.py --srs docs/SRS.md --todo docs/TODO.md --out docs/SRS_GAP_BACKLOG.md
+	$(PY_RUN) tools/check_codex_enforcer.py
+	$(PY_RUN) tools/check_assimilation_66_71_defaults.py --config config/strategy/assimilation_66_71_defaults.json
 	$(PY_RUN) tools/check_unmapped_srs_closure.py --defaults config/strategy/assimilation_unmapped_p2_defaults.json --todo docs/TODO.md --map docs/SRS_UNMAPPED_P2_EXECUTION_MAP.md
 
 paper-6m:

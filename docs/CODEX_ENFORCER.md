@@ -29,9 +29,10 @@ Before implementation:
 ## Execution Rules
 
 1. No item is marked done without `Evidence:` in `docs/TODO.md`.
-2. Evidence must point to real repository artifacts and runnable checks.
-3. If work is partial, mark as `in_progress` or leave unchecked.
-4. If blocked by external dependency, mark blocked and document the blocker.
+2. No item is marked done without `Impact: 1-10` in `docs/TODO.md`.
+3. Evidence must point to real repository artifacts and runnable checks.
+4. If work is partial, mark as `in_progress` or leave unchecked.
+5. If blocked by external dependency, mark blocked and document the blocker.
 
 ## Enforcement Commands
 
@@ -48,4 +49,3 @@ If enforcement fails:
 1. Do not check off task items.
 2. Fix the failure.
 3. Re-run enforcement.
-

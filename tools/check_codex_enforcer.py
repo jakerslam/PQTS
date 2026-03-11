@@ -36,16 +36,16 @@ def _extract_todo_refs(todo_text: str) -> set[str]:
     return out
 
 
-def _checked_item_missing_evidence(line: str) -> bool:
+def _checked_item_missing_required_fields(line: str) -> tuple[bool, bool]:
     token = line.strip()
     if not (token.startswith("- [x]") or token.startswith("- [X]")):
-        return False
+        return False, False
     ref_match = TODO_REF_RE.search(token)
     if not ref_match:
-        return False
+        return False, False
     if not REQ_ID_RE.search(ref_match.group(1)):
-        return False
-    return "Evidence:" not in token
+        return False, False
+    return "Evidence:" not in token, "Impact:" not in token
 
 
 def evaluate_codex_enforcer(
@@ -88,8 +88,11 @@ def evaluate_codex_enforcer(
         errors.append("docs/TODO.md missing SRS 66-71 assimilation execution sprint section")
 
     for idx, line in enumerate(todo.splitlines(), start=1):
-        if _checked_item_missing_evidence(line):
+        missing_evidence, missing_impact = _checked_item_missing_required_fields(line)
+        if missing_evidence:
             errors.append(f"docs/TODO.md:{idx} checked SRS 66-71 item missing Evidence field")
+        if missing_impact:
+            errors.append(f"docs/TODO.md:{idx} checked SRS 66-71 item missing Impact field")
 
     srs_ids = _extract_new_req_ids(srs)
     todo_ids = _extract_todo_refs(todo)
@@ -128,4 +131,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

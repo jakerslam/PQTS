@@ -27,10 +27,14 @@ Every engineering task must satisfy all criteria:
   - generated file paths and/or
   - test names.
 
-5. Documentation parity:
+5. Impact scoring:
+- The TODO line must include `Impact: 1-10` (system importance).
+- Use consistent scoring aligned to risk/surface criticality.
+
+6. Documentation parity:
 - User-facing behavior changes update relevant docs (`README.md`, subsystem docs, or runbooks).
 
-6. Non-regression:
+7. Non-regression:
 - Existing behavior is preserved or intentional breakage is documented with migration notes.
 
 ## Prohibited Check-Offs
@@ -58,4 +62,3 @@ Use this pattern in `docs/TODO.md`:
 Example:
 
 `Evidence: tools/check_codex_enforcer.py; make codex-enforcer; tests/test_check_codex_enforcer.py`
-
