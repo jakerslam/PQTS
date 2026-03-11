@@ -10,6 +10,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 TRACK_RE = re.compile(r"Track:\s*`?(parity|moat)`?", re.I)
+TYPE_RE = re.compile(r"Type:\s*`?(engineering|human_only)`?", re.I)
 CHECKBOX_RE = re.compile(r"^- \[(?P<done>[xX ])\]\s+.*$", re.M)
 LAST_UPDATED_RE = re.compile(r"Last updated:\s*(\d{4}-\d{2}-\d{2})")
 
@@ -32,12 +33,15 @@ def _parse_items(todo_text: str) -> list[dict[str, object]]:
         if cb is None:
             continue
         track_match = TRACK_RE.search(token)
+        type_match = TYPE_RE.search(token)
         track = track_match.group(1).lower() if track_match else ""
+        row_type = type_match.group(1).lower() if type_match else "engineering"
         rows.append(
             {
                 "line": token,
                 "done": cb.group("done").lower() == "x",
                 "track": track,
+                "type": row_type,
             }
         )
     return rows
@@ -87,7 +91,13 @@ def main() -> int:
     todo_text = todo_path.read_text(encoding="utf-8")
     rows = _parse_items(todo_text)
 
-    open_rows = [row for row in rows if not bool(row["done"]) and row["track"] in {"parity", "moat"}]
+    open_rows = [
+        row
+        for row in rows
+        if not bool(row["done"])
+        and row["track"] in {"parity", "moat"}
+        and row.get("type") != "human_only"
+    ]
     moat_open = sum(1 for row in open_rows if row["track"] == "moat")
     parity_open = sum(1 for row in open_rows if row["track"] == "parity")
     total_open = len(open_rows)

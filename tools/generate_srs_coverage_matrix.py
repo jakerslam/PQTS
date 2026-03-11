@@ -65,6 +65,9 @@ def parse_todo_status(todo_path: Path) -> dict[str, TODOStatus]:
         token = line.strip()
         if not token.startswith("- ["):
             continue
+        # Human-only tasks do not represent automatable engineering coverage.
+        if "Type: human_only" in token:
+            continue
         checked = token.startswith("- [x]") or token.startswith("- [X]")
         ref_match = REF_RE.search(token)
         if not ref_match:
