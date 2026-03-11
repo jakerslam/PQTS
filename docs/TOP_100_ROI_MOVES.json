@@ -10,7 +10,7 @@
     "refs": "COMP-2, COMP-5, MOAT-12",
     "depends": "",
     "section": "02c. Visibility Polish (Open, High ROI)",
-    "line_no": 191
+    "line_no": 195
   },
   {
     "rank": 2,
@@ -23,7 +23,7 @@
     "refs": "COMP-10, LANG-6, LANG-3, COMP-14",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 296
+    "line_no": 300
   },
   {
     "rank": 3,
@@ -36,7 +36,7 @@
     "refs": "COMP-14",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 297
+    "line_no": 301
   },
   {
     "rank": 4,
@@ -49,7 +49,7 @@
     "refs": "MOAT-13",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 298
+    "line_no": 302
   },
   {
     "rank": 5,
@@ -62,7 +62,7 @@
     "refs": "COMP-7, COMP-8, MOAT-8",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 299
+    "line_no": 303
   },
   {
     "rank": 6,
@@ -75,6 +75,6 @@
     "refs": "MOAT-15",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 300
+    "line_no": 304
   }
 ]

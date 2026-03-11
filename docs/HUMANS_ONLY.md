@@ -67,3 +67,10 @@ This file tracks tasks that cannot be reliably automated and require direct huma
 - Decide and sign off the single primary UI path for the next release phase (web app end-state and interim fallback policy).
 - Approve native-migration trigger thresholds (when to use JIT, when to move kernels to Rust, and what evidence is required).
 - Approve storage-tier escalation policy (when/if to introduce additional telemetry stores beyond current operational stack).
+
+## P0 Dominance Narrative and Market Validation
+
+- Own and maintain the category narrative that PQTS is a trust operating system for deployment (not just another backtester/bot).
+- Publish external beginner/pro validation evidence with participant mix, outcomes, and friction themes before major UX claim upgrades.
+- Maintain dated competitor comparison narratives and keep public claim language aligned with verifiable evidence.
+- Execute distribution/outreach campaigns (Show HN, X thread launches, community posts, partner outreach) and track outcomes.

@@ -83,6 +83,10 @@ Dependency order: ranking automation -> release truth gates -> security/runtime 
 - [x] Add web contract CI gate for typecheck/tests plus runtime dependency audit (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: UI-031, COMP-6`, `Evidence: .github/workflows/ci.yml`, `Impact: 8`)
 - [x] Add npm runtime-audit artifacting to weekly security scans (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: UI-031`, `Evidence: .github/workflows/security-scans.yml`, `Impact: 8`)
 
+## 02t. Competitive Dominance Split Execution (2026-03-11)
+
+- [x] Convert latest dominance strategy into explicit `SRS` vs `human_only` execution classes and validate SRS side remains fully executed (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: MOAT-1, MOAT-2, MOAT-3, MOAT-4, MOAT-5, MOAT-6, MOAT-7, MOAT-10, MOAT-11, MOAT-12, MOAT-13, MOAT-14, COMP-5, COMP-7, COMP-8, COMP-9, COMP-11, COMP-13, COMP-17, UI-001, UI-002, UI-004, UI-005, UI-006, UI-014, UI-015, UI-028, UI-029`, `Evidence: docs/DOMINANCE_SRS_HUMAN_SPLIT.md; make full-srs-check; make dod-audit; make governance-check`, `Impact: 9`)
+
 ## 00. Completed Foundation (Pinned)
 
 - [x] Docs/metadata link gate in CI and release (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-1`, `Impact: 10`, `Evidence: tools/check_public_links.py; .github/workflows/ci.yml; .github/workflows/release.yml`)
