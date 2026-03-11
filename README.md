@@ -87,8 +87,8 @@ cp .env.example .env
 # Start dashboard
 python src/dashboard/start.py
 
-# Optional package install once published:
-# pip install pqts
+# Install published package:
+pip install -U pqts
 
 # Run paper trading
 python main.py config/paper.yaml

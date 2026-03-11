@@ -1,9 +1,9 @@
 {
-  "canonical_release_version": "0.1.1",
+  "canonical_release_version": "0.1.4",
   "maturity": "alpha",
   "distribution": {
     "pypi": {
-      "available": false,
+      "available": true,
       "package": "pqts"
     }
   },

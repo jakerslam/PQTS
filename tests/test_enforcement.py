@@ -22,6 +22,7 @@ ADAPTER_FILES = {
     (SOURCE_ROOT / "markets" / "crypto" / "coinbase_adapter.py").relative_to(ROOT),
     (SOURCE_ROOT / "markets" / "equities" / "alpaca_adapter.py").relative_to(ROOT),
     (SOURCE_ROOT / "markets" / "forex" / "oanda_adapter.py").relative_to(ROOT),
+    (SOURCE_ROOT / "adapters" / "prediction_market_client.py").relative_to(ROOT),
 }
 
 ADAPTER_MODULES = {
@@ -137,7 +138,7 @@ class TestSingleOrderPath:
                 allowed = False
                 if node.name == "submit_order":
                     allowed = rel == ROUTER_REL
-                elif node.name == "place_order":
+                elif node.name in {"place_order", "create_order"}:
                     allowed = rel in ADAPTER_FILES
 
                 if not allowed:

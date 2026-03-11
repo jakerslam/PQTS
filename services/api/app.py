@@ -87,9 +87,13 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
     app.state.persistence = APIPersistence.connect(resolved.database_url)
     app.state.shutdown_in_progress = False
     if app.state.persistence is not None:
-        app.state.persistence.initialize()
-        app.state.persistence.seed_if_empty(app.state.store)
-        app.state.persistence.hydrate_store(app.state.store)
+        try:
+            app.state.persistence.initialize()
+            app.state.persistence.seed_if_empty(app.state.store)
+            app.state.persistence.hydrate_store(app.state.store)
+        except Exception:  # noqa: BLE001
+            # Keep API boot non-fatal when a configured DB is temporarily unavailable.
+            app.state.persistence = None
 
     runtime_controls = {
         "deployment_profile": resolved.deployment_profile,

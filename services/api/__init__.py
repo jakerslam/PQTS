@@ -8,4 +8,4 @@ SRC = ROOT / "src"
 if SRC.exists():
     src_str = str(SRC)
     if src_str not in sys.path:
-        sys.path.insert(0, src_str)
+        sys.path.append(src_str)
