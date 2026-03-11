@@ -4266,3 +4266,300 @@ Observed source links:
 
 - PQTS shall maintain a mistake taxonomy (model error, data staleness, sizing breach, process violation, narrative bias, etc.) for every adverse event.
 - Weekly process reviews shall aggregate taxonomy outcomes and automatically generate prioritized remediation tasks.
+
+## 72. UI Legitimacy and Star-Magnet Surface Requirements (March 11, 2026)
+
+These requirements enforce one coherent public UI surface with explicit trust/provenance and professional-grade operator workflows.
+
+### UXL-1 Web-Primary Surface and Runtime Contract
+
+- Next.js (`apps/web`) shall be the primary public UI surface for active release phases.
+- Dash shall be explicitly labeled operator fallback and shall not be the default public launch path.
+- Docker/README/quickstart flows shall default to web + API startup paths and place Dash behind an explicit operator profile.
+
+### UXL-2 Canonical Backend Ownership for UI State
+
+- Next.js route handlers for assistant and onboarding flows shall proxy canonical FastAPI endpoints and shall not keep authoritative in-memory domain state.
+- Canonical backend endpoints shall expose onboarding run creation/status and assistant turn responses with correlation metadata.
+
+### UXL-3 Global Trust Bar Completeness Contract
+
+- Trust bar shall be visible on all dashboard pages and include workspace, environment, account, venue, data freshness, native-hotpath status, kill-switch status, and trace/run identifiers.
+- Trust bar shall include live stream-health indicators for risk and execution channels.
+
+### UXL-4 Provenance Drawer Standard
+
+- Command center, benchmarks, execution, and order-truth pages shall expose one-click provenance drawers.
+- Provenance drawers shall include trust label, generation timestamp, source artifact path, report path, and leaderboard path.
+
+### UXL-5 Execution Explainability Grid Contract
+
+- Execution surface shall include an explainability grid mapping order lifecycle stages: signal, risk gate, router/venue, and fill outcome.
+- Each explainability row shall deep-link into per-order truth drilldown.
+
+### UXL-6 Browser-First Onboarding Runtime Contract
+
+- Onboarding wizard execution shall run against canonical backend run state with deterministic progress snapshots.
+- UI shall support browser-first onboarding without requiring CLI for first meaningful result, while still exposing code-visible command equivalents.
+
+### UXL-7 Studio Visual System Legitimacy Contract
+
+- Web UI shall use a tokenized design system with explicit typography tokens, semantic status colors, spacing scale, and responsive behavior.
+- Core tables/chips/cards shall render from shared style primitives to prevent ad hoc visual drift.
+
+### UXL-8 Public README Trust-Surface Contract
+
+- README shall present web-primary startup, trust/provenance surfaces, and benchmark evidence above the fold.
+- Visual tour media references shall resolve correctly in repository contexts and regeneration workflow shall remain documented and runnable.
+
+## 73. Additional Delta Requirements from External Post Chain (hanakoxbt OSINT stack, March 10, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced X post and its included links while preserving existing hard safety and provenance controls.
+
+Observed source links:
+- `https://x.com/hanakoxbt/status/2031439843440710064?s=20`
+- `https://kreo.app/@1743116` (included short-link target referenced in post thread)
+
+### HKO-1 Multi-Source Event-Intel Ingestion Contract
+
+- PQTS shall support ingesting multiple public event-intel feeds (for example shipping, satellite-derived, news, or social signal streams) through typed adapters.
+- Every feed adapter shall emit normalized event records with source, timestamp, confidence, and ingestion-lag fields.
+- Missing/late feeds shall degrade strategy outputs to hold/reduce states under policy rather than silently proceeding.
+
+### HKO-2 Geotemporal Entity-Linking Contract
+
+- PQTS shall provide geotemporal linking that maps external event records to tradable market entities with explicit uncertainty scores.
+- Link decisions shall store `event_id -> market_id` mappings, matching rationale, and expiry/refresh windows for replayability.
+- Low-confidence links shall be blocked from live candidate generation until corroboration thresholds are met.
+
+### HKO-3 Corroboration-First Trigger Gate Contract
+
+- Lead-lag trade triggers sourced from external event-intel shall require minimum corroboration across independent sources before order submission.
+- Corroboration policy shall be configurable by strategy stage (`paper`, `shadow`, `canary`, `live`) with stricter live thresholds.
+- Trigger diagnostics shall include corroborating source IDs, timestamps, and time-skew checks.
+
+### HKO-4 Event-to-Quote Causal Alignment Contract
+
+- Candidate generation shall enforce causal ordering between event-intel timestamps and market quote snapshots, with anti-lookahead validation.
+- If causal order cannot be proven (clock skew, stale quote, ambiguous event time), the candidate shall be blocked and logged.
+- Replay mode shall reproduce causal alignment checks identically to live/paper paths.
+
+### HKO-5 External Signal Provider Boundary Contract
+
+- External signal providers referenced by linked pages (for example Kreo-linked channels) shall be integrated only through read-only, provenance-tagged ingestion interfaces.
+- Provider-derived signals shall never bypass `RiskAwareRouter` or existing kill-switch/risk gates.
+- Provider health, schema drift, and entitlement status shall be surfaced in trust/provenance telemetry.
+
+### HKO-6 Pre-Trade Evidence Bundle Contract
+
+- Every order candidate sourced from event-intel signals shall produce a compact pre-trade evidence bundle with:
+  - matched event records,
+  - corroboration summary,
+  - causal alignment checks,
+  - latency metrics,
+  - net-EV/risk-gate decision.
+- Evidence bundles shall be persisted with run/trace identifiers and be queryable from execution explainability views.
+
+### HKO-7 Precision-Claim Governance Contract
+
+- Public precision/ROI claims for event-intel strategies (for example high win-rate or precision percentages) shall be marked `unverified` unless backed by reproducible benchmark bundles.
+- Any promoted claim shall link to timeframe, sample size, trust label, and trade-level accounting artifacts.
+
+### HKO-8 Capacity and Decay Monitoring Contract
+
+- PQTS shall track realized edge for event-intel strategies as function of signal latency bucket and concurrent trade load.
+- If edge decays beyond configured thresholds under higher load, strategy size and concurrency limits shall auto-tighten.
+- Decay breaches and mitigation actions shall be emitted as typed risk/incidence events.
+
+## 74. Additional Delta Requirements from External Post Chain (Shelpid_WI3M multi-agent execution, March 10, 2026)
+
+These requirements capture net-new, applicable workflow mechanics from the referenced X post and linked surfaces while excluding unverified promotional performance claims.
+
+Observed source links:
+- `https://x.com/Shelpid_WI3M/status/2031361973871374759?s=20`
+- `https://x.com/claudeai/status/2031088171262554195`
+- `https://polymarket.com/@vidarx?via=shelpid`
+- `https://t.me/KreoPolyBot?start=ref-shelpid`
+
+### SWI-1 Parallel Analyst/Verifier Agent Contract
+
+- Signal generation from external narrative/event sources shall run through parallel specialist agents with explicit role labels (for example hypothesis, contradiction, and execution-feasibility).
+- Candidate promotion to order intent shall require at least one independent verifier agent pass and an explicit disagreement score.
+- Agent outputs shall include role-local evidence references and confidence values for replayability.
+
+### SWI-2 High-Signal Decision Packet Contract
+
+- Multi-agent analysis shall collapse to one deterministic decision packet per candidate (`allow`, `reduce`, `hold`, or `block`) instead of unranked free-form summaries.
+- Decision packets shall include ranked blocker/warning findings with severity, reason codes, and traceable evidence pointers.
+- If ranked findings conflict across agents beyond configured thresholds, default action shall be `hold` or `block`.
+
+### SWI-3 Complexity-Scaled Analysis Budget Contract
+
+- Analysis depth (model/tool passes, context size, latency budget) shall scale with candidate complexity and uncertainty class.
+- Every cycle shall log token/cost/latency usage with per-candidate budget policy identifiers.
+- Budget overruns or timeout breaches shall fail closed to `hold`/`reduce` under stage policy.
+
+### SWI-4 Confidence-Calibrated Sizing Contract
+
+- Position sizing for agent-derived candidates shall be confidence-calibrated and stage-bounded; fixed-size default sizing shall be disallowed outside explicit diagnostic mode.
+- Confidence-to-size mapping shall be versioned and revalidated when model/prompt/workflow versions change.
+- Calibration drift beyond policy thresholds shall auto-tighten sizing and raise a typed risk event.
+
+### SWI-5 Workflow Determinism and Prompt-Drift Guard Contract
+
+- Agent workflow templates, routing logic, and prompt bundles shall be versioned and hash-pinned per run.
+- Live/canary execution shall reject ad-hoc prompt mutations unless explicitly approved and audit-logged.
+- Promotion gates shall require parity checks proving paper/shadow/live use the same versioned workflow bundle.
+
+### SWI-6 Copytrade/Wallet Signal Boundary Contract
+
+- External copytrade or public-wallet-derived signals shall enter PQTS only through read-only adapters with provenance, freshness, and trust labels.
+- Mirroring behavior shall be treated as a strategy hypothesis requiring replay/paper validation before canary/live eligibility.
+- External signal paths shall never bypass `RiskAwareRouter`, kill-switches, or stage-gate controls.
+
+### SWI-7 Source Reliability and Claim Handling
+
+- Public claims from this source chain about overnight profit, win rate, or rapid bot build-out shall be marked `unverified` unless backed by reproducible trade-level artifacts.
+- Requirements adopted from this source chain shall remain limited to observable system mechanics and validated control patterns.
+
+## 75. Additional Delta Requirements from External Post Chain (AleiahLock copytrade follow-up, March 10, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post and linked surfaces, focused on statistical claim hygiene and referral-aware copytrade safety.
+
+Observed source links:
+- `https://x.com/AleiahLock/status/2031374104163414452?s=20`
+- `https://polymarket.com/profile/0x84571f1bf97a5c710cbe51daff2dd4556cc887fd?tab=positions?via=aleiah`
+- `http://ratio.you/r/BP9FKCC4`
+
+### AL-11 Public-Profile Metric Reconciliation Contract
+
+- Any externally cited wallet/profile performance metrics (for example win rate, prediction count, or total PnL) shall be reconciled into a normalized schema that separates:
+  - realized closed PnL,
+  - unrealized mark-to-market PnL,
+  - fees/slippage-adjusted net PnL,
+  - evaluation window.
+- PQTS shall reject promotional metric ingestion when required decomposition fields are missing.
+- Reconciled profile metrics shall include source timestamp and profile snapshot hash for replayability.
+
+### AL-12 Win-Rate Statistical Confidence Contract
+
+- Headline win-rate claims sourced from public profiles shall include minimum sample-size and confidence-interval calculations before eligibility in strategy evaluation.
+- Win-rate claims without explicit window boundaries or with unstable confidence bands shall be downgraded to `diagnostic_only` or `unverified`.
+- Strategy promotion logic shall not use win-rate claims alone without paired expectancy/PnL-quality evidence.
+
+### AL-13 Sponsored/Referral Influence Disclosure Contract
+
+- External posts containing referral or promotional links (for example `?via=` or referral codes) shall be flagged with sponsorship/incentive-risk metadata.
+- Sponsored/incentive-flagged sources shall be down-weighted by default in signal trust scoring and blocked from direct auto-promotion pathways.
+- Decision artifacts shall persist disclosure flags and weighting effects for audit.
+
+### AL-14 Copytrade Safe-Onboarding and Claim-Boundary Contract
+
+- Copytrade pathways sourced from third-party promotional apps shall enforce explicit safe-onboarding gates (paper-first, per-leader caps, max daily loss, market allowlist).
+- UI/docs flows shall block “follow in 1 minute” style live-capital shortcuts unless safety gates are completed and acknowledged.
+- Public claims from this source chain about near-perfect win rates or large PnL totals shall remain `unverified` unless reproducible trade-level evidence with bounded timeframe is available.
+
+## 76. Additional Delta Requirements from External Post Chain (LCSeekers LMSR claim follow-up, March 11, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post while resolving mechanism claims against primary venue documentation.
+
+Observed source links:
+- `https://x.com/LCSeekers/status/2031417265921446236?s=20`
+- `https://docs.polymarket.com/developers/CLOB/introduction`
+- `https://docs.polymarket.com/trading/overview`
+
+### LCS-1 Venue Mechanism Ground-Truth Registry Contract
+
+- PQTS shall maintain a machine-readable venue/market mechanism registry (`clob`, `amm`, `lmsr`, or `hybrid`) with source URL, verification timestamp, and owner.
+- Strategy execution shall be blocked when the target venue has no verified mechanism profile.
+- Mechanism registry updates shall be audit-logged and replay-addressable.
+
+### LCS-2 Assumption-Bound Model Routing Contract
+
+- Every strategy and fill model shall declare required mechanism assumptions (for example `requires: clob` or `requires: lmsr`).
+- Runtime shall route to mechanism-compatible pricing/fill logic only; incompatible paths shall fail closed with structured reason codes.
+- Promotion artifacts shall include proof that paper/canary/live all used mechanism-compatible routing.
+
+### LCS-3 External Claim Contradiction Governance Contract
+
+- If external educational/promotional claims conflict with primary venue docs (for example LMSR vs CLOB), PQTS shall persist a contradiction record and downgrade claim trust to `unverified`.
+- Contradictory claims shall not be used as execution assumptions unless primary-source evidence is attached.
+- Contradiction records shall be visible in provenance/explainability views.
+
+### LCS-4 Self-Impact-Adjusted Edge Contract
+
+- Edge estimation shall include self-impact-adjusted expected value, not only point-in-time market mispricing (`p_true - p_market`).
+- Candidate sizing shall use impact-aware EV curves; strategies with non-positive impact-adjusted EV at target size shall auto-reduce or block.
+- Diagnostics shall expose raw EV vs impact-adjusted EV deltas per candidate.
+
+### LCS-5 Capacity and Crowding Stress Contract
+
+- PQTS shall run periodic capacity stress tests that sweep order size and concurrent load to estimate edge decay and break-even size.
+- Promotion to canary/live shall require passing configured edge-decay thresholds at intended capital bands.
+- Breaches in live/canary shall trigger automatic size/concurrency tightening and incident emission.
+
+### LCS-6 Liquidity Realism Contract
+
+- CLOB venues shall never be treated as infinite-liquidity sinks; execution planning must use observed depth, spread, and partial-fill likelihood.
+- Fill simulations and live diagnostics shall report depth-consumption and partial-fill metrics for each submitted order batch.
+- Any fallback assumption that implies guaranteed fills shall be restricted to labeled diagnostic mode only.
+
+## 77. Additional Delta Requirements from External Review Feedback (ChatGPT assessment, March 11, 2026)
+
+These requirements capture net-new closure criteria from the referenced platform assessment, focused on eliminating remaining architecture/trust inconsistencies.
+
+Observed source links:
+- `https://github.com/jakerslam/pqts`
+- `https://github.com/jakerslam/pqts/blob/main/docs/HUMAN_DECISIONS_LOG.md`
+- `https://github.com/jakerslam/pqts/blob/main/docs/BENCHMARKS.md`
+- `https://github.com/jakerslam/pqts/tree/main/apps/web`
+- `https://raw.githubusercontent.com/jakerslam/pqts/refs/heads/main/config/integrations/official_integrations.json`
+- `https://github.com/jakerslam/pqts/blob/main/docs/USER_RESEARCH_2026_03.md`
+
+### CGPT-1 Canonical Web/API Contract Closure
+
+- The Next.js frontend shall consume one canonical typed API contract generated from FastAPI OpenAPI definitions.
+- Client paths that do not map to canonical backend endpoints (for example orphan `/api/v1/*` aliases) shall fail CI contract checks.
+- Contract drift (removed/renamed backend fields or routes) shall block release promotion until web/API parity tests pass.
+
+### CGPT-2 Thin-Client Runtime Integrity
+
+- Production web runtime shall not read repository files directly for portfolio, benchmark, replay, or execution-truth data.
+- Production web runtime shall not execute local subprocess jobs (for example `python3 ...`) for user-facing API actions.
+- Any local-file/local-process development shortcuts must be explicitly dev-scoped, feature-flagged, and visibly labeled in UI diagnostics.
+
+### CGPT-3 Onboarding Single-Truth Contract
+
+- PQTS shall expose one canonical beginner onboarding path (package-first) and one explicitly labeled advanced source/developer path.
+- README, quickstart docs, CLI help, and PyPI metadata shall present identical canonical first-success commands and safety defaults.
+- If onboarding content diverges across these surfaces, governance checks shall fail and block release.
+
+### CGPT-4 Documentation Product Surface Reliability
+
+- Public documentation links in README, package metadata, and release notes shall resolve to a live canonical docs surface.
+- Docs link availability and key page integrity checks shall run in CI/release gates.
+- Broken docs links or mismatched canonical docs targets shall block release publication.
+
+### CGPT-5 Integration Maturity Claim Parity
+
+- Public multi-market positioning shall be constrained by the canonical integration index and maturity states (`active`, `experimental`, `certified`).
+- Marketing/README claims shall not present `experimental` adapters as certified live-ready integrations.
+- Integration maturity transitions shall require evidence artifacts and explicit state changes in the canonical registry.
+
+### CGPT-6 External Validation Readiness Contract
+
+- “Noob-friendly” and “pro-ready” release claims shall require external cohort evidence, not internal-proxy-only runs.
+- Cohort artifacts shall include participant mix, task completion, time-to-first-success, and top friction findings.
+- Release readiness gates shall downgrade maturity claims when external cohort thresholds are unmet.
+
+### CGPT-7 Benchmark Continuity and Progress Integrity
+
+- Benchmark program outputs shall preserve both historical weak baselines and current reference bundles to prove directional progress honestly.
+- Reference summaries shall exclude `diagnostic_only` and `unverified` runs by policy and verify this exclusion in CI.
+- Benchmark publication shall require trust-label/provenance fields and machine-readable run lineage.
+
+### CGPT-8 Distribution Truth and Version Cohesion Contract
+
+- Version, release, package, and API runtime identifiers shall remain synchronized across `pyproject`, tags/releases, package index, and API service metadata.
+- Release gates shall validate distribution truth consistency before publish steps execute.
+- Any truth-layer contradiction (version mismatch, stale release pointers, invalid install/doc claims) shall block promotion until resolved.

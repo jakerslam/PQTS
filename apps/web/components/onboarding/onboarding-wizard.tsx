@@ -71,19 +71,27 @@ export function OnboardingWizard() {
       }
       const payload = (await response.json()) as { run: OnboardingRun };
       setRun(payload.run);
-      const source = new EventSource(`/api/onboarding/runs/${payload.run.run_id}/stream`);
-      source.addEventListener("snapshot", (event) => {
-        const parsed = JSON.parse((event as MessageEvent).data) as OnboardingRun;
-        setRun(parsed);
-        if (parsed.status === "completed" || parsed.status === "failed") {
+      const runId = payload.run.run_id;
+      const poll = window.setInterval(async () => {
+        try {
+          const runResponse = await fetch(`/api/onboarding/runs/${runId}`, { method: "GET" });
+          if (!runResponse.ok) {
+            window.clearInterval(poll);
+            setIsExecuting(false);
+            return;
+          }
+          const runPayload = (await runResponse.json()) as { run: OnboardingRun };
+          const latest = runPayload.run;
+          setRun(latest);
+          if (latest.status === "completed" || latest.status === "failed") {
+            window.clearInterval(poll);
+            setIsExecuting(false);
+          }
+        } catch {
+          window.clearInterval(poll);
           setIsExecuting(false);
-          source.close();
         }
-      });
-      source.onerror = () => {
-        source.close();
-        setIsExecuting(false);
-      };
+      }, 1000);
     } catch {
       setRunError("Failed to start onboarding run.");
       setIsExecuting(false);

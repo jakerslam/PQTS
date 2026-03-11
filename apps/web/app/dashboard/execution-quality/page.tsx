@@ -1,4 +1,5 @@
-import { loadExecutionQualityRows, loadReferenceProvenance } from "@/lib/ops/reference-data";
+import { ProvenanceDrawer } from "@/components/provenance/provenance-drawer";
+import { getExecutionQuality, getReferencePerformance } from "@/lib/api/client";
 
 function mean(values: number[]): number {
   if (values.length === 0) {
@@ -7,9 +8,12 @@ function mean(values: number[]): number {
   return values.reduce((total, value) => total + value, 0) / values.length;
 }
 
-export default function ExecutionQualityPage() {
-  const rows = loadExecutionQualityRows(250);
-  const provenance = loadReferenceProvenance();
+export default async function ExecutionQualityPage() {
+  const [rows, references] = await Promise.all([
+    getExecutionQuality(250).catch(() => []),
+    getReferencePerformance().catch(() => null),
+  ]);
+  const provenance = references?.provenance;
   const realized = rows.map((row) => row.realized_slippage_bps);
   const predicted = rows.map((row) => row.predicted_slippage_bps);
   const alpha = rows.map((row) => row.realized_net_alpha_usd);
@@ -17,13 +21,13 @@ export default function ExecutionQualityPage() {
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <article className="card">
-        <h3 style={{ marginTop: 0 }}>Provenance</h3>
-        <p style={{ margin: "0 0 8px" }}>
-          Trust: <span className={`status-chip status-chip-${provenance.trust_label}`}>{provenance.trust_label}</span>
-        </p>
-        <p style={{ margin: 0, color: "var(--muted)" }}>
-          Generated: <code>{provenance.generated_at || "unknown"}</code> · Bundle: <code>{provenance.bundle || "n/a"}</code>
-        </p>
+        {provenance ? (
+          <ProvenanceDrawer provenance={provenance} title="Execution quality provenance" />
+        ) : (
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Provenance unavailable. Check reference bundle publication and API connectivity.
+          </p>
+        )}
       </article>
       <div className="grid">
         <article className="card">

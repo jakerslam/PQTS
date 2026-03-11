@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { webEnv } from "@/lib/env";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
 interface ProxyOptions {
   method?: "GET" | "POST";
@@ -15,10 +17,15 @@ function upstreamUrl(path: string): string {
 
 export async function proxyApi(path: string, options: ProxyOptions = {}): Promise<NextResponse> {
   const method = options.method ?? "GET";
+  const jar = await cookies();
+  const sessionToken = jar.get(SESSION_COOKIE_NAME)?.value;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${webEnv.NEXT_PUBLIC_API_TOKEN}`,
     Accept: "application/json",
   };
+  if (sessionToken) {
+    headers["X-Session-Token"] = sessionToken;
+  }
   if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }

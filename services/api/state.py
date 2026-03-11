@@ -36,6 +36,7 @@ class APIRuntimeStore:
     risk_incidents: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     operator_actions: list[dict[str, Any]] = field(default_factory=list)
     promotion_records: dict[str, dict[str, Any]] = field(default_factory=dict)
+    onboarding_runs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def bootstrap(cls) -> "APIRuntimeStore":
@@ -118,6 +119,7 @@ class APIRuntimeStore:
                     "history": [],
                 },
             },
+            onboarding_runs={},
         )
 
 

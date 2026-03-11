@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import time
 
 from fastapi.testclient import TestClient
 
@@ -141,6 +142,7 @@ def test_ops_diagnostics_surfaces_return_payload_shapes() -> None:
     assert truth.status_code == 200
     assert "rows" in truth.json()
     assert "explanation" in truth.json()
+    assert "evidence_bundle" in truth.json()
 
     replay = client.get("/v1/ops/replay", headers=_viewer())
     assert replay.status_code == 200
@@ -150,6 +152,11 @@ def test_ops_diagnostics_surfaces_return_payload_shapes() -> None:
     gallery = client.get("/v1/ops/template-gallery", headers=_viewer())
     assert gallery.status_code == 200
     assert "artifacts" in gallery.json()
+
+    reference = client.get("/v1/ops/reference-performance", headers=_viewer())
+    assert reference.status_code == 200
+    assert "bundle_count" in reference.json()
+    assert "provenance" in reference.json()
 
 
 def test_ops_command_endpoints_support_dry_run() -> None:
@@ -170,3 +177,43 @@ def test_ops_command_endpoints_support_dry_run() -> None:
     notify_payload = notify.json()
     assert notify_payload["dry_run"] is True
     assert "python" in notify_payload["command"][0]
+
+
+def test_assistant_turn_returns_constrained_suggestions() -> None:
+    client = TestClient(create_app(_settings()))
+    response = client.post("/v1/assistant/turn", json={"message": "show risk and reject reasons"}, headers=_viewer())
+    assert response.status_code == 200
+    payload = response.json()
+    assert "assistant_message" in payload
+    assert isinstance(payload.get("suggestions"), list)
+    assert any("/dashboard/risk" in str(item.get("href", "")) for item in payload.get("suggestions", []))
+
+
+def test_onboarding_run_start_and_status_progression() -> None:
+    client = TestClient(create_app(_settings()))
+    started = client.post(
+        "/v1/onboarding/runs",
+        json={"experience": "beginner", "automation": "manual", "capital_usd": 5000},
+        headers=_viewer(),
+    )
+    assert started.status_code == 200
+    payload = started.json()
+    assert "run" in payload
+    assert "plan" in payload
+    run_id = payload["run"]["run_id"]
+    assert run_id.startswith("run_")
+
+    deadline = time.time() + 6.0
+    latest_status = payload["run"]["status"]
+    while time.time() < deadline:
+        polled = client.get(f"/v1/onboarding/runs/{run_id}", headers=_viewer())
+        assert polled.status_code == 200
+        latest = polled.json()["run"]
+        latest_status = latest["status"]
+        if latest_status == "completed":
+            assert isinstance(latest.get("steps"), list)
+            assert len(latest.get("artifacts", [])) >= 1
+            assert latest.get("meets_under_5_minute_goal") is True
+            break
+        time.sleep(0.2)
+    assert latest_status == "completed"

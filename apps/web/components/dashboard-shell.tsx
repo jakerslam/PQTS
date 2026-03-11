@@ -79,7 +79,7 @@ export function DashboardShell({ children, trustSnapshot }: Props) {
           <div>
             <h1 style={{ margin: 0 }}>PQTS Dashboard</h1>
             <p style={{ margin: "6px 0 0", color: "var(--muted)" }}>
-              Authenticated operator workspace · role:{role}
+              Primary web surface (Studio) · role:{role}
             </p>
           </div>
           <nav style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "flex-end" }}>

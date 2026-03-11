@@ -11,6 +11,11 @@ import time
 from pathlib import Path
 from typing import Any
 
+try:
+    from execution.order_truth import load_pretrade_evidence_bundle, summarize_pretrade_evidence
+except ModuleNotFoundError:  # pragma: no cover - local repo path fallback
+    from src.execution.order_truth import load_pretrade_evidence_bundle, summarize_pretrade_evidence
+
 
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
@@ -55,6 +60,37 @@ def load_best_reference_bundle() -> dict[str, Any] | None:
 
     ranked = sorted((b for b in bundles if isinstance(b, dict)), key=_score, reverse=True)
     return ranked[0] if ranked else None
+
+
+def load_reference_provenance() -> dict[str, Any]:
+    payload = load_reference_performance()
+    best = load_best_reference_bundle()
+    if best is None:
+        return {
+            "trust_label": "unverified",
+            "generated_at": str(payload.get("generated_at", "")),
+            "bundle": "",
+            "report_path": "",
+            "leaderboard_path": "",
+            "source_path": "",
+        }
+    summary = best.get("summary", {}) if isinstance(best.get("summary"), dict) else {}
+    quality = _parse_float(summary.get("avg_quality_score"))
+    fill = _parse_float(summary.get("avg_fill_rate"))
+    if quality >= 0.25 and fill > 0.0:
+        trust_label = "reference"
+    elif fill > 0.0:
+        trust_label = "diagnostic_only"
+    else:
+        trust_label = "unverified"
+    return {
+        "trust_label": trust_label,
+        "generated_at": str(payload.get("generated_at", "")),
+        "bundle": str(best.get("bundle", "")),
+        "report_path": str(best.get("report_path", "")),
+        "leaderboard_path": str(best.get("leaderboard_path", "")),
+        "source_path": str(best.get("path", "")),
+    }
 
 
 def _parse_float(value: Any) -> float:
@@ -188,6 +224,8 @@ def summarize_replay(limit: int = 120) -> dict[str, Any]:
 
 def build_order_truth(order_id: str | None = None) -> dict[str, Any]:
     rows = load_execution_quality_rows(limit=300)
+    evidence_path = _repo_root() / "data" / "reports" / "order_truth" / "event_intel_latest.json"
+    evidence_summary = summarize_pretrade_evidence(load_pretrade_evidence_bundle(evidence_path))
     selected = None
     if order_id:
         selected = next((row for row in rows if str(row.get("trade_id", "")) == order_id), None)
@@ -206,10 +244,18 @@ def build_order_truth(order_id: str | None = None) -> dict[str, Any]:
             f"Execution: realized slippage {realized:.2f} bps on {selected.get('exchange', '')}.",
             f"Attribution: realized_net_alpha_usd={alpha:.4f}.",
         ]
+    if evidence_summary is not None:
+        explanation.append(
+            "Event-intel evidence bundle: "
+            f"trust={evidence_summary.get('trust_label', 'unverified')} "
+            f"sources={evidence_summary.get('source_count', 0)} "
+            f"gate={evidence_summary.get('risk_gate_decision', '')}"
+        )
     return {
         "selected": selected,
         "rows": rows,
         "explanation": explanation,
+        "evidence_bundle": evidence_summary,
     }
 
 

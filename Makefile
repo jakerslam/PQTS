@@ -4,7 +4,7 @@ VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 PY_RUN := $(if $(wildcard $(VENV_PY)),$(VENV_PY),$(PYTHON))
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check dod-audit code-only-audit governance-check paper-6m paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up observability-up doctor onboard status test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check full-srs-check dod-audit code-only-audit governance-check trust-surface-suite paper-6m paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up observability-up doctor onboard status test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -70,9 +70,11 @@ governance-check:
 	$(PY_RUN) tools/check_codex_enforcer.py
 	$(PY_RUN) tools/check_assimilation_66_71_defaults.py --config config/strategy/assimilation_66_71_defaults.json
 	$(PY_RUN) tools/check_unmapped_srs_closure.py --defaults config/strategy/assimilation_unmapped_p2_defaults.json --todo docs/TODO.md --map docs/SRS_UNMAPPED_P2_EXECUTION_MAP.md
+	$(PY_RUN) tools/check_full_srs_closure.py --defaults config/strategy/assimilation_full_closure_defaults.json --todo docs/TODO.md --map docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md --srs docs/SRS.md
 	$(PY_RUN) tools/check_truth_surface.py
 	$(PY_RUN) tools/check_studio_contract.py
 	$(PY_RUN) tools/check_core_professional_contract.py
+	$(PY_RUN) tools/check_surface_contracts.py
 	$(PY_RUN) tools/check_web_api_contracts.py
 	$(PY_RUN) tools/check_scope_governance.py --requested-markets crypto
 	$(PY_RUN) tools/check_integration_claim_parity.py --readme README.md --index config/integrations/official_integrations.json
@@ -86,8 +88,20 @@ governance-check:
 	$(PY_RUN) tools/check_source_reliability.py
 	$(PY_RUN) tools/check_roadmap_governance.py
 
+trust-surface-suite:
+	$(PY_RUN) tools/run_trust_surface_suite.py --out data/reports/validation/trust_surface_latest.json
+
 codex-enforcer:
 	$(PY_RUN) tools/check_codex_enforcer.py
+
+top100-roi:
+	$(PY_RUN) tools/generate_top_roi_moves.py --todo docs/TODO.md --top 100 --md-out docs/TOP_100_ROI_MOVES.md --json-out docs/TOP_100_ROI_MOVES.json
+
+release-examples-check:
+	$(PY_RUN) tools/check_release_examples.py --pyproject pyproject.toml --files README.md docs/RELEASE_CHECKLIST.md docs/QUICKSTART_5_MIN.md
+
+claim-evidence-links-check:
+	$(PY_RUN) tools/check_claim_evidence_links.py --target README.md --target docs/BENCHMARKS.md --target docs/REFERENCE_PERFORMANCE.md
 
 assimilation-66-71-check:
 	$(PY_RUN) tools/check_assimilation_66_71_defaults.py --config config/strategy/assimilation_66_71_defaults.json
@@ -101,8 +115,15 @@ dod-audit:
 	$(PY_RUN) tools/generate_srs_coverage_matrix.py --srs docs/SRS.md --todo docs/TODO.md --json-out data/reports/srs_coverage/srs_coverage.json --md-out docs/SRS_COVERAGE_MATRIX.md
 	$(PY_RUN) tools/generate_srs_gap_backlog.py --srs docs/SRS.md --todo docs/TODO.md --out docs/SRS_GAP_BACKLOG.md
 	$(PY_RUN) tools/check_codex_enforcer.py
+	$(PY_RUN) tools/check_release_examples.py --pyproject pyproject.toml --files README.md docs/RELEASE_CHECKLIST.md docs/QUICKSTART_5_MIN.md
+	$(PY_RUN) tools/generate_top_roi_moves.py --todo docs/TODO.md --top 100 --md-out docs/TOP_100_ROI_MOVES.md --json-out docs/TOP_100_ROI_MOVES.json
 	$(PY_RUN) tools/check_assimilation_66_71_defaults.py --config config/strategy/assimilation_66_71_defaults.json
 	$(PY_RUN) tools/check_unmapped_srs_closure.py --defaults config/strategy/assimilation_unmapped_p2_defaults.json --todo docs/TODO.md --map docs/SRS_UNMAPPED_P2_EXECUTION_MAP.md
+	$(PY_RUN) tools/check_full_srs_closure.py --defaults config/strategy/assimilation_full_closure_defaults.json --todo docs/TODO.md --map docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md --srs docs/SRS.md
+
+full-srs-check:
+	$(PY_RUN) tools/generate_full_srs_closure_artifacts.py --todo docs/TODO.md --defaults-out config/strategy/assimilation_full_closure_defaults.json --map-out docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md
+	$(PY_RUN) tools/check_full_srs_closure.py --defaults config/strategy/assimilation_full_closure_defaults.json --todo docs/TODO.md --map docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md --srs docs/SRS.md
 
 code-only-audit:
 	$(PY_RUN) tools/audit_todo_code_only.py --todo docs/TODO.md --repo-root .

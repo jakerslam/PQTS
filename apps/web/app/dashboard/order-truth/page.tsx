@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { buildOrderTruth, loadReferenceProvenance } from "@/lib/ops/reference-data";
+import { ProvenanceDrawer } from "@/components/provenance/provenance-drawer";
+import { getOrderTruth, getReferencePerformance } from "@/lib/api/client";
 
 interface PageProps {
   searchParams?: {
@@ -8,21 +9,37 @@ interface PageProps {
   };
 }
 
-export default function OrderTruthPage({ searchParams }: PageProps) {
+export default async function OrderTruthPage({ searchParams }: PageProps) {
   const orderId = String(searchParams?.order_id ?? "").trim();
-  const payload = buildOrderTruth(orderId);
-  const provenance = loadReferenceProvenance();
+  const [payload, reference] = await Promise.all([
+    getOrderTruth(orderId).catch(() => ({ selected: null, rows: [], explanation: [], evidence_bundle: null })),
+    getReferencePerformance().catch(() => null),
+  ]);
+  const provenance = reference?.provenance;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <article className="card">
-        <p style={{ margin: 0 }}>
-          Trust: <span className={`status-chip status-chip-${provenance.trust_label}`}>{provenance.trust_label}</span> · source{" "}
-          <code>{provenance.source_path || "unknown"}</code>
-        </p>
+        {provenance ? (
+          <ProvenanceDrawer provenance={provenance} title="Order truth provenance" />
+        ) : (
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Provenance unavailable. This indicates missing benchmark artifacts or API connectivity.
+          </p>
+        )}
       </article>
       <article className="card" style={{ display: "grid", gap: 8 }}>
         <h2 style={{ margin: 0 }}>Per-Order Truth Drilldown</h2>
+        {payload.evidence_bundle ? (
+          <div style={{ padding: 10, border: "1px solid var(--border)" }}>
+            <strong>Event-Intel Evidence Bundle</strong>
+            <p style={{ margin: "6px 0 0 0", color: "var(--muted)" }}>
+              trust={payload.evidence_bundle.trust_label} · sources={payload.evidence_bundle.source_count} ·
+              causal={payload.evidence_bundle.causal_ok ? "ok" : "fail"} · expected_net_ev=
+              {payload.evidence_bundle.expected_net_ev.toFixed(4)}
+            </p>
+          </div>
+        ) : null}
         {payload.selected ? (
           <>
             <p style={{ margin: 0 }}>

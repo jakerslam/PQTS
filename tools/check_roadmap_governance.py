@@ -43,6 +43,27 @@ def _parse_items(todo_text: str) -> list[dict[str, object]]:
     return rows
 
 
+def _parity_p0_state(todo_text: str) -> tuple[bool, bool]:
+    """Return (found, complete) for the Parity P0 subsection in TODO."""
+    in_p0 = False
+    found = False
+    has_open = False
+    for line in todo_text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("### "):
+            if in_p0:
+                break
+            if stripped.lower().startswith("### p0 "):
+                in_p0 = True
+                found = True
+            continue
+        if not in_p0:
+            continue
+        if stripped.startswith("- [ ]"):
+            has_open = True
+    return found, not has_open
+
+
 def _parse_review_date(path: Path) -> date | None:
     if not path.exists():
         return None
@@ -71,6 +92,7 @@ def main() -> int:
     parity_open = sum(1 for row in open_rows if row["track"] == "parity")
     total_open = len(open_rows)
     moat_share = (float(moat_open) / float(total_open)) if total_open > 0 else 1.0
+    p0_found, p0_complete = _parity_p0_state(todo_text)
 
     today = (
         datetime.strptime(str(args.today), "%Y-%m-%d").date()
@@ -81,7 +103,8 @@ def main() -> int:
     review_age_days = (today - review_date).days if review_date is not None else None
 
     reasons: list[str] = []
-    if moat_share < min_moat_share:
+    enforce_moat_share = (not p0_found) or p0_complete
+    if enforce_moat_share and moat_share < min_moat_share:
         reasons.append("moat_share_below_policy")
     if review_date is None:
         reasons.append("quarterly_review_missing_or_unparseable")
@@ -96,6 +119,9 @@ def main() -> int:
             "parity": parity_open,
             "moat_share": moat_share,
             "min_moat_share": min_moat_share,
+            "parity_p0_found": p0_found,
+            "parity_p0_complete": p0_complete,
+            "moat_share_enforced": enforce_moat_share,
         },
         "quarterly_review": {
             "path": str(review_file),

@@ -25,7 +25,7 @@ from websocket import create_connection
 ROOT = Path(__file__).resolve().parent.parent
 MEDIA_DIR = ROOT / "docs" / "media"
 TARGET_SIZE = (1280, 720)
-DEFAULT_DASHBOARD_URL = "http://127.0.0.1:8050"
+DEFAULT_DASHBOARD_URL = "http://127.0.0.1:8501"
 DEFAULT_CHROME_BINARY = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
@@ -102,6 +102,7 @@ def _start_chrome_process(chrome_binary: str, debug_port: int) -> subprocess.Pop
         "--disable-gpu",
         "--no-first-run",
         "--no-default-browser-check",
+        "--remote-allow-origins=*",
         f"--remote-debugging-port={debug_port}",
         "--window-size=1600,1000",
         f"--user-data-dir={chrome_profile}",
@@ -322,7 +323,7 @@ def _capture_media(base_url: str, chrome_binary: str, debug_port: int) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default=DEFAULT_DASHBOARD_URL, help="Dashboard URL to capture.")
-    parser.add_argument("--port", type=int, default=8050, help="Dashboard port when launching locally.")
+    parser.add_argument("--port", type=int, default=8501, help="Dashboard port when launching locally.")
     parser.add_argument(
         "--chrome-binary",
         default=DEFAULT_CHROME_BINARY,

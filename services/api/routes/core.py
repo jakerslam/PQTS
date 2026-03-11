@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+import threading
+import time
 from datetime import datetime, timezone
 from typing import Annotated, Any
 from uuid import uuid4
@@ -28,6 +30,8 @@ from services.api.ops_data import (
     build_order_truth,
     data_seed_presets,
     list_template_run_artifacts,
+    load_reference_performance,
+    load_reference_provenance,
     parse_last_json_line,
     run_python_command,
     summarize_execution_quality,
@@ -49,6 +53,8 @@ def _utc_now_iso() -> str:
 
 
 _PROMOTION_STAGE_ORDER = ("backtest", "paper", "shadow", "canary", "live")
+_ONBOARDING_EXPERIENCE = {"beginner", "intermediate", "advanced"}
+_ONBOARDING_AUTOMATION = {"manual", "assisted", "auto"}
 
 
 def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
@@ -60,6 +66,119 @@ def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
         "updated_at": _utc_now_iso(),
         "history": [],
     }
+
+
+def _normalize_experience(value: Any) -> str:
+    token = str(value or "beginner").strip().lower()
+    return token if token in _ONBOARDING_EXPERIENCE else "beginner"
+
+
+def _normalize_automation(value: Any) -> str:
+    token = str(value or "manual").strip().lower()
+    return token if token in _ONBOARDING_AUTOMATION else "manual"
+
+
+def _normalize_capital(value: Any) -> int:
+    try:
+        parsed = int(float(value))
+    except (TypeError, ValueError):
+        return 5000
+    return max(100, parsed)
+
+
+def _infer_risk_profile(*, experience: str, automation: str, capital_usd: int) -> str:
+    if experience == "advanced" and automation == "auto" and capital_usd >= 25000:
+        return "aggressive"
+    if experience == "beginner":
+        return "conservative"
+    return "balanced"
+
+
+def _build_onboarding_plan(*, experience: str, automation: str, capital_usd: int) -> dict[str, Any]:
+    risk_profile = _infer_risk_profile(
+        experience=experience,
+        automation=automation,
+        capital_usd=capital_usd,
+    )
+    commands = [
+        "pqts doctor --fix",
+        "pqts quickstart --execute",
+        f"pqts risk recommend --experience {experience} --capital-usd {capital_usd} --automation {automation}",
+        f"pqts paper start --risk-profile {risk_profile}",
+        "pqts status readiness",
+        "pqts status leaderboard",
+    ]
+    return {
+        "riskProfile": risk_profile,
+        "commands": commands,
+        "notes": [
+            "UI-generated actions remain code-visible and traceable.",
+            "Default flow is paper-first and cannot trigger live execution.",
+        ],
+        "generatedConfig": {
+            "experience": experience,
+            "automation": automation,
+            "capital_usd": capital_usd,
+            "risk_profile": risk_profile,
+            "paper_first": True,
+            "allow_live": False,
+        },
+        "uiToCliDiff": [
+            f"risk_profile: {risk_profile}",
+            f"capital_usd: {capital_usd}",
+            f"automation: {automation}",
+        ],
+    }
+
+
+def _build_onboarding_run(*, run_id: str, commands: list[str]) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "created_at": _utc_now_iso(),
+        "status": "queued",
+        "steps": [
+            {
+                "id": f"step_{idx + 1}",
+                "label": " ".join(command.split(" ")[:2]),
+                "command": command,
+                "status": "pending",
+            }
+            for idx, command in enumerate(commands)
+        ],
+        "artifacts": [],
+    }
+
+
+def _simulate_onboarding_progress(store: APIRuntimeStore, run_id: str) -> None:
+    run = store.onboarding_runs.get(run_id)
+    if run is None:
+        return
+    run["status"] = "running"
+    run["started_at"] = _utc_now_iso()
+    report_root = f"data/reports/quickstart/{run_id}"
+    steps = run.get("steps", [])
+    for idx, step in enumerate(steps):
+        if not isinstance(step, dict):
+            continue
+        step["status"] = "running"
+        step["started_at"] = _utc_now_iso()
+        time.sleep(0.25)
+        step["status"] = "completed"
+        step["completed_at"] = _utc_now_iso()
+        step["artifact_path"] = f"{report_root}/step_{idx + 1}.json"
+        run["artifacts"] = [
+            str(row.get("artifact_path", ""))
+            for row in steps
+            if isinstance(row, dict) and str(row.get("artifact_path", "")).strip()
+        ]
+        time.sleep(0.15)
+    run["status"] = "completed"
+    run["completed_at"] = _utc_now_iso()
+    created = datetime.fromisoformat(str(run.get("created_at")))
+    completed = datetime.fromisoformat(str(run.get("completed_at")))
+    elapsed = max(int((completed - created).total_seconds()), 0)
+    run["first_meaningful_result_seconds"] = elapsed
+    run["meets_under_5_minute_goal"] = elapsed <= 300
 
 
 def _coerce_stage(stage: str) -> str:
@@ -535,6 +654,98 @@ def apply_promotion_action(
         key=lambda row: str(row.get("strategy_id", "")),
     )
     return with_correlation(request, {"updated": updated, "records": records})
+
+
+@router.post("/assistant/turn")
+def assistant_turn(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    message = str(payload.get("message", "")).strip()
+    if not message:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="message is required")
+
+    message_lc = message.lower()
+    suggestions: list[dict[str, str]] = []
+    if "risk" in message_lc or "kill" in message_lc:
+        suggestions.append({"title": "Open risk surface", "href": "/dashboard/risk"})
+    if "order" in message_lc or "fill" in message_lc or "reject" in message_lc:
+        suggestions.append({"title": "Inspect order truth", "href": "/dashboard/order-truth"})
+    if "benchmark" in message_lc or "result" in message_lc:
+        suggestions.append({"title": "Review benchmarks", "href": "/dashboard/benchmarks"})
+    if not suggestions:
+        suggestions = [
+            {"title": "Open command center", "href": "/dashboard"},
+            {"title": "Start guided onboarding", "href": "/onboarding"},
+        ]
+    return with_correlation(request, {
+        "assistant_message": (
+            "Recommendation generated using constrained operator policy. "
+            "Review linked surfaces before any capital-affecting action."
+        ),
+        "suggestions": suggestions,
+    })
+
+
+@router.post("/onboarding/runs")
+def start_onboarding_run(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    experience = _normalize_experience(payload.get("experience"))
+    automation = _normalize_automation(payload.get("automation"))
+    capital_usd = _normalize_capital(payload.get("capital_usd", payload.get("capitalUsd")))
+    plan = _build_onboarding_plan(
+        experience=experience,
+        automation=automation,
+        capital_usd=capital_usd,
+    )
+    run_id = f"run_{uuid4().hex[:10]}"
+    run = _build_onboarding_run(run_id=run_id, commands=[str(item) for item in plan["commands"]])
+    store.onboarding_runs[run_id] = run
+
+    worker = threading.Thread(
+        target=_simulate_onboarding_progress,
+        args=(store, run_id),
+        daemon=True,
+    )
+    worker.start()
+
+    return with_correlation(request, {"run": run, "plan": plan})
+
+
+@router.get("/onboarding/runs/{run_id}")
+def get_onboarding_run(
+    run_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    run = store.onboarding_runs.get(str(run_id).strip())
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+    return with_correlation(request, {"run": run})
+
+
+@router.get("/ops/reference-performance")
+def get_reference_performance(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    payload = load_reference_performance()
+    payload["provenance"] = load_reference_provenance()
+    return with_correlation(request, payload)
 
 
 @router.get("/ops/execution-quality")

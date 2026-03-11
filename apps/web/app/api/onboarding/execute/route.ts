@@ -1,7 +1,4 @@
-import { NextResponse } from "next/server";
-
-import { buildOnboardingPlan } from "@/lib/onboarding/plan";
-import { startOnboardingRun } from "@/lib/onboarding/run-store";
+import { proxyApi } from "@/lib/api/server-proxy";
 
 interface Body {
   experience?: "beginner" | "intermediate" | "advanced";
@@ -11,14 +8,12 @@ interface Body {
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => ({}))) as Body;
-  const plan = buildOnboardingPlan({
-    experience: payload.experience ?? "beginner",
-    automation: payload.automation ?? "manual",
-    capitalUsd: Number(payload.capitalUsd ?? 5000),
-  });
-  const run = startOnboardingRun(plan.commands);
-  return NextResponse.json({
-    run,
-    plan,
+  return proxyApi("/v1/onboarding/runs", {
+    method: "POST",
+    body: {
+      experience: payload.experience ?? "beginner",
+      automation: payload.automation ?? "manual",
+      capital_usd: Number(payload.capitalUsd ?? 5000),
+    },
   });
 }

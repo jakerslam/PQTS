@@ -1,20 +1,15 @@
-import { loadReplayEvents, replayHash } from "@/lib/ops/reference-data";
+import { getReplay } from "@/lib/api/client";
 
-function eventTypeCounts(events: Array<Record<string, unknown>>): Array<{ event_type: string; count: number }> {
-  const counts = new Map<string, number>();
-  for (const row of events) {
-    const key = String(row.event_type ?? "unknown");
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .map(([event_type, count]) => ({ event_type, count }))
-    .sort((left, right) => right.count - left.count || left.event_type.localeCompare(right.event_type));
-}
-
-export default function ReplayPage() {
-  const events = loadReplayEvents(240);
-  const counts = eventTypeCounts(events);
-  const hash = replayHash(events);
+export default async function ReplayPage() {
+  const replay = await getReplay(240).catch(() => ({
+    hash: "",
+    count: 0,
+    event_types: [],
+    events: [],
+  }));
+  const events = replay.events;
+  const counts = replay.event_types;
+  const hash = replay.hash || "unknown";
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -24,7 +19,7 @@ export default function ReplayPage() {
           Replay hash: <code>{hash}</code>
         </p>
         <p style={{ margin: 0, color: "var(--muted)" }}>
-          Events loaded: {events.length}
+          Events loaded: {replay.count}
         </p>
       </article>
 

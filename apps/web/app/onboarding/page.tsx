@@ -7,7 +7,7 @@ export default function OnboardingPage() {
       <header className="card" style={{ marginBottom: 16 }}>
         <h1 style={{ marginTop: 0 }}>PQTS Onboarding</h1>
         <p style={{ marginBottom: 0, color: "var(--muted)" }}>
-          Beginner-first setup that maps directly to the CLI and keeps promotion safety gates intact.
+          Browser-first setup that maps directly to CLI equivalents while preserving promotion safety gates.
         </p>
       </header>
 

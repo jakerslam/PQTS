@@ -1,9 +1,15 @@
-import { getFills, getOrders } from "@/lib/api/client";
+import { ProvenanceDrawer } from "@/components/provenance/provenance-drawer";
+import { getFills, getOrderTruth, getOrders, getReferencePerformance } from "@/lib/api/client";
 import { LiveStreamStatus } from "@/components/stream/live-stream-status";
 import Link from "next/link";
 
 export default async function ExecutionPage() {
-  const [orders, fills] = await Promise.all([getOrders(), getFills()]).catch(() => [[], []]);
+  const [orders, fills, truth, references] = await Promise.all([
+    getOrders().catch(() => []),
+    getFills().catch(() => []),
+    getOrderTruth().catch(() => ({ selected: null, rows: [], explanation: [], evidence_bundle: null })),
+    getReferencePerformance().catch(() => null),
+  ]);
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -21,6 +27,73 @@ export default async function ExecutionPage() {
           <Link href="/dashboard/order-truth">Per-Order Truth Drilldown</Link>
           <Link href="/dashboard/replay">Deterministic Replay Timeline</Link>
         </div>
+      </article>
+      <article className="card">
+        {references?.provenance ? (
+          <ProvenanceDrawer provenance={references.provenance} title="Execution provenance" />
+        ) : (
+          <p style={{ margin: 0, color: "var(--muted)" }}>
+            Execution provenance unavailable; check benchmark artifact publication and API connectivity.
+          </p>
+        )}
+      </article>
+
+      <article className="card">
+        <h2 style={{ marginTop: 0 }}>Order Lifecycle Explainability</h2>
+        {truth.evidence_bundle ? (
+          <div style={{ marginBottom: 12, padding: 10, border: "1px solid var(--border)" }}>
+            <strong>Event-Intel Evidence</strong>
+            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>
+              trust={truth.evidence_bundle.trust_label} · sources={truth.evidence_bundle.source_count} ·
+              gate={truth.evidence_bundle.risk_gate_decision} · latency=
+              {truth.evidence_bundle.latency_ms.toFixed(1)}ms
+            </div>
+          </div>
+        ) : null}
+        {truth.rows.length === 0 ? (
+          <p style={{ color: "var(--muted)" }}>No explainability rows available from order truth API.</p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th align="left">Order</th>
+                <th align="left">Signal</th>
+                <th align="left">Risk Gate</th>
+                <th align="left">Router/Venue</th>
+                <th align="left">Fill Outcome</th>
+                <th align="left">Drilldown</th>
+              </tr>
+            </thead>
+            <tbody>
+              {truth.rows.slice(0, 12).map((row) => {
+                const riskDecision =
+                  row.realized_net_alpha_usd > 0
+                    ? "ALLOW"
+                    : row.predicted_slippage_bps > row.realized_slippage_bps
+                      ? "REDUCE"
+                      : "HOLD";
+                const outcome =
+                  row.realized_slippage_bps <= row.predicted_slippage_bps
+                    ? `within budget (${row.realized_slippage_bps.toFixed(2)}bps)`
+                    : `drifted (${row.realized_slippage_bps.toFixed(2)}bps)`;
+                return (
+                  <tr key={row.trade_id}>
+                    <td>{row.trade_id}</td>
+                    <td>{row.strategy_id}</td>
+                    <td>{riskDecision}</td>
+                    <td>
+                      {row.exchange} · {row.side}
+                    </td>
+                    <td>{outcome}</td>
+                    <td>
+                      <Link href={`/dashboard/order-truth?order_id=${encodeURIComponent(row.trade_id)}`}>Open</Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </article>
 
       <article className="card">

@@ -1,6 +1,4 @@
-import { NextResponse } from "next/server";
-
-import { getOnboardingRun } from "@/lib/onboarding/run-store";
+import { proxyApi } from "@/lib/api/server-proxy";
 
 interface Params {
   params: Promise<{
@@ -10,9 +8,5 @@ interface Params {
 
 export async function GET(_request: Request, context: Params) {
   const { runId } = await context.params;
-  const run = getOnboardingRun(runId);
-  if (!run) {
-    return NextResponse.json({ error: "run not found" }, { status: 404 });
-  }
-  return NextResponse.json({ run });
+  return proxyApi(`/v1/onboarding/runs/${encodeURIComponent(runId)}`);
 }

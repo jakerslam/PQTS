@@ -9,10 +9,11 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "audit:runtime": "npm audit --omit=dev",
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "next": "15.0.3",
+    "next": "15.5.12",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-markdown": "9.0.1",
@@ -23,11 +24,11 @@
     "@types/node": "22.8.7",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
-    "@playwright/test": "1.49.0",
+    "@playwright/test": "1.58.2",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "16.0.1",
     "eslint": "8.57.1",
-    "eslint-config-next": "15.0.3",
+    "eslint-config-next": "15.5.12",
     "jsdom": "25.0.1",
     "typescript": "5.6.3",
     "vitest": "2.1.8"

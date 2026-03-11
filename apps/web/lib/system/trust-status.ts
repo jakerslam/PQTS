@@ -81,7 +81,7 @@ export function buildTrustStatusSnapshot(): TrustStatusSnapshot {
     .trim();
   return {
     environment: inferEnvironment(),
-    workspace: "PQTS Studio/Core",
+    workspace: "studio-web",
     accountId: String(process.env.PQTS_ACCOUNT_ID ?? "paper-main"),
     venue: venueHint || "sim",
     dataFreshnessSeconds: inferDataFreshnessSeconds(),
@@ -93,4 +93,3 @@ export function buildTrustStatusSnapshot(): TrustStatusSnapshot {
     generatedAt: new Date().toISOString(),
   };
 }
-

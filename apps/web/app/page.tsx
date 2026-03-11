@@ -6,8 +6,12 @@ export default async function HomePage() {
 
   return (
     <main>
-      <h1>PQTS Control Dashboard</h1>
-      <p>Next.js web app scaffold is connected to the PQTS API contract layer.</p>
+      <section className="card">
+        <h1 style={{ marginTop: 0 }}>PQTS Studio</h1>
+        <p style={{ margin: 0, color: "var(--muted)" }}>
+          Web-primary control tower for strategy operations, risk gates, and promotion evidence.
+        </p>
+      </section>
 
       <section className="grid" style={{ marginTop: 16 }}>
         <article className="card">
@@ -20,7 +24,7 @@ export default async function HomePage() {
         </article>
         <article className="card">
           <p className="kpi-title">Kill Switch</p>
-          <p className="kpi-value">{risk?.kill_switch_active ? "ACTIVE" : "Normal"}</p>
+          <p className="kpi-value">{risk?.kill_switch_active ? "ACTIVE" : "NORMAL"}</p>
         </article>
         <article className="card">
           <p className="kpi-title">Daily PnL</p>
@@ -29,13 +33,13 @@ export default async function HomePage() {
       </section>
 
       <section className="card" style={{ marginTop: 16 }}>
-        <h2 style={{ marginTop: 0 }}>New to PQTS?</h2>
-        <p style={{ marginBottom: 0 }}>
-          Start with the guided onboarding wizard, then continue into the authenticated dashboard.
+        <h2 style={{ marginTop: 0 }}>Start Flow</h2>
+        <p style={{ marginBottom: 0, color: "var(--muted)" }}>
+          Complete guided onboarding, then move into dashboard execution/risk surfaces with one shared data model.
         </p>
         <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/onboarding">Open onboarding wizard</Link>
-          <Link href="/dashboard">Open dashboard</Link>
+          <Link href="/onboarding">Guided onboarding</Link>
+          <Link href="/dashboard">Open Studio dashboard</Link>
         </div>
       </section>
     </main>

@@ -59,6 +59,8 @@ python main.py run config/paper.yaml --show-toggles
 # Dash fallback (operator/internal):
 python src/dashboard/start.py
 docker compose up --build
+# optional Dash fallback in compose:
+docker compose --profile operator up --build
 ```
 
 ## 6) Read-Only First + Wallet Mode Progression

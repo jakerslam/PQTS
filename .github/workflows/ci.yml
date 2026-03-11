@@ -153,6 +153,36 @@ jobs:
       - name: Truth-surface consistency checks (gating)
         run: python3 tools/check_truth_surface.py
 
+      - name: Release instruction example checks (gating)
+        run: |
+          python3 tools/check_release_examples.py \
+            --pyproject pyproject.toml \
+            --files README.md docs/RELEASE_CHECKLIST.md docs/QUICKSTART_5_MIN.md
+
+      - name: Top-100 ROI ranking freshness checks (gating)
+        run: |
+          python3 tools/generate_top_roi_moves.py \
+            --todo docs/TODO.md \
+            --top 100 \
+            --md-out docs/TOP_100_ROI_MOVES.md \
+            --json-out docs/TOP_100_ROI_MOVES.json
+          git diff --exit-code docs/TOP_100_ROI_MOVES.md docs/TOP_100_ROI_MOVES.json
+
+      - name: Full SRS family-closure checks (gating)
+        run: |
+          python3 tools/generate_full_srs_closure_artifacts.py \
+            --todo docs/TODO.md \
+            --defaults-out config/strategy/assimilation_full_closure_defaults.json \
+            --map-out docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md
+          python3 tools/check_full_srs_closure.py \
+            --defaults config/strategy/assimilation_full_closure_defaults.json \
+            --todo docs/TODO.md \
+            --map docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md \
+            --srs docs/SRS.md
+          git diff --exit-code \
+            config/strategy/assimilation_full_closure_defaults.json \
+            docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md
+
       - name: Studio UX + template contract validation (gating)
         run: python3 tools/check_studio_contract.py
 
@@ -161,6 +191,9 @@ jobs:
 
       - name: Web API contract validation (gating)
         run: python3 tools/check_web_api_contracts.py
+
+      - name: Surface contract and migration gate validation (gating)
+        run: python3 tools/check_surface_contracts.py
 
       - name: Wedge-first scope governance validation (gating)
         run: python3 tools/check_scope_governance.py --requested-markets crypto
@@ -231,6 +264,13 @@ jobs:
       - name: Claim evidence checks (gating)
         run: python3 tools/check_claim_evidence.py
 
+      - name: Claim evidence link checks (gating)
+        run: |
+          python3 tools/check_claim_evidence_links.py \
+            --target README.md \
+            --target docs/BENCHMARKS.md \
+            --target docs/REFERENCE_PERFORMANCE.md
+
       - name: External validation evidence checks (gating)
         run: |
           python3 tools/check_external_validation_evidence.py \
@@ -281,6 +321,9 @@ jobs:
 
       - name: Run vitest
         run: npm test
+
+      - name: Runtime dependency audit
+        run: npm run audit:runtime
 
   static_analysis:
     name: Bandit and Mypy (non-gating)

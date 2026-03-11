@@ -13,21 +13,26 @@
 
 > A crypto-first algorithmic trading platform with staged expansion to equities and forex.
 
+## Why This Repo Is Different
+
+PQTS is designed as a **deployment trust operating system**:
+
+- **One engine, two user densities**: beginner-friendly guided workflows and pro-grade drilldowns on the same object model
+- **Promotion gates built in**: explicit `backtest -> paper -> shadow -> canary -> live` lifecycle
+- **Truth + provenance surfaces**: benchmark trust labels, artifact paths, and per-order explainability
+- **Fast stack with measured native hotpaths**: Python-first with Rust acceleration where latency matters
+- **Web-primary product surface**: Next.js Studio + FastAPI control plane, with Dash retained as operator fallback
+
 ## 🚀 Features
 
-- **Crypto-First With Expansion Paths**: Production wedge is crypto; equities/forex adapters are staged behind certification gates
-- **10 Strategy Channels**: Scalping, arbitrage, trend following, mean reversion, ML, volume profile, regime detection, order flow, liquidity sweeps, multi-timeframe
-- **Universal Indicators**: Technical analysis that works across all markets
-- **Risk Management**: Institutional-grade position sizing (Kelly criterion) and drawdown controls
-- **Machine Learning**: Ensemble models with online learning
-- **Backtesting Framework**: Event-driven backtesting with realistic execution
-- **Real-time Dashboard**: Live P&L and performance metrics
-- **Paper Trading**: Test risk-free before going live
-- **Telegram/Discord Alerts**: Incident, kill-switch, and daily PnL notification hooks
-
-## 🏆 Why PQTS
-
-PQTS is built for operational robustness first, not just strategy scripts.
+- **Web-Primary Studio**: Next.js dashboard for onboarding, execution, risk, promotion, and benchmark evidence
+- **Canonical FastAPI Control Plane**: typed `/v1` contracts for account, portfolio, execution, risk, promotions, and ops diagnostics
+- **Order-Truth and Execution Explainability**: signal -> risk gate -> router/venue -> fill outcome drilldowns
+- **Promotion Control Center**: explicit advance/hold/rollback/halt state transitions
+- **Paper-First Safety Defaults**: no hidden live execution path in first-success onboarding
+- **Benchmark Program + Trust Labels**: reference vs diagnostic vs unverified artifact classification
+- **Operational Guardrails**: kill-switches, risk controls, reconciliation workflows, and incident telemetry
+- **Notifications Hooks**: stdout/Telegram/Discord channel validation and alert plumbing
 
 | Capability | PQTS | Freqtrade | NautilusTrader | Hummingbot |
 |------------|------|-----------|----------------|------------|
@@ -37,31 +42,45 @@ PQTS is built for operational robustness first, not just strategy scripts.
 | Simulation leaderboard + reporting | ✅ Native | ⚠️ Backtesting focus | ✅ Strong backtesting | ⚠️ Bot metrics focus |
 | Multi-market scope (crypto/equities/forex) | ✅ (crypto-first, staged expansion) | ⚠️ Primarily crypto | ✅ | ⚠️ Primarily crypto/market-making |
 
+### Reference Performance Snapshot
+
+Latest top reference bundle (`2026-03-11_reference_multi_market_making`):
+
+Evidence:
+- [Bundle README](results/2026-03-11_reference_multi_market_making/README.md)
+- [Leaderboard CSV](results/2026-03-11_reference_multi_market_making/simulation_leaderboard_20260311T054538975060Z.csv)
+- [Suite report JSON](results/2026-03-11_reference_multi_market_making/simulation_suite_20260311T054538975060Z.json)
+
+- `avg_quality_score=0.8403`
+- `avg_fill_rate=1.0000`
+- `avg_reject_rate=0.0000`
+- `total_filled=90` / `total_submitted=90`
+
 ## 🖼️ Visual Tour
 
 ### Screenshots
 
 | Dashboard Overview | Simulation Leaderboard |
 | --- | --- |
-| ![Dashboard Overview](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/dashboard_overview.png) | ![Simulation Leaderboard](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/simulation_leaderboard.png) |
+| ![Dashboard Overview](docs/media/dashboard_overview.png) | ![Simulation Leaderboard](docs/media/simulation_leaderboard.png) |
 
 | Risk Controls | Canary Progress |
 | --- | --- |
-| ![Risk Controls](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/risk_controls.png) | ![Canary Progress](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/canary_progress.png) |
+| ![Risk Controls](docs/media/risk_controls.png) | ![Canary Progress](docs/media/canary_progress.png) |
 
 | Ops Health | Execution Pipeline |
 | --- | --- |
-| ![Ops Health](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/ops_health.png) | ![Execution Pipeline](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/execution_pipeline.png) |
+| ![Ops Health](docs/media/ops_health.png) | ![Execution Pipeline](docs/media/execution_pipeline.png) |
 
 | Architecture Layers | Performance Snapshot |
 | --- | --- |
-| ![Architecture Layers](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/architecture_layers.png) | ![Performance Snapshot](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/performance_snapshot.png) |
+| ![Architecture Layers](docs/media/architecture_layers.png) | ![Performance Snapshot](docs/media/performance_snapshot.png) |
 
 ### GIF Previews
 
 | Dashboard Pulse | Leaderboard Cycle | Risk Alert Flash |
 | --- | --- | --- |
-| ![Dashboard Pulse](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/dashboard_pulse.gif) | ![Leaderboard Cycle](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/leaderboard_cycle.gif) | ![Risk Alert Flash](https://raw.githubusercontent.com/jakerslam/pqts/main/docs/media/risk_alert_flash.gif) |
+| ![Dashboard Pulse](docs/media/dashboard_pulse.gif) | ![Leaderboard Cycle](docs/media/leaderboard_cycle.gif) | ![Risk Alert Flash](docs/media/risk_alert_flash.gif) |
 
 Regenerate media assets with:
 
@@ -72,11 +91,15 @@ python scripts/generate_readme_media.py
 ## 📊 Quick Start
 
 ```bash
-# Preferred first-success path (package install)
+# 1) Install package
 pip install -U pqts
+
+# 2) Launch guided first-success flow
 pqts quickstart --execute
+
+# 3) Validate strategy and start bounded paper run
 pqts backtest momentum
-pqts paper start
+pqts paper start --risk-profile conservative
 ```
 
 Source/development path:
@@ -87,10 +110,18 @@ cd pqts
 make setup
 source .venv/bin/activate
 cp .env.example .env
-# Start primary web dashboard
-cd apps/web && npm install && npm run dev
-# Dash fallback (operator/internal)
-cd .. && python src/dashboard/start.py
+
+# Start canonical API control plane
+python -m uvicorn services.api.app:app --host 0.0.0.0 --port 8000
+
+# Start primary web Studio surface
+cd apps/web
+npm install
+npm run dev
+
+# Optional: Dash operator fallback surface
+cd ..
+python src/dashboard/start.py
 
 # Run paper trading
 python main.py config/paper.yaml
@@ -105,20 +136,25 @@ python main.py config/paper.yaml \
 
 ## 🐳 Docker Compose
 
-One-command local stack (app + dashboard + Redis + Postgres):
+One-command local stack (app + API + web + Redis + Postgres):
 
 ```bash
 docker compose up --build
+
+# Optional operator fallback (Dash):
+# docker compose --profile operator up --build
+
 # optional observability profile:
 # docker compose --profile observability up --build
 # or:
 # make observability-up
 ```
 
-Dashboard: `http://localhost:8501`  
+Web Studio: `http://localhost:3000`  
+Dash fallback (operator profile): `http://localhost:8501`  
 API metrics (observability profile): `http://localhost:8000/metrics`  
 Prometheus (observability profile): `http://localhost:9090`  
-Grafana (observability profile): `http://localhost:3000` (`admin` / `admin`)
+Grafana (observability profile): `http://localhost:3001` (`admin` / `admin`)
 Docs site (GitHub Pages): [https://jakerslam.github.io/PQTS/](https://jakerslam.github.io/PQTS/)
 Leaderboard fallback in-repo page: [docs/leaderboard/index.html](docs/leaderboard/index.html)
 Workflow fallback artifact when Pages is unavailable: `docs-site-fallback` in `Publish Docs Site` runs.
@@ -126,9 +162,11 @@ Latest release: [v0.1.5](https://github.com/jakerslam/PQTS/releases/tag/v0.1.5)
 
 ## 🌐 Web App Dashboard (Next.js)
 
-The authenticated web surface lives in `apps/web` and now includes:
 Primary public web surface: Next.js (`apps/web`).
 Dash remains the operator fallback during web cutover.
+
+Primary public web surface: **Next.js (`apps/web`)**.  
+Dash remains explicit operator fallback for legacy/internal diagnostics.
 
 - Promotion Control Center (`/dashboard/promotion`)
 - Execution Quality (`/dashboard/execution-quality`)
@@ -152,7 +190,7 @@ When deploying Protheus to production-like environments:
 - **Environment Variables**: Always copy `.env.example` to `.env` and populate with production credentials
 - **Configuration Files**: Start with `config/paper.yaml` for testing, then modify for live trading with appropriate risk limits
 - **Data Directories**: Ensure `data/` and `logs/` directories have sufficient disk space and appropriate backups
-- **Port Configuration**: The dashboard defaults to port 8501; ensure this is exposed appropriately in your environment
+- **Port Configuration**: Web Studio defaults to `3000`, API to `8000`, Dash fallback to `8501` (operator profile)
 - **Secret Management**: Use a secrets manager (AWS Secrets Manager, Vault, etc.) rather than storing credentials in config files for production
 
 ## ⚡ One-Command Demo
@@ -445,14 +483,25 @@ python scripts/run_canary_ramp.py
 python scripts/control_plane_report.py
 ```
 
-## 🎛️ Dashboard
+## 🎛️ Studio Surface
 
-Launch the real-time dashboard:
+Launch the primary web Studio:
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Access at `http://localhost:3000`
+
+Operator fallback (Dash):
+
 ```bash
 python src/dashboard/start.py
 ```
 
-Access at `http://localhost:8501`
+Fallback access at `http://localhost:8501`
 
 ## 📈 Strategy Performance
 
@@ -531,6 +580,7 @@ Repository layout guide: `docs/REPO_STRUCTURE.md`
 - [Two-Week RYG Plan](docs/EXECUTION_PLAN_2W_RYG.md)
 - [SRS Coverage Matrix](docs/SRS_COVERAGE_MATRIX.md)
 - [SRS Gap Backlog](docs/SRS_GAP_BACKLOG.md)
+- [Top 100 ROI Moves](docs/TOP_100_ROI_MOVES.md)
 - [Development Summary](docs/DEVELOPMENT_SUMMARY.md)
 - [Native Hotpath](docs/NATIVE_HOTPATH.md)
 - [Live Money Roadmap](docs/ROADMAP_LIVE_MONEY.md)
@@ -572,8 +622,16 @@ Repository layout guide: `docs/REPO_STRUCTURE.md`
 
 ## 📦 Releases
 
-- Create a semantic version tag (for example `v0.1.1`) to trigger release + PyPI publish workflow.
+- Create a semantic version tag (for example `vX.Y.Z`) to trigger release + PyPI publish workflow.
 - Release notes are generated automatically in GitHub Releases.
+
+## 🎯 ROI Execution
+
+- Generate the ranked Top-100 execution slice from current TODO metadata:
+  - `make top100-roi`
+- CI enforces freshness for:
+  - `docs/TOP_100_ROI_MOVES.md`
+  - `docs/TOP_100_ROI_MOVES.json`
 
 ## 🛠️ Configuration
 

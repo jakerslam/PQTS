@@ -126,8 +126,8 @@ class APIPersistence:
         _ensure_sqlite_parent(value)
         try:
             engine = create_engine(value, future=True, pool_pre_ping=True)
-        except ModuleNotFoundError:
-            # Keep API startup non-fatal when optional Postgres driver is unavailable.
+        except (ModuleNotFoundError, ImportError):
+            # Keep API startup non-fatal when optional Postgres driver/libpq is unavailable.
             return None
         session_factory = sessionmaker(bind=engine, future=True)
         return cls(database_url=value, session_factory=session_factory)

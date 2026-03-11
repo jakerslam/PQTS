@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "family": "HKO",
+  "updated_at": "2026-03-11T00:00:00Z",
+  "event_intel": {
+    "min_sources": 2,
+    "max_corroboration_skew_seconds": 120.0,
+    "max_clock_skew_seconds": 2.0,
+    "max_quote_age_seconds": 15.0,
+    "max_event_age_seconds": 300.0,
+    "provider": {
+      "read_only": true,
+      "required_fields": [
+        "signal_id",
+        "event_ts",
+        "confidence"
+      ],
+      "max_provider_age_seconds": 60.0,
+      "block_write_keys": [
+        "submit_order",
+        "place_order",
+        "cancel_order",
+        "execute_trade",
+        "router_action"
+      ]
+    }
+  },
+  "edge_decay": {
+    "low_load_max": 5,
+    "high_load_min": 20,
+    "min_samples_per_bucket": 3,
+    "decay_tighten_threshold": 0.35,
+    "decay_pause_threshold": 0.6
+  },
+  "evidence": {
+    "bundle_path": "data/reports/order_truth/event_intel_latest.json",
+    "required_fields": [
+      "candidate_id",
+      "strategy_id",
+      "trust_label",
+      "timing",
+      "corroboration",
+      "causal_alignment",
+      "risk_gate"
+    ]
+  }
+}

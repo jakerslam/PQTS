@@ -1,4 +1,5 @@
-import { loadReferencePerformance } from "@/lib/ops/reference-data";
+import { ProvenanceDrawer } from "@/components/provenance/provenance-drawer";
+import { getReferencePerformance } from "@/lib/api/client";
 
 function trustLabel(fillRate: number, quality: number): "reference" | "diagnostic_only" | "unverified" {
   if (fillRate > 0 && quality >= 0.25) return "reference";
@@ -6,8 +7,13 @@ function trustLabel(fillRate: number, quality: number): "reference" | "diagnosti
   return "unverified";
 }
 
-export default function BenchmarksPage() {
-  const payload = loadReferencePerformance();
+export default async function BenchmarksPage() {
+  const payload = await getReferencePerformance().catch(() => ({
+    generated_at: "",
+    bundle_count: 0,
+    bundles: [],
+    provenance: undefined,
+  }));
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <article className="card">
@@ -18,6 +24,7 @@ export default function BenchmarksPage() {
         <p style={{ margin: 0 }}>
           Last generated: <code>{payload.generated_at || "unknown"}</code>
         </p>
+        {payload.provenance ? <ProvenanceDrawer provenance={payload.provenance} /> : null}
       </article>
 
       <article className="card">
@@ -69,4 +76,3 @@ export default function BenchmarksPage() {
     </section>
   );
 }
-

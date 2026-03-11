@@ -12,7 +12,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main style={{ maxWidth: 520 }}>
       <section className="card">
         <h1>Sign In</h1>
-        <p>Use demo login for local dashboard scaffolding.</p>
+        <p>Authenticate into the primary PQTS web surface. Use operator credentials for non-read-only actions.</p>
         <form action="/api/auth/login" method="post" style={{ display: "grid", gap: 12 }}>
           <input type="hidden" name="next" value={nextPath} />
           <label htmlFor="email">Email</label>

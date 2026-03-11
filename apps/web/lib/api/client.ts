@@ -1,5 +1,15 @@
 import { webEnv } from "@/lib/env";
-import type { AccountSummary, Fill, Order, Position, RiskState } from "@/lib/api/types";
+import type {
+  AccountSummary,
+  ExecutionQualityRow,
+  Fill,
+  Order,
+  OrderTruthPayload,
+  Position,
+  ReplayPayload,
+  ReferencePerformance,
+  RiskState,
+} from "@/lib/api/types";
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${webEnv.NEXT_PUBLIC_API_BASE_URL}${path}`, {
@@ -65,6 +75,29 @@ interface RiskEnvelope {
   };
 }
 
+interface ExecutionQualityEnvelope {
+  rows: Array<{
+    trade_id: string;
+    strategy_id: string;
+    symbol: string;
+    exchange: string;
+    side: string;
+    quantity: number;
+    price: number;
+    realized_slippage_bps: number;
+    predicted_slippage_bps: number;
+    realized_net_alpha_usd: number;
+    timestamp: string;
+  }>;
+}
+
+interface OrderTruthEnvelope {
+  selected: ExecutionQualityEnvelope["rows"][number] | null;
+  rows: ExecutionQualityEnvelope["rows"];
+  explanation: string[];
+  evidence_bundle?: OrderTruthPayload["evidence_bundle"];
+}
+
 export async function getAccountSummary(): Promise<AccountSummary> {
   const payload = await apiGet<AccountEnvelope>(`/v1/accounts/${webEnv.NEXT_PUBLIC_ACCOUNT_ID}`);
   return payload.account;
@@ -119,4 +152,54 @@ export async function getRiskState(): Promise<RiskState> {
     current_drawdown: Number(payload.risk_state.current_drawdown),
     daily_pnl: Number(payload.risk_state.metadata?.daily_pnl ?? 0),
   };
+}
+
+function mapExecutionQualityRow(row: ExecutionQualityEnvelope["rows"][number]): ExecutionQualityRow {
+  return {
+    trade_id: String(row.trade_id),
+    strategy_id: String(row.strategy_id),
+    symbol: String(row.symbol),
+    exchange: String(row.exchange),
+    side: String(row.side),
+    quantity: Number(row.quantity),
+    price: Number(row.price),
+    realized_slippage_bps: Number(row.realized_slippage_bps),
+    predicted_slippage_bps: Number(row.predicted_slippage_bps),
+    realized_net_alpha_usd: Number(row.realized_net_alpha_usd),
+    timestamp: String(row.timestamp),
+  };
+}
+
+export async function getReferencePerformance(): Promise<ReferencePerformance> {
+  return apiGet<ReferencePerformance>(`/v1/ops/reference-performance`);
+}
+
+export async function getExecutionQuality(limit = 200): Promise<ExecutionQualityRow[]> {
+  const bounded = Math.min(Math.max(Math.floor(limit), 1), 2000);
+  const payload = await apiGet<ExecutionQualityEnvelope>(`/v1/ops/execution-quality?limit=${bounded}`);
+  return payload.rows.map(mapExecutionQualityRow);
+}
+
+export async function getOrderTruth(orderId?: string): Promise<OrderTruthPayload> {
+  const params = new URLSearchParams();
+  if (orderId) {
+    params.set("order_id", orderId);
+  }
+  const suffix = params.toString();
+  const path = suffix ? `/v1/ops/order-truth?${suffix}` : "/v1/ops/order-truth";
+  const payload = await apiGet<OrderTruthEnvelope>(path);
+  return {
+    selected: payload.selected ? mapExecutionQualityRow(payload.selected) : null,
+    rows: payload.rows.map(mapExecutionQualityRow),
+    explanation: Array.isArray(payload.explanation) ? payload.explanation.map((item) => String(item)) : [],
+    evidence_bundle:
+      payload.evidence_bundle && typeof payload.evidence_bundle === "object"
+        ? payload.evidence_bundle
+        : null,
+  };
+}
+
+export async function getReplay(limit = 120): Promise<ReplayPayload> {
+  const bounded = Math.min(Math.max(Math.floor(limit), 1), 1000);
+  return apiGet<ReplayPayload>(`/v1/ops/replay?limit=${bounded}`);
 }

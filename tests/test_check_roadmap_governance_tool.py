@@ -79,3 +79,53 @@ def test_check_roadmap_governance_fails_when_review_missing(tmp_path: Path, monk
         ],
     )
     assert check_roadmap_governance.main() == 2
+
+
+def test_check_roadmap_governance_skips_moat_share_until_p0_complete(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    todo = tmp_path / "TODO.md"
+    todo.write_text(
+        """
+### P0 Trust and Reproducibility Baseline
+- [ ] parity p0 open (`Track: parity`, `Ref: COMP-1`)
+
+### P1 Product Coherence
+- [ ] parity p1 open (`Track: parity`, `Ref: COMP-6`)
+- [ ] parity p1 open two (`Track: parity`, `Ref: COMP-7`)
+- [ ] moat p1 open (`Track: moat`, `Ref: MOAT-1`)
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    review = tmp_path / "REVIEW.md"
+    review.write_text("Last updated: 2026-03-10\n", encoding="utf-8")
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        json.dumps(
+            {
+                "min_moat_share_after_parity_p0": 0.75,
+                "quarterly_review": {
+                    "max_review_age_days": 120,
+                    "review_file": str(review),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "check_roadmap_governance.py",
+            "--todo",
+            str(todo),
+            "--policy",
+            str(policy),
+            "--today",
+            "2026-03-10",
+        ],
+    )
+    # Moat share is below threshold, but gating should be deferred until P0 is complete.
+    assert check_roadmap_governance.main() == 0

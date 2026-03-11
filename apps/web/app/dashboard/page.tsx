@@ -2,8 +2,8 @@ import Link from "next/link";
 
 import { StreamTurnPreview } from "@/components/stream/stream-turn-preview";
 import { ToolEventRenderer } from "@/components/tool-renderers/tool-event-renderer";
-import { getAccountSummary, getRiskState } from "@/lib/api/client";
-import { loadBestReferenceBundle, loadReferencePerformance } from "@/lib/ops/reference-data";
+import { ProvenanceDrawer } from "@/components/provenance/provenance-drawer";
+import { getAccountSummary, getReferencePerformance, getRiskState } from "@/lib/api/client";
 import { getRegisteredToolTypes } from "@/lib/tools/registry";
 
 function nextActionHref(bundleCount: number, killSwitchActive: boolean): string {
@@ -28,9 +28,27 @@ function nextActionLabel(bundleCount: number, killSwitchActive: boolean): string
 
 export default async function DashboardHomePage() {
   const knownTypes = getRegisteredToolTypes();
-  const [account, risk] = await Promise.all([getAccountSummary(), getRiskState()]).catch(() => [null, null]);
-  const references = loadReferencePerformance();
-  const bestBundle = loadBestReferenceBundle();
+  const [account, risk, references] = await Promise.all([
+    getAccountSummary().catch(() => null),
+    getRiskState().catch(() => null),
+    getReferencePerformance().catch(() => ({
+      generated_at: "",
+      bundle_count: 0,
+      bundles: [],
+      provenance: undefined,
+    })),
+  ]);
+  const bestBundle =
+    references.bundles.length > 0
+      ? references.bundles
+          .slice()
+          .sort((left, right) => {
+            if (right.summary.avg_quality_score !== left.summary.avg_quality_score) {
+              return right.summary.avg_quality_score - left.summary.avg_quality_score;
+            }
+            return right.summary.avg_fill_rate - left.summary.avg_fill_rate;
+          })[0]
+      : null;
   const killSwitchActive = Boolean(risk?.kill_switch_active);
   const actionHref = nextActionHref(references.bundle_count, killSwitchActive);
   const actionLabel = nextActionLabel(references.bundle_count, killSwitchActive);
@@ -66,10 +84,16 @@ export default async function DashboardHomePage() {
       <article className="card">
         <h3 style={{ marginTop: 0 }}>Benchmark Reference Callout</h3>
         {bestBundle ? (
-          <p style={{ margin: 0 }}>
-            <strong>{bestBundle.bundle}</strong> · quality {bestBundle.summary.avg_quality_score.toFixed(3)} · fill {bestBundle.summary.avg_fill_rate.toFixed(3)} · trust{" "}
-            <span className="status-chip status-chip-reference">reference</span>
-          </p>
+          <>
+            <p style={{ margin: 0 }}>
+              <strong>{bestBundle.bundle}</strong> · quality {bestBundle.summary.avg_quality_score.toFixed(3)} · fill{" "}
+              {bestBundle.summary.avg_fill_rate.toFixed(3)} · reject {bestBundle.summary.avg_reject_rate.toFixed(3)} · trust{" "}
+              <span className={`status-chip status-chip-${references.provenance?.trust_label ?? "unverified"}`}>
+                {references.provenance?.trust_label ?? "unverified"}
+              </span>
+            </p>
+            {references.provenance ? <ProvenanceDrawer provenance={references.provenance} /> : null}
+          </>
         ) : (
           <p style={{ margin: 0, color: "var(--muted)" }}>No benchmark bundle available yet.</p>
         )}

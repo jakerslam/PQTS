@@ -28,6 +28,7 @@ export function TrustStatusBar({ snapshot, densityMode }: Props) {
   return (
     <section className="card trust-status-shell" aria-live="polite" role="status">
       <div className="trust-status-row">
+        <span className="status-chip">workspace:{snapshot.workspace}</span>
         <span className="status-chip">env:{snapshot.environment}</span>
         <span className="status-chip">mode:{densityMode}</span>
         <span className="status-chip">acct:{snapshot.accountId}</span>
@@ -37,6 +38,8 @@ export function TrustStatusBar({ snapshot, densityMode }: Props) {
         <span className="status-chip">kill:{snapshot.killSwitchState}</span>
         <span className={`status-chip status-chip-${snapshot.trustLabel}`}>trust:{snapshot.trustLabel}</span>
         <LiveStreamStatus channel="risk" accountId={snapshot.accountId} />
+        <LiveStreamStatus channel="orders" accountId={snapshot.accountId} />
+        <LiveStreamStatus channel="fills" accountId={snapshot.accountId} />
         <button
           type="button"
           className="inline-link-button"
@@ -54,4 +57,3 @@ export function TrustStatusBar({ snapshot, densityMode }: Props) {
     </section>
   );
 }
-
