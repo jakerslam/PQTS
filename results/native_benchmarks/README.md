@@ -18,4 +18,10 @@ python3 scripts/benchmark_execution_latency.py --orders 300 --target-p95-ms 200 
 
 Observed p95 speedup (`fallback / native`): **~2.83x**.
 
+## Claim Classification
+
+- `result_class: reference`
+- Provenance: `execution_latency_benchmark_20260310T175028Z.json` and `execution_latency_benchmark_20260310T175237Z.json`
+- Evidence basis: command output above + committed JSON artifacts in this directory.
+
 These are local in-process router benchmarks. Venue/network round-trip latency still dominates true live submit-to-ack timings.
