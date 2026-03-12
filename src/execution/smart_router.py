@@ -20,6 +20,15 @@ class OrderType(Enum):
     ICEBERG = "iceberg"
     TWAP = "twap"
     VWAP = "vwap"
+    OCO = "oco"
+    OTO = "oto"
+    POST_ONLY = "post_only"
+    REDUCE_ONLY = "reduce_only"
+    IOC = "ioc"
+    FOK = "fok"
+    GTC = "gtc"
+    CONTINGENT = "contingent"
+    POV = "pov"
 
 
 @dataclass
@@ -91,7 +100,7 @@ class SmartOrderRouter:
             maker_ladder_cfg.get("incremental_cost_buffer_bps", 0.5)
         )
 
-        logger.info(f"SmartOrderRouter initialized")
+        logger.info("SmartOrderRouter initialized")
 
     @staticmethod
     def _urgency_bucket(time_in_force: str) -> str:
@@ -99,6 +108,20 @@ class SmartOrderRouter:
         if token in {"IOC", "FOK"}:
             return "urgent"
         return "normal"
+
+    @staticmethod
+    def _is_explicit_advanced_order(order_type: OrderType) -> bool:
+        return order_type in {
+            OrderType.OCO,
+            OrderType.OTO,
+            OrderType.POST_ONLY,
+            OrderType.REDUCE_ONLY,
+            OrderType.IOC,
+            OrderType.FOK,
+            OrderType.GTC,
+            OrderType.CONTINGENT,
+            OrderType.POV,
+        }
 
     def _maker_ladder_decision(
         self,
@@ -239,6 +262,10 @@ class SmartOrderRouter:
         self, request: OrderRequest, market_data: Dict, exchange: str
     ) -> OrderType:
         """Select optimal order type"""
+        if self._is_explicit_advanced_order(request.order_type):
+            # Honor explicit advanced order instructions from strategy/operator.
+            return request.order_type
+
         venue_quality = self.venue_quality.get(str(exchange), {})
         if (
             float(venue_quality.get("slippage_ratio", 1.0)) >= self.slippage_guard_ratio
@@ -287,20 +314,26 @@ class SmartOrderRouter:
     def _split_order(self, request: OrderRequest, market_data: Dict) -> List[OrderRequest]:
         """Split large orders for optimal execution"""
 
-        if request.quantity <= self.max_single_order_size:
+        if request.quantity <= self.max_single_order_size and request.order_type != OrderType.POV:
             return [request]
 
-        # TWAP splitting
-        num_slices = int(request.quantity / self.max_single_order_size) + 1
+        if request.order_type == OrderType.POV:
+            target_participation = min(max(float(self.config.get("pov_participation_rate", 0.15)), 0.01), 0.5)
+            observed_volume = max(float(market_data.get("vol_24h", 0.0)) / 86_400.0, 1.0)
+            slice_size = max(self.max_single_order_size * target_participation, 1e-8)
+            num_slices = max(1, int(min(request.quantity / slice_size, observed_volume / slice_size)))
+        else:
+            # TWAP splitting
+            num_slices = int(request.quantity / self.max_single_order_size) + 1
         slice_size = request.quantity / num_slices
 
         splits = []
-        for i in range(num_slices):
+        for _ in range(num_slices):
             split = OrderRequest(
                 symbol=request.symbol,
                 side=request.side,
                 quantity=slice_size,
-                order_type=OrderType.LIMIT,
+                order_type=OrderType.LIMIT if request.order_type != OrderType.POV else OrderType.POV,
                 price=request.price,
                 time_in_force=request.time_in_force,
                 strategy_id=request.strategy_id,
@@ -315,7 +348,6 @@ class SmartOrderRouter:
     ) -> tuple:
         """Estimate trading costs"""
 
-        exchange_config = self.exchanges.get(exchange, {})
         monthly_volume = float(
             self.monthly_volume_by_venue.get(exchange, self.default_monthly_volume_usd)
         )
@@ -324,6 +356,9 @@ class SmartOrderRouter:
             OrderType.TWAP,
             OrderType.ICEBERG,
             OrderType.VWAP,
+            OrderType.POST_ONLY,
+            OrderType.GTC,
+            OrderType.POV,
         }
         fee_bps = self.fee_optimizer.effective_fee_bps(
             exchange,

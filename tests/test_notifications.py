@@ -1,4 +1,4 @@
-"""Tests for Telegram/Discord notification dispatch helpers."""
+"""Tests for multi-channel notification dispatch helpers."""
 
 from __future__ import annotations
 
@@ -56,14 +56,17 @@ def test_dispatch_sends_to_configured_channels(monkeypatch):
             discord_webhook_url="https://discord.test/webhook",
             telegram_bot_token="123:token",
             telegram_chat_id="-1001",
+            slack_webhook_url="https://hooks.slack.test/services/a/b",
+            email_webhook_url="https://email.test/hooks/send",
+            sms_webhook_url="https://sms.test/hooks/send",
         ),
         dedupe_ttl_seconds=60,
         min_interval_seconds=0,
     )
 
     result = dispatcher.dispatch("hello", event_key="evt-1")
-    assert result["sent_count"] == 2
-    assert len(calls) == 2
+    assert result["sent_count"] == 5
+    assert len(calls) == 5
 
 
 def test_dispatch_dedupe_blocks_repeat(monkeypatch):

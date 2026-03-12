@@ -60,6 +60,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.getenv("PQTS_TELEGRAM_CHAT_ID", ""),
         help="Telegram chat ID.",
     )
+    parser.add_argument(
+        "--slack-webhook-url",
+        default=os.getenv("PQTS_SLACK_WEBHOOK_URL", ""),
+        help="Slack webhook URL.",
+    )
+    parser.add_argument(
+        "--email-webhook-url",
+        default=os.getenv("PQTS_EMAIL_WEBHOOK_URL", ""),
+        help="Email relay webhook URL.",
+    )
+    parser.add_argument(
+        "--sms-webhook-url",
+        default=os.getenv("PQTS_SMS_WEBHOOK_URL", ""),
+        help="SMS relay webhook URL.",
+    )
     parser.add_argument("--dedupe-ttl-seconds", type=int, default=3600)
     parser.add_argument("--min-interval-seconds", type=int, default=5)
     return parser
@@ -91,6 +106,9 @@ def main() -> int:
             discord_webhook_url=str(args.discord_webhook_url),
             telegram_bot_token=str(args.telegram_bot_token),
             telegram_chat_id=str(args.telegram_chat_id),
+            slack_webhook_url=str(args.slack_webhook_url),
+            email_webhook_url=str(args.email_webhook_url),
+            sms_webhook_url=str(args.sms_webhook_url),
         ),
         dedupe_ttl_seconds=int(args.dedupe_ttl_seconds),
         min_interval_seconds=int(args.min_interval_seconds),

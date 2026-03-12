@@ -653,6 +653,9 @@ def _run_notify_test(args: argparse.Namespace) -> int:
         discord_webhook_url=str(args.discord_webhook or os.getenv("PQTS_DISCORD_WEBHOOK_URL", "")),
         telegram_bot_token=str(args.telegram_token or os.getenv("PQTS_TELEGRAM_BOT_TOKEN", "")),
         telegram_chat_id=str(args.telegram_chat_id or os.getenv("PQTS_TELEGRAM_CHAT_ID", "")),
+        slack_webhook_url=str(args.slack_webhook or os.getenv("PQTS_SLACK_WEBHOOK_URL", "")),
+        email_webhook_url=str(args.email_webhook or os.getenv("PQTS_EMAIL_WEBHOOK_URL", "")),
+        sms_webhook_url=str(args.sms_webhook or os.getenv("PQTS_SMS_WEBHOOK_URL", "")),
     )
     dispatcher = NotificationDispatcher(
         channels,
@@ -908,19 +911,22 @@ def build_first_success_parser() -> argparse.ArgumentParser:
 
     notify_parser = subparsers.add_parser(
         "notify",
-        help="Send a test notification to stdout/telegram/discord.",
+        help="Send a test notification to stdout/telegram/discord/slack/email/sms.",
     )
     notify_subparsers = notify_parser.add_subparsers(dest="notify_action", required=True)
     notify_test_parser = notify_subparsers.add_parser("test", help="Send test notification.")
     notify_test_parser.add_argument(
         "--channel",
-        choices=["stdout", "telegram", "discord"],
+        choices=["stdout", "telegram", "discord", "slack", "email", "sms"],
         default="stdout",
     )
     notify_test_parser.add_argument("--message", default="[PQTS TEST] Notifications channel check.")
     notify_test_parser.add_argument("--discord-webhook", default="")
     notify_test_parser.add_argument("--telegram-token", default="")
     notify_test_parser.add_argument("--telegram-chat-id", default="")
+    notify_test_parser.add_argument("--slack-webhook", default="")
+    notify_test_parser.add_argument("--email-webhook", default="")
+    notify_test_parser.add_argument("--sms-webhook", default="")
     notify_test_parser.add_argument("--output", choices=["table", "json"], default="table")
     notify_test_parser.set_defaults(handler=_run_notify_test)
 

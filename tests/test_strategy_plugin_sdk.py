@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from strategies.plugin_sdk import discover_plugins, scaffold_strategy_plugin, strategy_slug
+from strategies.plugin_sdk import (
+    discover_plugins,
+    scaffold_strategy_plugin,
+    strategy_slug,
+    validate_plugin_manifest,
+)
 
 
 def test_strategy_slug_normalizes_name() -> None:
@@ -23,3 +28,36 @@ def test_scaffold_strategy_plugin_creates_manifest_and_discoverable_plugin(tmp_p
     rows = discover_plugins(tmp_path / "plugins" / "strategies")
     assert len(rows) == 1
     assert rows[0].plugin_id == "momentum_burst"
+
+
+def test_validate_plugin_manifest_enforces_reference_for_gate_verified() -> None:
+    invalid = validate_plugin_manifest(
+        {
+            "plugin_id": "foo",
+            "name": "Foo",
+            "module": "plugins.foo",
+            "class_name": "FooStrategy",
+            "version": "0.1.0",
+            "markets": ["crypto"],
+            "risk_profile": "balanced",
+            "gate_verified": True,
+            "trust_label": "diagnostic_only",
+        }
+    )
+    assert invalid["valid"] is False
+    assert any("trust_label=reference" in reason for reason in invalid["errors"])
+
+    valid = validate_plugin_manifest(
+        {
+            "plugin_id": "foo",
+            "name": "Foo",
+            "module": "plugins.foo",
+            "class_name": "FooStrategy",
+            "version": "0.1.0",
+            "markets": ["crypto"],
+            "risk_profile": "balanced",
+            "gate_verified": True,
+            "trust_label": "reference",
+        }
+    )
+    assert valid["valid"] is True

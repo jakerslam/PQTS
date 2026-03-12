@@ -13,6 +13,11 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
+from analytics.readiness_gates import (
+    evaluate_backtest_readiness,
+    evaluate_paper_trade_readiness,
+    evaluate_promotion_gate,
+)
 from contracts.api import (
     AccountSummary,
     FillSnapshot,
@@ -21,6 +26,15 @@ from contracts.api import (
     PositionSnapshot,
     RiskStateSnapshot,
 )
+from contracts.instruments import normalize_instrument
+from execution.venue_failover import select_primary_and_fallback
+from research.advanced_training import (
+    run_adaptive_ensemble_training,
+    run_evolutionary_search,
+    run_rl_training,
+)
+from research.anti_leakage_validator import summarize_leakage_report
+from research.strategy_studio import build_strategy_graph, simulate_preview
 from services.api.auth import APIIdentity, require_identity, require_operator
 from services.api.cache import APICache, enforce_rate_limit, get_cache
 from services.api.correlation import read_request_correlation, with_correlation
@@ -39,6 +53,7 @@ from services.api.ops_data import (
 )
 from services.api.persistence import APIPersistence, get_persistence
 from services.api.state import APIRuntimeStore, StreamHub, get_store, get_stream_hub
+from strategies.marketplace import StrategyListing, summarize_marketplace
 
 router = APIRouter(prefix="/v1", tags=["core"])
 
@@ -999,6 +1014,52 @@ def apply_promotion_action(
     return with_correlation(request, {"updated": updated, "records": records})
 
 
+@router.post("/promotions/gate-evaluate")
+def evaluate_promotion_gate_bundle(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    strategy_id = str(payload.get("strategy_id", "")).strip()
+    if not strategy_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required")
+    metrics = payload.get("metrics", {})
+    if not isinstance(metrics, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="metrics must be an object")
+
+    backtest = evaluate_backtest_readiness(
+        net_expectancy=float(metrics.get("net_expectancy", 0.0) or 0.0),
+        calibration_stability=float(metrics.get("calibration_stability", 0.0) or 0.0),
+        max_drawdown_observed=float(metrics.get("max_drawdown_observed", 1.0) or 1.0),
+    )
+    paper = evaluate_paper_trade_readiness(
+        realized_net_alpha=float(metrics.get("realized_net_alpha", 0.0) or 0.0),
+        sample_size=int(metrics.get("sample_size", 0) or 0),
+        critical_violations=int(metrics.get("critical_violations", 0) or 0),
+        slippage_mape=float(metrics.get("slippage_mape", 1.0) or 1.0),
+    )
+    promotion = evaluate_promotion_gate(
+        paper_campaign_passed=bool(metrics.get("paper_campaign_passed", paper.passed)),
+        unresolved_high_severity_incidents=int(metrics.get("unresolved_high_severity_incidents", 0) or 0),
+        stress_replay_passed=bool(metrics.get("stress_replay_passed", False)),
+        portfolio_limits_intact=bool(metrics.get("portfolio_limits_intact", True)),
+    )
+    passed = bool(backtest.passed and paper.passed and promotion.passed)
+    recommendation = "advance" if passed else "hold"
+    return with_correlation(request, {
+        "strategy_id": strategy_id,
+        "decision": recommendation,
+        "passed": passed,
+        "gates": {
+            "backtest": backtest.as_dict(),
+            "paper": paper.as_dict(),
+            "promotion": promotion.as_dict(),
+        },
+    })
+
+
 @router.get("/agent/context")
 def get_agent_context(
     identity: Annotated[APIIdentity, Depends(require_identity)],
@@ -1547,6 +1608,140 @@ def sync_brokerage_accounts(
     if target and not touched:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="link_id not found")
     return with_correlation(request, {"synced_links": touched, "synced_at": now_iso})
+
+
+@router.post("/studio/strategy/preview")
+def preview_studio_strategy(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    strategy_id = str(payload.get("strategy_id", "")).strip() or "untitled"
+    code = str(payload.get("code", ""))
+    graph = build_strategy_graph(
+        {
+            "strategy_id": strategy_id,
+            "nodes": payload.get("nodes", []),
+            "edges": payload.get("edges", []),
+        }
+    )
+    sample_rows = payload.get("sample_rows", [])
+    if not isinstance(sample_rows, list):
+        sample_rows = []
+    report = simulate_preview(
+        strategy_id=strategy_id,
+        graph=graph,
+        code=code,
+        sample_rows=[row for row in sample_rows if isinstance(row, dict)],
+    )
+    report["leakage_summary"] = summarize_leakage_report(report.get("leakage_report", {}))
+    return with_correlation(request, report)
+
+
+@router.post("/studio/strategy/train")
+def train_studio_strategy(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    strategy_id = str(payload.get("strategy_id", "")).strip()
+    if not strategy_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required")
+    mode = str(payload.get("mode", "adaptive")).strip().lower()
+    if mode == "adaptive":
+        candidates = payload.get("candidate_models", [])
+        if not isinstance(candidates, list):
+            candidates = []
+        artifact = run_adaptive_ensemble_training(
+            strategy_id=strategy_id,
+            candidate_models=[row for row in candidates if isinstance(row, dict)],
+            retrain_on_live_data=bool(payload.get("retrain_on_live_data", True)),
+            optuna_trials=int(payload.get("optuna_trials", 32) or 32),
+        )
+    elif mode == "rl":
+        artifact = run_rl_training(
+            strategy_id=strategy_id,
+            episodes=int(payload.get("episodes", 200) or 200),
+            reward_mean=float(payload.get("reward_mean", 0.0) or 0.0),
+            reward_std=float(payload.get("reward_std", 1.0) or 1.0),
+        )
+    elif mode == "evolutionary":
+        artifact = run_evolutionary_search(
+            strategy_id=strategy_id,
+            generations=int(payload.get("generations", 30) or 30),
+            population_size=int(payload.get("population_size", 64) or 64),
+            best_fitness=float(payload.get("best_fitness", 0.0) or 0.0),
+        )
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mode must be adaptive|rl|evolutionary")
+    return with_correlation(request, {"artifact": artifact.to_dict()})
+
+
+@router.post("/execution/failover/evaluate")
+def evaluate_execution_failover(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    rows = payload.get("venues", [])
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="venues must be an array")
+    report = select_primary_and_fallback(
+        [row for row in rows if isinstance(row, dict)],
+        max_latency_ms=float(payload.get("max_latency_ms", 250.0) or 250.0),
+        max_reject_rate=float(payload.get("max_reject_rate", 0.20) or 0.20),
+    )
+    return with_correlation(request, report)
+
+
+@router.get("/instruments/normalize")
+def normalize_instrument_contract(
+    request: Request,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    cache: Annotated[APICache, Depends(get_cache)],
+    venue: Annotated[str, Query(min_length=1)],
+    symbol: Annotated[str, Query(min_length=1)],
+    market: Annotated[str, Query(min_length=1)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    instrument = normalize_instrument(venue=venue, symbol=symbol, market=market)
+    return with_correlation(request, {"instrument": instrument.to_dict()})
+
+
+@router.get("/marketplace/listings")
+def list_marketplace_listings(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    rows = [dict(row) for row in store.marketplace_listings.values() if isinstance(row, dict)]
+    summary = summarize_marketplace(rows)
+    return with_correlation(request, summary)
+
+
+@router.post("/marketplace/listings")
+def upsert_marketplace_listing(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    listing = StrategyListing.from_payload(payload)
+    if not listing.strategy_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required")
+    store.marketplace_listings[listing.listing_id] = listing.to_dict()
+    summary = summarize_marketplace([dict(row) for row in store.marketplace_listings.values()])
+    return with_correlation(request, {"listing": listing.to_dict(), "summary": summary})
 
 
 @router.get("/studio/terminal")

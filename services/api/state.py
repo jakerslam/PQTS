@@ -45,6 +45,7 @@ class APIRuntimeStore:
     agent_intents: dict[str, dict[str, Any]] = field(default_factory=dict)
     agent_receipts: dict[str, dict[str, Any]] = field(default_factory=dict)
     agent_hooks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    marketplace_listings: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def bootstrap(cls) -> "APIRuntimeStore":
@@ -136,6 +137,24 @@ class APIRuntimeStore:
             agent_intents={},
             agent_receipts={},
             agent_hooks={},
+            marketplace_listings={
+                "listing_market_making_reference": {
+                    "listing_id": "listing_market_making_reference",
+                    "strategy_id": "market_making",
+                    "title": "Reference Market Making (Crypto)",
+                    "version": "0.1.5",
+                    "author": "pqts-core",
+                    "verified_badge": True,
+                    "reputation_score": 0.84,
+                    "promotion_stage": "canary",
+                    "trust_label": "reference",
+                    "created_at": now_iso,
+                    "metadata": {
+                        "source": "reference_bundle",
+                        "market": "crypto",
+                    },
+                }
+            },
         )
 
 

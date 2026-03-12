@@ -160,6 +160,17 @@ def summarize_execution_quality(limit: int = 200) -> dict[str, Any]:
     predicted = [_parse_float(row.get("predicted_slippage_bps")) for row in rows]
     alpha = [_parse_float(row.get("realized_net_alpha_usd")) for row in rows]
 
+    chart_points = [
+        {
+            "trade_id": str(row.get("trade_id", "")),
+            "timestamp": str(row.get("timestamp", "")),
+            "realized_slippage_bps": _parse_float(row.get("realized_slippage_bps")),
+            "predicted_slippage_bps": _parse_float(row.get("predicted_slippage_bps")),
+            "realized_net_alpha_usd": _parse_float(row.get("realized_net_alpha_usd")),
+        }
+        for row in rows
+    ]
+
     return {
         "summary": {
             "rows": len(rows),
@@ -168,6 +179,7 @@ def summarize_execution_quality(limit: int = 200) -> dict[str, Any]:
             "avg_realized_net_alpha_usd": _mean(alpha),
             "total_realized_net_alpha_usd": sum(alpha),
         },
+        "chart_points": chart_points,
         "rows": rows,
     }
 
@@ -362,7 +374,7 @@ def build_data_seed_command(payload: dict[str, Any]) -> list[str]:
 
 def build_notify_command(payload: dict[str, Any]) -> list[str]:
     channel = str(payload.get("channel", "stdout"))
-    if channel not in {"stdout", "telegram", "discord"}:
+    if channel not in {"stdout", "telegram", "discord", "slack", "email", "sms"}:
         channel = "stdout"
     message = str(payload.get("message", "[PQTS TEST] Notifications channel check from API."))
 
@@ -388,6 +400,12 @@ def build_notify_command(payload: dict[str, Any]) -> list[str]:
         )
     elif channel == "discord":
         command.extend(["--discord-webhook", str(payload.get("discord_webhook", ""))])
+    elif channel == "slack":
+        command.extend(["--slack-webhook", str(payload.get("slack_webhook", ""))])
+    elif channel == "email":
+        command.extend(["--email-webhook", str(payload.get("email_webhook", ""))])
+    elif channel == "sms":
+        command.extend(["--sms-webhook", str(payload.get("sms_webhook", ""))])
     return command
 
 

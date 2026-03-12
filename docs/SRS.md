@@ -5022,3 +5022,175 @@ Observed source references:
 - Default agent policy shall deny execution (`execute=false`) until explicitly enabled by operator policy update.
 - Runtime shall deny execute requests for default policies even when caller has operator identity.
 - Invalid hook/event/action payloads shall fail closed rather than silently degrade.
+
+## 90. Competitor-Beating Integration Requirements (March 12, 2026)
+
+These requirements assimilate parity-plus improvements across Freqtrade, NautilusTrader, Jesse, Superalgos, and Hummingbot while preserving PQTS institutional controls (promotion gates, provenance, kill-switches, explainability).
+
+### CBX-1 Hybrid Visual + Code Strategy Studio Contract
+
+- The system SHALL provide a unified strategy studio that combines node-based visual authoring with a full Python/Rust code editor, including syntax checks and autocomplete.
+- Source parity reference: Superalgos visual design workflows + Jesse integrated strategy editor.
+- Beat mechanism: real-time simulation preview and promotion-gate readiness feedback in the same authoring surface.
+
+### CBX-2 Embedded Strategy Copilot Contract
+
+- The system SHALL provide an embedded AI assistant that can generate, debug, optimize, and explain strategy logic using repository-aware context and gate-history feedback.
+- Source parity reference: JesseGPT/Jesse AI optimize flows.
+- Beat mechanism: assistant outputs must be policy-constrained, code-visible, and linked to promotion/risk evidence.
+
+### CBX-3 Adaptive Ensemble ML Runtime Contract
+
+- The system SHALL support adaptive ensemble ML pipelines with live retraining hooks and hyperparameter search integration.
+- Source parity reference: FreqAI + Optuna/Hyperopt workflows.
+- Beat mechanism: native hotpath acceleration and gate-coupled retraining safety checks before promotion use.
+
+### CBX-4 RL + Evolutionary Training Contract
+
+- The system SHALL support reinforcement learning and evolutionary strategy training workflows with deterministic artifact export into promotion gates.
+- Source parity reference: Nautilus-style ML/RL research integration.
+- Beat mechanism: one-click promotion eligibility artifacts with explicit risk-boundary metadata.
+
+### CBX-5 Mandatory Anti-Leakage Validation Contract
+
+- The system SHALL run no-look-ahead-bias and leakage checks automatically on every strategy submission and publish machine-readable audit reports.
+- Source parity reference: Freqtrade lookahead analysis + Jesse/Nautilus validation discipline.
+- Beat mechanism: hard gate failure status blocks promotion progression until resolved.
+
+### CBX-6 Unified Web-Primary Studio Control Contract
+
+- The system SHALL provide a unified Next.js web studio with one-click backtest, paper, shadow, canary, and live promotion controls.
+- Source parity reference: Freqtrade WebUI + Jesse built-in interface + Nautilus notebook control patterns.
+- Beat mechanism: one canonical control plane for all modes with trust/provenance overlays.
+
+### CBX-7 Multi-Channel Notification Automation Contract
+
+- The system SHALL support Telegram, Discord, Slack, email, and SMS notifications with actionable controls for operator workflows.
+- Source parity reference: Freqtrade Telegram + Jesse alert surfaces.
+- Beat mechanism: channel actions remain role-gated and audit-linked to risk/promotion state.
+
+### CBX-8 Interactive Explainability Charting Contract
+
+- The system SHALL provide interactive charting for indicators, fills, slippage, and order provenance directly in Studio.
+- Source parity reference: Superalgos charting and Jesse interactive strategy visualization.
+- Beat mechanism: chart annotations must deep-link to order-truth and gate artifacts.
+
+### CBX-9 Mandatory Promotion Gate Lifecycle Contract
+
+- The system SHALL enforce promotion gates (`backtest -> paper -> shadow -> canary -> live`) for all production strategy workflows.
+- Source parity reference: Freqtrade dry-run progression + Nautilus research-to-live parity expectations.
+- Beat mechanism: add institutional kill-switch, rollback contracts, and stage-blocking evidence checks.
+
+### CBX-10 Full Order Provenance + Explainability Contract
+
+- The system SHALL preserve full order provenance where each order/fill is traceable to strategy decision, risk gate, router decision, and model/context inputs.
+- Source parity reference: exceeds baseline competitor logging surfaces.
+- Beat mechanism: per-order explainability becomes a first-class API/UI contract for audits and incident response.
+
+### CBX-11 Advanced Pre-Trade Risk Engine Contract
+
+- The system SHALL enforce pre-trade risk controls including position caps, margin checks, drawdown limits, rate limits, and kill-switch blocking.
+- Source parity reference: Nautilus RiskEngine + Freqtrade edge/risk modules.
+- Beat mechanism: real-time risk telemetry and fail-closed execution gating across all venues.
+
+### CBX-12 Mandatory Stress + Robustness Suite Contract
+
+- The system SHALL execute Monte Carlo, walk-forward, and stress-test suites before promotion advancement.
+- Source parity reference: Jesse robustness metrics + Hummingbot-style strategy stress behavior.
+- Beat mechanism: promotion cannot advance on incomplete or failed robustness evidence.
+
+### CBX-13 Rust-Native Deterministic Execution Core Contract
+
+- The system SHALL maintain a Rust-native deterministic execution core with high-resolution event sequencing and reproducible replay.
+- Source parity reference: Nautilus Rust execution core.
+- Beat mechanism: hybrid Python+Rust orchestration with explicit latency SLO and governance coupling.
+
+### CBX-14 Advanced Order-Type Coverage Contract
+
+- The system SHALL support OCO, OTO, IOC, FOK, GTC, post-only, reduce-only, contingent triggers, and partial-fill handling across execution adapters.
+- Source parity reference: Nautilus, Jesse, and Hummingbot advanced order capability sets.
+- Beat mechanism: order-type safety and traceability are enforced through canonical contracts and risk-aware router paths.
+
+### CBX-15 Live-Path Performance SLO Contract
+
+- The system SHALL target sub-15ms p95 local submit latency and high-throughput market-data processing on validated benchmark workloads.
+- Source parity reference: Nautilus low-latency execution claims and high-throughput positioning.
+- Beat mechanism: publish repeatable benchmark artifacts with provenance and environment disclosures.
+
+### CBX-16 Research-to-Live Backtest Parity Contract
+
+- The system SHALL provide deterministic high-resolution backtesting with explicit parity mapping to live execution semantics.
+- Source parity reference: Nautilus research/live parity emphasis.
+- Beat mechanism: automatic parity checks and promotion-gate linkage reduce hidden simulation-to-live drift.
+
+### CBX-17 Strategy Leaderboard + Promotion Recommendation Contract
+
+- The system SHALL maintain a multi-market leaderboard that ranks strategy runs by quality metrics and emits promotion recommendations.
+- Source parity reference: Jesse benchmarking + Freqtrade analysis workflows.
+- Beat mechanism: trust labels and provenance metadata must accompany all leaderboard recommendations.
+
+### CBX-18 Staged Deployment with Zero-Downtime Rollout Contract
+
+- The system SHALL support paper, shadow, canary, and staged live rollouts with rollback-safe transitions and no required downtime windows.
+- Source parity reference: exceeds single-step live deployment models common in retail-focused stacks.
+- Beat mechanism: promotion and rollback operations are policy-driven, auditable, and stage-gated.
+
+### CBX-19 Multi-Asset Normalized Instrument Contract
+
+- The system SHALL support normalized multi-asset trading across crypto spot/futures/perps/options, equities, FX, and traditional futures adapters.
+- Source parity reference: Nautilus multi-asset breadth + Freqtrade crypto depth.
+- Beat mechanism: single risk/governance surface across all instruments and venues.
+
+### CBX-20 Multi-Venue Connectivity + Failover Contract
+
+- The system SHALL integrate major exchanges/brokers through CCXT and native streaming adapters with venue-specific risk overlays and failover controls.
+- Source parity reference: Freqtrade exchange breadth + Nautilus adapter model.
+- Beat mechanism: venue certification and runtime health gating control live eligibility.
+
+### CBX-21 Verified Strategy Marketplace Contract
+
+- The system SHALL provide a strategy marketplace with verified badges, reputation scoring, and one-click import guarded by promotion-gate evidence.
+- Source parity reference: Superalgos community marketplace + Freqtrade strategy sharing.
+- Beat mechanism: only gate-verified strategies may receive production-trust badges.
+
+### CBX-22 Plugin Extensibility Contract
+
+- The system SHALL provide plugin interfaces for indicators, execution algorithms, connectors, and adapters with schema validation and test hooks.
+- Source parity reference: Hummingbot modularity + Nautilus component model.
+- Beat mechanism: plugins must pass contract and gate validation before operational activation.
+
+### CBX-23 Contribution Pipeline Quality Gate Contract
+
+- The system SHALL run automated backtest, gate checks, and policy validation on contribution pipelines before merge eligibility.
+- Source parity reference: Freqtrade community contribution velocity.
+- Beat mechanism: enforce evidence-bearing PR checks for strategy/runtime changes.
+
+### CBX-24 Observability + Incident Telemetry Contract
+
+- The system SHALL expose Prometheus/Grafana observability plus incident telemetry with order-level provenance context.
+- Source parity reference: Nautilus execution logging and mainstream ops observability patterns.
+- Beat mechanism: incident views connect directly to explainability and promotion history artifacts.
+
+### CBX-25 Docker-First Operations Contract
+
+- The system SHALL support Docker-first deployment profiles for operator-only and observability-enabled runtime modes.
+- Source parity reference: Freqtrade Docker ease-of-use and container-first operations.
+- Beat mechanism: preserve institutional controls and gate telemetry in all container profiles.
+
+### CBX-26 Core Path Coverage and Benchmark Publication Contract
+
+- The system SHALL enforce full automated test coverage on core control, execution, and risk paths and publish benchmark artifacts with reproducible commands.
+- Source parity reference: parity with leader reliability expectations.
+- Beat mechanism: benchmark publication must include trust/provenance metadata and policy checks.
+
+### CBX-27 Open Community Growth Contract
+
+- The system SHALL remain MIT-licensed and maintain contributor onboarding standards (`CONTRIBUTING`, good-first-issue labeling, reproducible setup paths).
+- Source parity reference: Freqtrade-scale open-source community flywheel.
+- Beat mechanism: combine community growth with institutional safety gates and evidence discipline.
+
+### CBX-28 Research-to-Live Change-Minimization Contract
+
+- The system SHALL preserve research-to-live parity such that promotions require minimal code-surface divergence and explicit migration deltas when exceptions occur.
+- Source parity reference: Nautilus parity philosophy.
+- Beat mechanism: enforce gate checks on parity drift and require documented exceptions before live promotion.

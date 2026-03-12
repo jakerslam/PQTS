@@ -136,6 +136,7 @@ def test_ops_diagnostics_surfaces_return_payload_shapes() -> None:
     execution = client.get("/v1/ops/execution-quality", headers=_viewer())
     assert execution.status_code == 200
     assert "summary" in execution.json()
+    assert "chart_points" in execution.json()
     assert "rows" in execution.json()
 
     truth = client.get("/v1/ops/order-truth", headers=_viewer())
@@ -480,3 +481,110 @@ def test_agent_default_policy_blocks_execute_even_for_operator() -> None:
 
     denied = client.post(f"/v1/agent/intents/{intent_id}/execute", headers=_operator())
     assert denied.status_code == 403
+
+
+def test_strategy_studio_preview_training_and_gate_evaluation_contracts() -> None:
+    client = TestClient(create_app(_settings()))
+
+    preview = client.post(
+        "/v1/studio/strategy/preview",
+        json={
+            "strategy_id": "trend_following",
+            "code": "def signal(x):\n    return x\n",
+            "nodes": [{"node_id": "n1", "kind": "signal", "params": {"window": 20}}],
+            "edges": [["n1", "sink"]],
+            "sample_rows": [{"feature_ts": "2026-03-10T00:00:00", "target_ts": "2026-03-10T00:00:00"}],
+        },
+        headers=_viewer(),
+    )
+    assert preview.status_code == 200
+    preview_payload = preview.json()
+    assert preview_payload["compile_report"]["compiled"] is True
+    assert preview_payload["leakage_report"]["passed"] is True
+    assert "PASS no-lookahead validation" in preview_payload["leakage_summary"]
+
+    train = client.post(
+        "/v1/studio/strategy/train",
+        json={
+            "strategy_id": "trend_following",
+            "mode": "adaptive",
+            "candidate_models": [{"score": 0.61}, {"score": 0.64}],
+            "retrain_on_live_data": True,
+            "optuna_trials": 32,
+        },
+        headers=_operator(),
+    )
+    assert train.status_code == 200
+    assert train.json()["artifact"]["mode"] == "adaptive_ensemble"
+
+    gates = client.post(
+        "/v1/promotions/gate-evaluate",
+        json={
+            "strategy_id": "trend_following",
+            "metrics": {
+                "net_expectancy": 0.12,
+                "calibration_stability": 0.91,
+                "max_drawdown_observed": 0.09,
+                "realized_net_alpha": 42.0,
+                "sample_size": 400,
+                "critical_violations": 0,
+                "slippage_mape": 0.08,
+                "paper_campaign_passed": True,
+                "unresolved_high_severity_incidents": 0,
+                "stress_replay_passed": True,
+                "portfolio_limits_intact": True,
+            },
+        },
+        headers=_operator(),
+    )
+    assert gates.status_code == 200
+    assert gates.json()["passed"] is True
+    assert gates.json()["decision"] == "advance"
+
+
+def test_failover_instrument_and_marketplace_endpoints() -> None:
+    client = TestClient(create_app(_settings()))
+
+    failover = client.post(
+        "/v1/execution/failover/evaluate",
+        json={
+            "venues": [
+                {"venue": "binance", "latency_ms": 25, "reject_rate": 0.01, "connected": True, "liquidity_score": 0.95},
+                {"venue": "coinbase", "latency_ms": 45, "reject_rate": 0.02, "connected": True, "liquidity_score": 0.9},
+            ]
+        },
+        headers=_viewer(),
+    )
+    assert failover.status_code == 200
+    assert failover.json()["primary"]["venue"] == "binance"
+    assert failover.json()["fallback"]["venue"] == "coinbase"
+
+    normalized = client.get(
+        "/v1/instruments/normalize",
+        params={"venue": "oanda", "symbol": "EUR/USD", "market": "forex"},
+        headers=_viewer(),
+    )
+    assert normalized.status_code == 200
+    assert normalized.json()["instrument"]["asset_class"] == "forex"
+
+    listing = client.post(
+        "/v1/marketplace/listings",
+        json={
+            "strategy_id": "trend_following",
+            "title": "Trend Following Reference",
+            "version": "0.2.0",
+            "author": "ops",
+            "verified_badge": True,
+            "reputation_score": 0.83,
+            "promotion_stage": "canary",
+            "trust_label": "reference",
+        },
+        headers=_operator(),
+    )
+    assert listing.status_code == 200
+    assert listing.json()["listing"]["strategy_id"] == "trend_following"
+
+    listings = client.get("/v1/marketplace/listings", headers=_viewer())
+    assert listings.status_code == 200
+    assert listings.json()["count"] >= 1
+    assert listings.json()["verified_count"] >= 1

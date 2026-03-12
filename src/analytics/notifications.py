@@ -17,6 +17,9 @@ class NotificationChannels:
     discord_webhook_url: str = ""
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    slack_webhook_url: str = ""
+    email_webhook_url: str = ""
+    sms_webhook_url: str = ""
 
 
 def _now_ts() -> float:
@@ -103,6 +106,12 @@ class NotificationDispatcher:
             return bool(str(self.channels.telegram_bot_token).strip()) and bool(
                 str(self.channels.telegram_chat_id).strip()
             )
+        if channel == "slack":
+            return bool(str(self.channels.slack_webhook_url).strip())
+        if channel == "email":
+            return bool(str(self.channels.email_webhook_url).strip())
+        if channel == "sms":
+            return bool(str(self.channels.sms_webhook_url).strip())
         return False
 
     def _should_send(self, channel: str, event_key: str) -> tuple[bool, str]:
@@ -154,11 +163,53 @@ class NotificationDispatcher:
             "text": str(response.text[:200]),
         }
 
+    def _post_slack(self, message: str) -> Dict[str, Any]:
+        url = str(self.channels.slack_webhook_url).strip()
+        response = requests.post(
+            url,
+            json={"text": str(message)},
+            timeout=self.timeout_seconds,
+        )
+        return {
+            "ok": bool(200 <= int(response.status_code) < 300),
+            "status_code": int(response.status_code),
+            "channel": "slack",
+            "text": str(response.text[:200]),
+        }
+
+    def _post_email(self, message: str) -> Dict[str, Any]:
+        url = str(self.channels.email_webhook_url).strip()
+        response = requests.post(
+            url,
+            json={"subject": "[PQTS] Ops Notification", "body": str(message)},
+            timeout=self.timeout_seconds,
+        )
+        return {
+            "ok": bool(200 <= int(response.status_code) < 300),
+            "status_code": int(response.status_code),
+            "channel": "email",
+            "text": str(response.text[:200]),
+        }
+
+    def _post_sms(self, message: str) -> Dict[str, Any]:
+        url = str(self.channels.sms_webhook_url).strip()
+        response = requests.post(
+            url,
+            json={"message": str(message)},
+            timeout=self.timeout_seconds,
+        )
+        return {
+            "ok": bool(200 <= int(response.status_code) < 300),
+            "status_code": int(response.status_code),
+            "channel": "sms",
+            "text": str(response.text[:200]),
+        }
+
     def dispatch(self, message: str, *, event_key: str = "") -> Dict[str, Any]:
         payload_key = str(event_key).strip() or _short_hash(str(message))
         attempts: list[Dict[str, Any]] = []
 
-        for channel in ("discord", "telegram"):
+        for channel in ("discord", "telegram", "slack", "email", "sms"):
             allowed, reason = self._should_send(channel, payload_key)
             if not allowed:
                 attempts.append(
@@ -174,8 +225,14 @@ class NotificationDispatcher:
             try:
                 if channel == "discord":
                     result = self._post_discord(message)
-                else:
+                elif channel == "telegram":
                     result = self._post_telegram(message)
+                elif channel == "slack":
+                    result = self._post_slack(message)
+                elif channel == "email":
+                    result = self._post_email(message)
+                else:
+                    result = self._post_sms(message)
                 attempts.append({**result, "sent": True, "reason": "ok"})
             except Exception as exc:  # pragma: no cover - network/runtime defensive path
                 attempts.append(
@@ -194,5 +251,7 @@ class NotificationDispatcher:
             "message": str(message),
             "attempts": attempts,
             "sent_count": int(sent_count),
-            "channels_configured": int(sum(1 for c in ("discord", "telegram") if self._channel_enabled(c))),
+            "channels_configured": int(
+                sum(1 for c in ("discord", "telegram", "slack", "email", "sms") if self._channel_enabled(c))
+            ),
         }

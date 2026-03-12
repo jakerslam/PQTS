@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **699**
-- implemented: **699**
+- Total requirements: **727**
+- implemented: **727**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -26,6 +26,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | AX | 10 | 0 | 0 | 0 | 0 | 10 |
 | BF | 6 | 0 | 0 | 0 | 0 | 6 |
 | BTR | 5 | 0 | 0 | 0 | 0 | 5 |
+| CBX | 28 | 0 | 0 | 0 | 0 | 28 |
 | CGPT | 8 | 0 | 0 | 0 | 0 | 8 |
 | CGPTR | 3 | 0 | 0 | 0 | 0 | 3 |
 | COH | 8 | 0 | 0 | 0 | 0 | 8 |
@@ -803,3 +804,31 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | AGP-7 | Agent Notification Hook Governance Contract | implemented | done | docs/TODO.md |
 | AGP-8 | First-Party Python Agent SDK Contract | implemented | done | docs/TODO.md |
 | AGP-9 | Fail-Closed Agent Safety Defaults Contract | implemented | done | docs/TODO.md |
+| CBX-1 | Hybrid Visual + Code Strategy Studio Contract | implemented | done | docs/TODO.md |
+| CBX-2 | Embedded Strategy Copilot Contract | implemented | done | docs/TODO.md |
+| CBX-3 | Adaptive Ensemble ML Runtime Contract | implemented | done | docs/TODO.md |
+| CBX-4 | RL + Evolutionary Training Contract | implemented | done | docs/TODO.md |
+| CBX-5 | Mandatory Anti-Leakage Validation Contract | implemented | done | docs/TODO.md |
+| CBX-6 | Unified Web-Primary Studio Control Contract | implemented | done | docs/TODO.md |
+| CBX-7 | Multi-Channel Notification Automation Contract | implemented | done | docs/TODO.md |
+| CBX-8 | Interactive Explainability Charting Contract | implemented | done | docs/TODO.md |
+| CBX-9 | Mandatory Promotion Gate Lifecycle Contract | implemented | done | docs/TODO.md |
+| CBX-10 | Full Order Provenance + Explainability Contract | implemented | done | docs/TODO.md |
+| CBX-11 | Advanced Pre-Trade Risk Engine Contract | implemented | done | docs/TODO.md |
+| CBX-12 | Mandatory Stress + Robustness Suite Contract | implemented | done | docs/TODO.md |
+| CBX-13 | Rust-Native Deterministic Execution Core Contract | implemented | done | docs/TODO.md |
+| CBX-14 | Advanced Order-Type Coverage Contract | implemented | done | docs/TODO.md |
+| CBX-15 | Live-Path Performance SLO Contract | implemented | done | docs/TODO.md |
+| CBX-16 | Research-to-Live Backtest Parity Contract | implemented | done | docs/TODO.md |
+| CBX-17 | Strategy Leaderboard + Promotion Recommendation Contract | implemented | done | docs/TODO.md |
+| CBX-18 | Staged Deployment with Zero-Downtime Rollout Contract | implemented | done | docs/TODO.md |
+| CBX-19 | Multi-Asset Normalized Instrument Contract | implemented | done | docs/TODO.md |
+| CBX-20 | Multi-Venue Connectivity + Failover Contract | implemented | done | docs/TODO.md |
+| CBX-21 | Verified Strategy Marketplace Contract | implemented | done | docs/TODO.md |
+| CBX-22 | Plugin Extensibility Contract | implemented | done | docs/TODO.md |
+| CBX-23 | Contribution Pipeline Quality Gate Contract | implemented | done | docs/TODO.md |
+| CBX-24 | Observability + Incident Telemetry Contract | implemented | done | docs/TODO.md |
+| CBX-25 | Docker-First Operations Contract | implemented | done | docs/TODO.md |
+| CBX-26 | Core Path Coverage and Benchmark Publication Contract | implemented | done | docs/TODO.md |
+| CBX-27 | Open Community Growth Contract | implemented | done | docs/TODO.md |
+| CBX-28 | Research-to-Live Change-Minimization Contract | implemented | done | docs/TODO.md |

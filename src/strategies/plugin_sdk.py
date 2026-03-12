@@ -66,6 +66,37 @@ def discover_plugins(root: str | Path = "plugins/strategies") -> list[StrategyPl
     return rows
 
 
+def validate_plugin_manifest(payload: dict[str, object]) -> dict[str, object]:
+    required = ["plugin_id", "name", "module", "class_name", "version", "markets", "risk_profile"]
+    missing = [field for field in required if field not in payload]
+    markets = payload.get("markets", [])
+    markets_ok = isinstance(markets, list) and all(str(item).strip() for item in markets)
+    plugin_id = str(payload.get("plugin_id", "")).strip()
+    module = str(payload.get("module", "")).strip()
+    class_name = str(payload.get("class_name", "")).strip()
+    trust_label = str(payload.get("trust_label", "unverified")).strip().lower()
+    gate_verified = bool(payload.get("gate_verified", False))
+    errors: list[str] = []
+    if missing:
+        errors.append(f"missing fields: {', '.join(missing)}")
+    if not plugin_id:
+        errors.append("plugin_id must be non-empty")
+    if not module:
+        errors.append("module must be non-empty")
+    if not class_name:
+        errors.append("class_name must be non-empty")
+    if not markets_ok:
+        errors.append("markets must be a non-empty list of tokens")
+    if gate_verified and trust_label != "reference":
+        errors.append("gate_verified plugins require trust_label=reference")
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "gate_verified": gate_verified,
+        "trust_label": trust_label or "unverified",
+    }
+
+
 def scaffold_strategy_plugin(
     *,
     name: str,

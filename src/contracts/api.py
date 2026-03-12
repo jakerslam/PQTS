@@ -68,6 +68,15 @@ class OrderType(str, Enum):
     LIMIT = "limit"
     STOP = "stop"
     STOP_LIMIT = "stop_limit"
+    OCO = "oco"
+    OTO = "oto"
+    POST_ONLY = "post_only"
+    REDUCE_ONLY = "reduce_only"
+    CONTINGENT = "contingent"
+    ICEBERG = "iceberg"
+    TWAP = "twap"
+    VWAP = "vwap"
+    POV = "pov"
 
 
 class OrderStatus(str, Enum):
@@ -288,4 +297,3 @@ class ErrorEnvelope:
 def batch_to_dict(items: Sequence[Any]) -> list[dict[str, Any]]:
     """Serialize a sequence of schema instances into primitive dicts."""
     return [item.to_dict() for item in items]
-
