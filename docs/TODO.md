@@ -204,6 +204,20 @@ Dependency order: canonical plan catalog -> signup + subscription APIs -> campai
 - [x] Add roadmap governance for parity/moat allocation and quarterly efficacy review (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: MOAT-15`, `Impact: 9`, `Evidence: docs/SRS_DOD_AUDIT_2026_03_11.md; make dod-audit; data/reports/srs_coverage/srs_coverage.json`)
 - [x] Add periodic competitor-source revalidation workflow (`ROI: medium`, `Type: engineering`, `Track: moat`, `Ref: MOAT-16`, `Impact: 7`, `Evidence: docs/SRS_DOD_AUDIT_2026_03_11.md; make dod-audit; data/reports/srs_coverage/srs_coverage.json`)
 
+## 02w. LunarResearcher Assimilation Sprint (2026-03-12)
+
+Dependency order: edge decomposition and priors -> sizing and behavioral gates -> copy-trade safety wrappers -> explainability and ablation evidence.
+
+- [ ] Implement net-edge decomposition gate (fees/spread/slippage/latency penalties) with fail-closed order blocking and reason-code telemetry (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: LUNR-1, LUNR-5`, `Impact: 10`, `Evidence: pending`)
+- [ ] Implement required base-rate priors and sequential Bayesian delta persistence for decision artifacts (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LUNR-2, LUNR-3`, `Impact: 8`, `Evidence: pending`)
+- [ ] Enforce stage-aware fractional-Kelly hard caps with explicit full-Kelly override audit trail (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LUNR-4`, `Impact: 8`, `Evidence: pending`)
+- [ ] Implement copy-trade signal adapter safety envelope (leader allowlists, max-follow notional, drawdown kill-switch, canonical router enforcement) (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: LUNR-6`, `Impact: 9`, `Evidence: pending`)
+- [ ] Implement pre-trade cognitive-trap guardrail checks with deterministic `hold/reduce` outcomes (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: LUNR-7`, `Impact: 9`, `Evidence: pending`)
+- [ ] Add formula-only alpha ablation checks and promotion-blocking lift thresholds vs naive baseline (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: LUNR-8`, `Impact: 9`, `Evidence: pending`)
+- [ ] Publish decision explainability cards (`p_market`, `p_model`, posterior delta, EV, size, gate outcome) via API + dashboard linkage (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LUNR-9`, `Impact: 8`, `Evidence: pending`)
+- [ ] Perform legal/compliance review for copy-trade workflows in target jurisdictions before enabling live copy-follow mode (`ROI: high`, `Type: human_only`, `Track: parity`, `Ref: LUNR-6`, `Impact: 8`, `Evidence: pending`)
+- [ ] Perform third-party bot/operator security due-diligence checklist before adding external signal adapters to production allowlist (`ROI: medium`, `Type: human_only`, `Track: parity`, `Ref: LUNR-6`, `Impact: 7`, `Evidence: pending`)
+
 ## 02b. High-ROI Coverage Closure Sprint (2026-03-10)
 
 - [x] Enforce Studio casual UX contract gates in CI (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-7`, `Impact: 10`, `Evidence: docs/SRS_DOD_AUDIT_2026_03_11.md; make dod-audit; data/reports/srs_coverage/srs_coverage.json`)

@@ -5291,3 +5291,52 @@ These requirements assimilate parity-plus improvements across Freqtrade, Nautilu
 
 - Runtime SHALL enforce bounded in-memory retention for ops jobs and prune oldest records when the cap is exceeded.
 - Retention rules SHALL preserve recent operational evidence without unbounded memory growth.
+
+## 93. Additional Delta Requirements from External Post Chain (LunarResearcher LMSR/Bayesian/Kelly workflow, March 12, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post chain and linked bot context without duplicating existing LMSR baseline families already present in this SRS.
+
+### LUNR-1 Net Edge Decomposition Contract
+
+- The system SHALL compute tradable edge as an explicit decomposition of model-vs-market probability edge minus fees, spread, slippage, and latency penalties.
+- Order generation SHALL be blocked when net edge is below configurable minimum thresholds by market/stage/account.
+
+### LUNR-2 Base-Rate Prior Contract
+
+- The system SHALL require explicit base-rate priors by market class before enabling related strategy pathways in paper/canary/live.
+- Missing or stale priors SHALL fail closed and emit remediation reason codes.
+
+### LUNR-3 Sequential Bayesian Delta Contract
+
+- The system SHALL persist pre-update and post-update posterior values for each Bayesian update step with evidence references and timestamps.
+- Decision artifacts SHALL expose posterior deltas used in EV and sizing calculations.
+
+### LUNR-4 Fractional Kelly Hard-Cap Contract
+
+- The system SHALL apply fractional-Kelly sizing with hard per-trade and per-event bankroll caps and stage-aware multipliers.
+- Full-Kelly operation SHALL require explicit risk override and audit trace.
+
+### LUNR-5 Repricing-Lag Opportunity Contract
+
+- The system SHALL detect and score evidence-to-market repricing lag windows and attach freshness/latency metadata to candidate trades.
+- Lag-derived signals SHALL be blocked when data freshness, feed integrity, or venue sync checks fail.
+
+### LUNR-6 Copy-Trade Adapter Safety Envelope Contract
+
+- The system SHALL allow copy-trade style signal ingestion only through policy-wrapped adapters with leader allowlists, max-follow notional, and drawdown kill-switches.
+- Copy-trade derived intents SHALL pass the same `RiskAwareRouter` and promotion-gate controls as native strategies.
+
+### LUNR-7 Cognitive Trap Guardrail Contract
+
+- The system SHALL run a pre-trade behavioral checklist for known failure modes (for example chasing, recency bias, overconfidence sizing, and revenge re-entry).
+- Guardrail failures SHALL produce explicit `hold`/`reduce` outcomes with machine-readable reason codes.
+
+### LUNR-8 Formula-Only Alpha Falsification Contract
+
+- The system SHALL run ablation checks proving live/paper edge remains after removing formula-only shortcuts and naive market-implied baselines.
+- Promotion gates SHALL block when incremental forecasting lift versus baseline is not statistically supported.
+
+### LUNR-9 Probability/EV Explainability Card Contract
+
+- The system SHALL publish per-decision explainability cards containing `p_market`, `p_model`, posterior delta, expected value, size recommendation, and gate outcome.
+- Explainability cards SHALL be queryable through API and linked from execution/order-truth surfaces.

@@ -2,6 +2,19 @@
   {
     "rank": 1,
     "score": 500.0,
+    "title": "Implement net-edge decomposition gate (fees/spread/slippage/latency penalties) with fail-closed order blocking and reason-code telemetry",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "LUNR-1, LUNR-5",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 211
+  },
+  {
+    "rank": 2,
+    "score": 500.0,
     "title": "Trigger first public release + GitHub Pages leaderboard export workflows, then publish links/status in README/docs",
     "roi": "very_high",
     "impact": 10,
@@ -10,10 +23,62 @@
     "refs": "COMP-2, COMP-5, MOAT-12",
     "depends": "",
     "section": "02c. Visibility Polish (Open, High ROI)",
-    "line_no": 227
+    "line_no": 241
   },
   {
-    "rank": 2,
+    "rank": 3,
+    "score": 384.0,
+    "title": "Implement required base-rate priors and sequential Bayesian delta persistence for decision artifacts",
+    "roi": "high",
+    "impact": 8,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "LUNR-2, LUNR-3",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 212
+  },
+  {
+    "rank": 4,
+    "score": 384.0,
+    "title": "Enforce stage-aware fractional-Kelly hard caps with explicit full-Kelly override audit trail",
+    "roi": "high",
+    "impact": 8,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "LUNR-4",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 213
+  },
+  {
+    "rank": 5,
+    "score": 384.0,
+    "title": "Publish decision explainability cards (`p_market`, `p_model`, posterior delta, EV, size, gate outcome) via API + dashboard linkage",
+    "roi": "high",
+    "impact": 8,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "LUNR-9",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 217
+  },
+  {
+    "rank": 6,
+    "score": 384.0,
+    "title": "Perform legal/compliance review for copy-trade workflows in target jurisdictions before enabling live copy-follow mode",
+    "roi": "high",
+    "impact": 8,
+    "track": "parity",
+    "item_type": "human_only",
+    "refs": "LUNR-6",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 218
+  },
+  {
+    "rank": 7,
     "score": 384.0,
     "title": "Own canonical docs-surface migration and update package/release/docs links after cutover",
     "roi": "high",
@@ -23,10 +88,49 @@
     "refs": "COMP-1, CGPT-4, COMP-15",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 353
+    "line_no": 367
   },
   {
-    "rank": 3,
+    "rank": 8,
+    "score": 382.0,
+    "title": "Implement copy-trade signal adapter safety envelope (leader allowlists, max-follow notional, drawdown kill-switch, canonical router enforcement)",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "LUNR-6",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 214
+  },
+  {
+    "rank": 9,
+    "score": 382.0,
+    "title": "Implement pre-trade cognitive-trap guardrail checks with deterministic `hold/reduce` outcomes",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "LUNR-7",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 215
+  },
+  {
+    "rank": 10,
+    "score": 382.0,
+    "title": "Add formula-only alpha ablation checks and promotion-blocking lift thresholds vs naive baseline",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "LUNR-8",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 216
+  },
+  {
+    "rank": 11,
     "score": 382.0,
     "title": "Run monthly user interviews for casual and professional cohorts and feed roadmap deltas",
     "roi": "high",
@@ -36,6 +140,19 @@
     "refs": "COMP-7, COMP-8, MOAT-8",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 350
+    "line_no": 364
+  },
+  {
+    "rank": 12,
+    "score": 276.0,
+    "title": "Perform third-party bot/operator security due-diligence checklist before adding external signal adapters to production allowlist",
+    "roi": "medium",
+    "impact": 7,
+    "track": "parity",
+    "item_type": "human_only",
+    "refs": "LUNR-6",
+    "depends": "",
+    "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
+    "line_no": 219
   }
 ]
