@@ -1121,6 +1121,38 @@ Observed outbound links:
 - Public claims about rapid account growth, high win rates, or deterministic doubling paths shall be marked `unverified` unless corroborated with reproducible order-level records.
 - Requirements adopted from this source chain shall remain limited to observable mechanics and validated inferred controls.
 
+## 83. Additional Delta Requirements from External Post Chain (0xCristal, March 11, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced follow-up post and avoid duplication of existing fixed-entry, impulse, and compounding controls in `AR-1..AR-8`.
+
+Observed source links:
+- `https://x.com/0xCristal/status/2031736474744545644?s=20`
+- Quoted context reference in post body: `Lunar (@LunarResearcher)` (quoted-post mention)
+
+### AR-9 Mid-Probability Entry Band Policy Contract
+
+- Strategy profiles shall support configurable mid-probability entry bands (source-profile example: `0.21` to `0.70`) rather than a single fixed-entry point.
+- Entry-policy evaluation shall enforce per-market minimum edge thresholds after fees/slippage for any contract admitted inside the configured band.
+- Orders outside the active entry band shall be blocked with explicit policy reason codes and telemetry.
+
+### AR-10 Underlier-Focused Market Scope Contract
+
+- Strategy policies shall support explicit underlier scope gating (source-profile emphasis: `BTC` and `ETH` prediction markets).
+- Candidate selection shall reject off-scope underliers unless an approved expansion profile is active.
+- Runtime shall report per-underlier exposure, hit rate, and reject/fill quality to validate scope assumptions before expansion.
+
+### AR-11 External-Reference Assimilation Governance Contract
+
+- Any strategy logic adapted from external references (for example Telegram-shared bot recipes) shall be captured as versioned, auditable policy artifacts before execution.
+- External-reference-derived rules shall require replay/backtest evidence and risk policy validation before paper/canary promotion.
+- Runtime shall persist provenance tags for each rule indicating origin (`internal`, `external_reference`, `hybrid`) and validation status.
+
+### AR-12 Promotional-Claim Quarantine Contract
+
+- Extreme payout screenshots or anecdotal ROI claims from this source chain shall be classified as promotional artifacts and excluded from reference benchmark sets.
+- Reference benchmark inclusion shall require reproducible run bundles with full trade-level logs and provenance metadata.
+- Claims lacking reproducible evidence shall remain `unverified` and may inform hypothesis generation only.
+
 ## 26. Additional Requirements from External Post Chain (0xRicker, March 8, 2026)
 
 These requirements are derived from the referenced post and attached formula/backtest images describing an XGBoost+LLM signal stack with strict pre-trade risk gating.

@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **664**
-- implemented: **664**
+- Total requirements: **668**
+- implemented: **668**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -20,7 +20,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | AHF | 12 | 0 | 0 | 0 | 0 | 12 |
 | AL | 14 | 0 | 0 | 0 | 0 | 14 |
 | ANTP | 8 | 0 | 0 | 0 | 0 | 8 |
-| AR | 8 | 0 | 0 | 0 | 0 | 8 |
+| AR | 12 | 0 | 0 | 0 | 0 | 12 |
 | AX | 10 | 0 | 0 | 0 | 0 | 10 |
 | BF | 6 | 0 | 0 | 0 | 0 | 6 |
 | BTR | 5 | 0 | 0 | 0 | 0 | 5 |
@@ -229,6 +229,10 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | AR-6 | Session State, Telemetry, and Control Surface | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AR-7 | Profile/Wallet Context as Optional Signal | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AR-8 | Source Reliability and Claim Handling | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
+| AR-9 | Mid-Probability Entry Band Policy Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| AR-10 | Underlier-Focused Market Scope Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| AR-11 | External-Reference Assimilation Governance Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| AR-12 | Promotional-Claim Quarantine Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | RK-1 | Model Stack and Probability Calibration | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | RK-2 | Explicit Edge Threshold Gate | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | RK-3 | Risk Gate Sequence and Latency Budget | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |

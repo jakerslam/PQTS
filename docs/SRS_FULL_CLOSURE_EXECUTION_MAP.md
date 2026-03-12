@@ -29,7 +29,7 @@ contracts for every remaining SRS family-assimilation block.
 
 ## AR Family
 
-- Refs: `AR-1, AR-2, AR-3, AR-4, AR-5, AR-6, AR-7, AR-8`
+- Refs: `AR-1, AR-2, AR-3, AR-4, AR-5, AR-6, AR-7, AR-8, AR-9, AR-10, AR-11, AR-12`
 - Baseline hook: `srs_baseline.ar`
 - Contract: fail-closed, provenance-required, evidence-logged
 
