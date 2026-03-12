@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **727**
-- implemented: **727**
+- Total requirements: **744**
+- implemented: **744**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -61,6 +61,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | MARIK | 8 | 0 | 0 | 0 | 0 | 8 |
 | MNC | 5 | 0 | 0 | 0 | 0 | 5 |
 | MOAT | 16 | 0 | 0 | 0 | 0 | 16 |
+| MON | 8 | 0 | 0 | 0 | 0 | 8 |
 | MORP | 4 | 0 | 0 | 0 | 0 | 4 |
 | MTM | 12 | 0 | 0 | 0 | 0 | 12 |
 | NAUT | 8 | 0 | 0 | 0 | 0 | 8 |
@@ -69,6 +70,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | NS | 6 | 0 | 0 | 0 | 0 | 6 |
 | OBBFD | 9 | 0 | 0 | 0 | 0 | 9 |
 | OBSC | 5 | 0 | 0 | 0 | 0 | 5 |
+| OPSJ | 4 | 0 | 0 | 0 | 0 | 4 |
 | PG | 7 | 0 | 0 | 0 | 0 | 7 |
 | PH | 10 | 0 | 0 | 0 | 0 | 10 |
 | PHL | 4 | 0 | 0 | 0 | 0 | 4 |
@@ -80,6 +82,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | RBI | 8 | 0 | 0 | 0 | 0 | 8 |
 | RCG | 8 | 0 | 0 | 0 | 0 | 8 |
 | RK | 9 | 0 | 0 | 0 | 0 | 9 |
+| RLG | 5 | 0 | 0 | 0 | 0 | 5 |
 | RP | 9 | 0 | 0 | 0 | 0 | 9 |
 | RV | 4 | 0 | 0 | 0 | 0 | 4 |
 | SECAPI | 10 | 0 | 0 | 0 | 0 | 10 |
@@ -832,3 +835,20 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | CBX-26 | Core Path Coverage and Benchmark Publication Contract | implemented | done | docs/TODO.md |
 | CBX-27 | Open Community Growth Contract | implemented | done | docs/TODO.md |
 | CBX-28 | Research-to-Live Change-Minimization Contract | implemented | done | docs/TODO.md |
+| MON-1 | Open-Core Packaging Contract | implemented | done | docs/TODO.md |
+| MON-2 | Plan and Pricing Catalog Contract | implemented | done | docs/TODO.md |
+| MON-3 | Self-Serve Signup Contract | implemented | done | docs/TODO.md |
+| MON-4 | Billing Subscription Contract | implemented | done | docs/TODO.md |
+| MON-5 | Workspace Campaign Activation Contract | implemented | done | docs/TODO.md |
+| MON-6 | Workspace Ops and Promotion Visibility Contract | implemented | done | docs/TODO.md |
+| MON-7 | Marketplace Revenue Contract | implemented | done | docs/TODO.md |
+| MON-8 | Commercial Documentation Truth Contract | implemented | done | docs/TODO.md |
+| RLG-1 | Unified Release Readiness Gate Contract | implemented | done | docs/TODO.md |
+| RLG-2 | External Beta Cohort Gate Contract | implemented | done | docs/TODO.md |
+| RLG-3 | Certified Integration Maturity Gate Contract | implemented | done | docs/TODO.md |
+| RLG-4 | Benchmark Trust and Provenance Gate Contract | implemented | done | docs/TODO.md |
+| RLG-5 | Backlog Truth Marker Contract | implemented | done | docs/TODO.md |
+| OPSJ-1 | Typed Ops Job Lifecycle Contract | implemented | done | docs/TODO.md |
+| OPSJ-2 | Ops Job API Contract | implemented | done | docs/TODO.md |
+| OPSJ-3 | Ops Job Audit and Result Contract | implemented | done | docs/TODO.md |
+| OPSJ-4 | Ops Job Retention Contract | implemented | done | docs/TODO.md |

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -178,6 +179,47 @@ def test_ops_command_endpoints_support_dry_run() -> None:
     notify_payload = notify.json()
     assert notify_payload["dry_run"] is True
     assert "python" in notify_payload["command"][0]
+
+
+def test_ops_command_endpoints_execute_via_job_contract() -> None:
+    mocked_result = {
+        "succeeded": True,
+        "returncode": 0,
+        "stdout": '{"status":"ok","channel":"stdout"}\n',
+        "stderr": "",
+        "duration_ms": 8,
+        "command": ["python3", "main.py", "notify", "test"],
+    }
+    with patch("services.api.routes.core.run_python_command", return_value=mocked_result):
+        client = TestClient(create_app(_settings()))
+        started = client.post(
+            "/v1/ops/notify/test",
+            json={"execute": True, "channel": "stdout", "message": "job flow"},
+            headers=_operator(),
+        )
+        assert started.status_code == 200
+        payload = started.json()
+        assert payload["accepted"] is True
+        assert payload["dry_run"] is False
+        job_id = payload["job"]["job_id"]
+        assert job_id.startswith("job_")
+
+        deadline = time.time() + 2.0
+        final_status = ""
+        while time.time() < deadline:
+            polled = client.get(f"/v1/ops/jobs/{job_id}", headers=_viewer())
+            assert polled.status_code == 200
+            job = polled.json()["job"]
+            final_status = str(job.get("status", ""))
+            if final_status in {"succeeded", "failed"}:
+                break
+            time.sleep(0.05)
+        assert final_status == "succeeded"
+
+        listed = client.get("/v1/ops/jobs", headers=_viewer())
+        assert listed.status_code == 200
+        assert listed.json()["count"] >= 1
+        assert any(row["job_id"] == job_id for row in listed.json()["jobs"])
 
 
 def test_assistant_turn_returns_constrained_suggestions() -> None:
@@ -588,3 +630,116 @@ def test_failover_instrument_and_marketplace_endpoints() -> None:
     assert listings.status_code == 200
     assert listings.json()["count"] >= 1
     assert listings.json()["verified_count"] >= 1
+
+
+def test_signup_requires_disclaimer_and_paper_first_acceptance() -> None:
+    client = TestClient(create_app(_settings()))
+    denied = client.post(
+        "/v1/signup",
+        json={
+            "email": "ops@example.com",
+            "organization": "Ops Team",
+            "plan": "starter",
+            "accepted_risk_disclaimer": False,
+            "accepted_paper_first_policy": False,
+        },
+        headers=_viewer(),
+    )
+    assert denied.status_code == 400
+
+
+def test_workspace_signup_subscribe_campaign_and_health_contracts() -> None:
+    client = TestClient(create_app(_settings()))
+
+    signup = client.post(
+        "/v1/signup",
+        json={
+            "email": "ops@example.com",
+            "organization": "Ops Team",
+            "plan": "starter",
+            "accepted_risk_disclaimer": True,
+            "accepted_paper_first_policy": True,
+        },
+        headers=_viewer(),
+    )
+    assert signup.status_code == 200
+    workspace = signup.json()["workspace"]
+    workspace_id = workspace["workspace_id"]
+    assert workspace["plan"] == "starter_cloud"
+
+    subscribe = client.post(
+        f"/v1/workspaces/{workspace_id}/billing/subscribe",
+        json={
+            "plan": "pro",
+            "create_checkout_session": True,
+            "dry_run": True,
+            "success_url": "https://app.example/success",
+            "cancel_url": "https://app.example/cancel",
+        },
+        headers=_viewer(),
+    )
+    assert subscribe.status_code == 200
+    sub_payload = subscribe.json()
+    assert sub_payload["workspace"]["plan"] == "pro_cloud"
+    assert sub_payload["checkout"]["dry_run"] is True
+
+    campaign = client.post(
+        f"/v1/workspaces/{workspace_id}/campaign/start",
+        json={"execute": False, "cycles": 4, "notional_usd": 100.0},
+        headers=_viewer(),
+    )
+    assert campaign.status_code == 200
+    assert campaign.json()["dry_run"] is True
+    assert "python" in campaign.json()["command"][0]
+
+    health = client.get(f"/v1/workspaces/{workspace_id}/ops-health", headers=_viewer())
+    assert health.status_code == 200
+    assert "ops_health" in health.json()
+    assert "subscription" in health.json()
+
+    gate = client.get(
+        f"/v1/workspaces/{workspace_id}/promotion-gate",
+        params={"strategy_id": "trend_following"},
+        headers=_viewer(),
+    )
+    assert gate.status_code == 200
+    assert "promotion_gate" in gate.json()
+    assert "gate" in gate.json()["promotion_gate"]
+
+
+def test_marketplace_sale_and_revenue_summary_contracts() -> None:
+    client = TestClient(create_app(_settings()))
+
+    signup = client.post(
+        "/v1/signup",
+        json={
+            "email": "buyer@example.com",
+            "organization": "Buyer Workspace",
+            "plan": "community",
+            "accepted_risk_disclaimer": True,
+            "accepted_paper_first_policy": True,
+        },
+        headers=_viewer(),
+    )
+    assert signup.status_code == 200
+    workspace_id = signup.json()["workspace"]["workspace_id"]
+
+    sale = client.post(
+        "/v1/marketplace/sales/record",
+        json={
+            "listing_id": "listing_market_making_reference",
+            "buyer_workspace_id": workspace_id,
+            "gross_amount_usd": 200.0,
+            "seller_id": "author_1",
+        },
+        headers=_operator(),
+    )
+    assert sale.status_code == 200
+    sale_payload = sale.json()["sale"]
+    assert sale_payload["commission_amount_usd"] == 50.0
+    assert sale_payload["seller_net_amount_usd"] == 150.0
+
+    summary = client.get("/v1/marketplace/revenue-summary", headers=_operator())
+    assert summary.status_code == 200
+    assert summary.json()["count"] >= 1
+    assert summary.json()["commission_amount_usd"] >= 50.0

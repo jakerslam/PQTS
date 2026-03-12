@@ -1,12 +1,13 @@
 # PQTS Issue Backlog
 
-Last updated: 2026-03-09 (America/Denver)
+Last updated: 2026-03-12 (America/Denver)
 
 This file splits every open item in `docs/TODO.md` into issue-ready tickets with stable IDs and explicit dependencies.
 
 Status note:
-- Treat this document as a historical issue template set.
+- Treat this document as a historical issue template archive.
 - Canonical active execution order is maintained in `docs/TODO.md`.
+- Canonical requirement source of truth is `docs/SRS.md`.
 - Any item already implemented in code/tests should be considered closed even if still listed here.
 
 ## How To Use

@@ -37,6 +37,14 @@ from research.anti_leakage_validator import summarize_leakage_report
 from research.strategy_studio import build_strategy_graph, simulate_preview
 from services.api.auth import APIIdentity, require_identity, require_operator
 from services.api.cache import APICache, enforce_rate_limit, get_cache
+from services.api.commerce import (
+    build_workspace_subscription,
+    create_checkout_session,
+    load_plan_catalog,
+    marketplace_commission,
+    plan_summary,
+    resolve_plan,
+)
 from services.api.correlation import read_request_correlation, with_correlation
 from services.api.ops_data import (
     build_data_seed_command,
@@ -102,6 +110,9 @@ _AGENT_HOOK_ALLOWED_HOSTS = (
     "api.telegram.org",
     "webhook.site",
 )
+_OPS_JOB_TYPES = {"data_seed", "notify_test"}
+_OPS_JOB_TERMINAL_STATUS = {"succeeded", "failed"}
+_OPS_JOB_RETENTION = 300
 
 
 def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
@@ -444,6 +455,83 @@ def _normalize_capital(value: Any) -> int:
     return max(100, parsed)
 
 
+def _create_ops_job(
+    store: APIRuntimeStore,
+    *,
+    job_type: str,
+    requested_by: str,
+    command: list[str],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    normalized_type = str(job_type).strip().lower()
+    if normalized_type not in _OPS_JOB_TYPES:
+        raise ValueError(f"unsupported ops job type: {job_type}")
+    now_iso = _utc_now_iso()
+    job_id = f"job_{uuid4().hex[:12]}"
+    job = {
+        "job_id": job_id,
+        "type": normalized_type,
+        "status": "queued",
+        "created_at": now_iso,
+        "started_at": "",
+        "completed_at": "",
+        "requested_by": requested_by,
+        "command": [sys.executable, *command],
+        "payload": dict(payload),
+        "result": None,
+        "error": "",
+    }
+    store.ops_jobs[job_id] = job
+    if len(store.ops_jobs) > _OPS_JOB_RETENTION:
+        ordered = sorted(
+            (
+                (str(value.get("created_at", "")), key)
+                for key, value in store.ops_jobs.items()
+                if isinstance(value, dict)
+            ),
+            key=lambda item: item[0],
+        )
+        overflow = max(0, len(ordered) - _OPS_JOB_RETENTION)
+        for _, key in ordered[:overflow]:
+            store.ops_jobs.pop(key, None)
+    return job
+
+
+def _run_ops_job(
+    store: APIRuntimeStore,
+    *,
+    job_id: str,
+    command: list[str],
+    timeout_seconds: int,
+    parse_notify_json: bool,
+) -> None:
+    job = store.ops_jobs.get(job_id)
+    if not isinstance(job, dict):
+        return
+    job["status"] = "running"
+    job["started_at"] = _utc_now_iso()
+    result = run_python_command(command, timeout_seconds=timeout_seconds)
+    output_lines = [line for line in str(result.get("stdout", "")).splitlines() if line.strip()]
+    payload: dict[str, Any] = {
+        "succeeded": bool(result.get("succeeded", False)),
+        "returncode": int(result.get("returncode", -1)),
+        "duration_ms": int(result.get("duration_ms", 0) or 0),
+        "stdout": str(result.get("stdout", "")),
+        "stderr": str(result.get("stderr", "")),
+        "output_lines": output_lines,
+    }
+    if parse_notify_json:
+        payload["parsed"] = parse_last_json_line(payload["stdout"])
+    job["result"] = payload
+    job["completed_at"] = _utc_now_iso()
+    if bool(payload.get("succeeded", False)):
+        job["status"] = "succeeded"
+        job["error"] = ""
+    else:
+        job["status"] = "failed"
+        job["error"] = str(payload.get("stderr", "")).strip()
+
+
 def _infer_risk_profile(*, experience: str, automation: str, capital_usd: int) -> str:
     if experience == "advanced" and automation == "auto" and capital_usd >= 25000:
         return "aggressive"
@@ -580,6 +668,358 @@ def _enforce_write_limit(request: Request, cache: APICache, identity: APIIdentit
         limit=int(settings.write_rate_limit_per_minute),
         window_seconds=60,
     )
+
+
+def _feature_flags_for_plan(plan: str) -> dict[str, bool]:
+    token = str(plan).strip().lower()
+    return {
+        "multi_market_enabled": token in {"starter_cloud", "pro_cloud", "enterprise"},
+        "live_canary_enabled": token in {"pro_cloud", "enterprise"},
+        "ops_alert_exports": token in {"starter_cloud", "pro_cloud", "enterprise"},
+        "marketplace_verified_listing": token in {"pro_cloud", "enterprise"},
+    }
+
+
+def _require_workspace(store: APIRuntimeStore, workspace_id: str) -> dict[str, Any]:
+    row = store.workspaces.get(str(workspace_id).strip())
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found")
+    return row
+
+
+def _workspace_ops_health(store: APIRuntimeStore, workspace_id: str) -> dict[str, Any]:
+    _ = workspace_id
+    account_id = "paper-main"
+    account = store.accounts.get(account_id)
+    risk = store.risk_states.get(account_id)
+    incidents = list(store.risk_incidents.get(account_id, []))
+    sync_rows = _collect_brokerage_sync_health(store)
+    degraded_sync = [row for row in sync_rows if bool(row.get("fail_closed_trade_block"))]
+    return {
+        "account_id": account_id,
+        "account": account.to_dict() if account is not None else None,
+        "risk_state": risk.to_dict() if risk is not None else None,
+        "critical_incidents": len([row for row in incidents if str(row.get("severity", "")).lower() == "critical"]),
+        "sync_health": {
+            "connections": len(sync_rows),
+            "degraded_count": len(degraded_sync),
+            "all_clear": len(degraded_sync) == 0,
+        },
+        "kill_switch_active": bool(getattr(risk, "kill_switch_active", False)) if risk is not None else False,
+    }
+
+
+def _workspace_promotion_gate_status(store: APIRuntimeStore, workspace_id: str, strategy_id: str) -> dict[str, Any]:
+    _ = workspace_id
+    promotion = store.promotion_records.get(strategy_id) or _default_promotion_record(strategy_id)
+    stage = _coerce_stage(str(promotion.get("stage", "paper")))
+    incidents = list(store.risk_incidents.get("paper-main", []))
+    unresolved_high = len([row for row in incidents if str(row.get("severity", "")).lower() in {"critical", "high"}])
+    risk = store.risk_states.get("paper-main")
+    gate = evaluate_promotion_gate(
+        paper_campaign_passed=stage in {"paper", "shadow", "canary", "live"},
+        unresolved_high_severity_incidents=unresolved_high,
+        stress_replay_passed=unresolved_high == 0,
+        portfolio_limits_intact=not bool(getattr(risk, "kill_switch_active", False)),
+    )
+    return {
+        "strategy_id": strategy_id,
+        "current_stage": stage,
+        "ready_for_live_canary": bool(gate.passed and stage in {"paper", "shadow", "canary"}),
+        "gate": gate.as_dict(),
+        "updated_at": str(promotion.get("updated_at", "")),
+    }
+
+
+@router.post("/signup")
+def signup_workspace(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    email = str(payload.get("email", "")).strip().lower()
+    organization = str(payload.get("organization", "")).strip()
+    accepted_disclaimer = bool(payload.get("accepted_risk_disclaimer", False))
+    accepted_paper_first = bool(payload.get("accepted_paper_first_policy", False))
+    if not email or "@" not in email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="valid email is required")
+    if not organization:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="organization is required")
+    if not accepted_disclaimer or not accepted_paper_first:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="accepted_risk_disclaimer and accepted_paper_first_policy are required",
+        )
+
+    settings = request.app.state.settings
+    catalog = load_plan_catalog(settings)
+    plan = resolve_plan(catalog, str(payload.get("plan", "")))
+    workspace_id = f"ws_{uuid4().hex[:10]}"
+    now_iso = _utc_now_iso()
+    workspace = {
+        "workspace_id": workspace_id,
+        "name": str(payload.get("workspace_name", organization)).strip() or organization,
+        "organization": organization,
+        "owner_email": email,
+        "owner_subject": identity.subject,
+        "plan": plan,
+        "feature_flags": _feature_flags_for_plan(plan),
+        "risk_disclaimer_accepted": True,
+        "paper_first_policy_accepted": True,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+    subscription_status = "active" if plan == "community" else "trialing"
+    subscription = build_workspace_subscription(
+        workspace_id=workspace_id,
+        plan=plan,
+        actor=identity.subject,
+        catalog=catalog,
+        status=subscription_status,
+        trial_days=int(settings.signup_trial_days),
+    )
+    store.workspaces[workspace_id] = workspace
+    store.workspace_subscriptions[workspace_id] = subscription
+    signup_event = {
+        "event_id": f"signup_{uuid4().hex[:10]}",
+        "workspace_id": workspace_id,
+        "plan": plan,
+        "email": email,
+        "organization": organization,
+        "created_at": now_iso,
+    }
+    store.signup_events.insert(0, signup_event)
+    del store.signup_events[500:]
+    return with_correlation(request, {
+        "workspace": workspace,
+        "subscription": subscription,
+        "plan_summary": plan_summary(catalog, plan),
+        "next_actions": [
+            f"POST /v1/workspaces/{workspace_id}/billing/subscribe",
+            f"POST /v1/workspaces/{workspace_id}/campaign/start",
+            f"GET /v1/workspaces/{workspace_id}/ops-health",
+            f"GET /v1/workspaces/{workspace_id}/promotion-gate",
+        ],
+    })
+
+
+@router.post("/workspaces/{workspace_id}/billing/subscribe")
+def workspace_billing_subscribe(
+    workspace_id: str,
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    workspace = _require_workspace(store, workspace_id)
+    settings = request.app.state.settings
+    catalog = load_plan_catalog(settings)
+    plan = resolve_plan(catalog, str(payload.get("plan", workspace.get("plan", "community"))))
+    create_checkout = bool(payload.get("create_checkout_session", True))
+    dry_run = bool(payload.get("dry_run", True))
+    success_url = str(payload.get("success_url", "https://app.pqts.local/billing/success"))
+    cancel_url = str(payload.get("cancel_url", "https://app.pqts.local/billing/cancel"))
+    checkout = None
+    plan_info = plan_summary(catalog, plan)
+    if create_checkout and float(plan_info.get("price_monthly_usd", 0.0)) > 0.0:
+        checkout = create_checkout_session(
+            settings=settings,
+            catalog=catalog,
+            workspace_id=workspace_id,
+            plan=plan,
+            customer_email=str(workspace.get("owner_email", "")),
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={"requested_by": identity.subject},
+            dry_run=dry_run,
+        )
+
+    status = "active"
+    if plan != "community" and create_checkout:
+        status = "pending_checkout" if checkout and not checkout.get("live", False) else "active"
+    subscription = build_workspace_subscription(
+        workspace_id=workspace_id,
+        plan=plan,
+        actor=identity.subject,
+        catalog=catalog,
+        status=status,
+        trial_days=int(settings.signup_trial_days),
+    )
+    workspace["plan"] = plan
+    workspace["feature_flags"] = _feature_flags_for_plan(plan)
+    workspace["updated_at"] = _utc_now_iso()
+    store.workspaces[workspace_id] = workspace
+    store.workspace_subscriptions[workspace_id] = subscription
+    billing_event = {
+        "event_id": f"bill_{uuid4().hex[:10]}",
+        "workspace_id": workspace_id,
+        "plan": plan,
+        "status": status,
+        "checkout_session_id": str((checkout or {}).get("session_id", "")),
+        "created_at": _utc_now_iso(),
+        "actor": identity.subject,
+    }
+    store.billing_events.insert(0, billing_event)
+    del store.billing_events[1000:]
+    return with_correlation(request, {
+        "workspace": workspace,
+        "subscription": subscription,
+        "plan_summary": plan_info,
+        "checkout": checkout,
+    })
+
+
+@router.post("/workspaces/{workspace_id}/campaign/start")
+def workspace_campaign_start(
+    workspace_id: str,
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    _ = _require_workspace(store, workspace_id)
+    config = str(payload.get("config", "config/paper.yaml"))
+    cycles = int(payload.get("cycles", 8) or 8)
+    sleep_seconds = float(payload.get("sleep_seconds", 0.0) or 0.0)
+    notional_usd = float(payload.get("notional_usd", 125.0) or 125.0)
+    readiness_every = int(payload.get("readiness_every", 4) or 4)
+    symbols = str(payload.get("symbols", "")).strip()
+    risk_profile = str(payload.get("risk_profile", "balanced")).strip() or "balanced"
+    out_dir = str(payload.get("out_dir", f"data/reports/workspaces/{workspace_id}/paper")).strip()
+
+    command = [
+        "scripts/run_paper_campaign.py",
+        "--config",
+        config,
+        "--cycles",
+        str(max(cycles, 1)),
+        "--sleep-seconds",
+        str(max(sleep_seconds, 0.0)),
+        "--notional-usd",
+        str(max(notional_usd, 1.0)),
+        "--readiness-every",
+        str(max(readiness_every, 1)),
+        "--out-dir",
+        out_dir,
+        "--risk-profile",
+        risk_profile,
+    ]
+    if symbols:
+        command.extend(["--symbols", symbols])
+    execute = bool(payload.get("execute", False))
+    if not execute:
+        return with_correlation(request, {
+            "workspace_id": workspace_id,
+            "dry_run": True,
+            "command": [sys.executable, *command],
+            "paper_first_enforced": True,
+        })
+    result = run_python_command(command, timeout_seconds=180)
+    return with_correlation(request, {
+        "workspace_id": workspace_id,
+        "dry_run": False,
+        **result,
+    })
+
+
+@router.get("/workspaces/{workspace_id}/ops-health")
+def workspace_ops_health(
+    workspace_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    workspace = _require_workspace(store, workspace_id)
+    health = _workspace_ops_health(store, workspace_id)
+    subscription = store.workspace_subscriptions.get(workspace_id, {})
+    return with_correlation(request, {
+        "workspace": workspace,
+        "subscription": subscription if isinstance(subscription, dict) else {},
+        "ops_health": health,
+    })
+
+
+@router.get("/workspaces/{workspace_id}/promotion-gate")
+def workspace_promotion_gate(
+    workspace_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    strategy_id: Annotated[str, Query(min_length=1)] = "trend_following",
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    workspace = _require_workspace(store, workspace_id)
+    gate = _workspace_promotion_gate_status(store, workspace_id, strategy_id=strategy_id)
+    return with_correlation(request, {"workspace": workspace, "promotion_gate": gate})
+
+
+@router.post("/marketplace/sales/record")
+def record_marketplace_sale(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    listing_id = str(payload.get("listing_id", "")).strip()
+    buyer_workspace_id = str(payload.get("buyer_workspace_id", "")).strip()
+    if not listing_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="listing_id is required")
+    if listing_id not in store.marketplace_listings:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="listing not found")
+    _ = _require_workspace(store, buyer_workspace_id)
+
+    gross_amount = float(payload.get("gross_amount_usd", 0.0) or 0.0)
+    if gross_amount <= 0.0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="gross_amount_usd must be > 0")
+    settings = request.app.state.settings
+    catalog = load_plan_catalog(settings)
+    commission = marketplace_commission(catalog, gross_amount)
+    sale_id = f"sale_{uuid4().hex[:10]}"
+    row = {
+        "sale_id": sale_id,
+        "listing_id": listing_id,
+        "buyer_workspace_id": buyer_workspace_id,
+        "seller_id": str(payload.get("seller_id", "community_author")).strip() or "community_author",
+        "currency": str(payload.get("currency", "USD")).strip().upper() or "USD",
+        **commission,
+        "created_at": _utc_now_iso(),
+        "created_by": identity.subject,
+    }
+    store.marketplace_sales[sale_id] = row
+    return with_correlation(request, {"sale": row})
+
+
+@router.get("/marketplace/revenue-summary")
+def marketplace_revenue_summary(
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    sales = [dict(row) for row in store.marketplace_sales.values() if isinstance(row, dict)]
+    gross = sum(float(row.get("gross_amount_usd", 0.0) or 0.0) for row in sales)
+    commission = sum(float(row.get("commission_amount_usd", 0.0) or 0.0) for row in sales)
+    seller_net = sum(float(row.get("seller_net_amount_usd", 0.0) or 0.0) for row in sales)
+    return with_correlation(request, {
+        "count": len(sales),
+        "gross_amount_usd": round(gross, 2),
+        "commission_amount_usd": round(commission, 2),
+        "seller_net_amount_usd": round(seller_net, 2),
+        "sales": sorted(sales, key=lambda row: str(row.get("created_at", "")), reverse=True)[:200],
+    })
 
 
 @router.get("/accounts/{account_id}")
@@ -1998,6 +2438,7 @@ def run_data_seed(
     identity: Annotated[APIIdentity, Depends(require_operator)],
     request: Request,
     cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
     command = build_data_seed_command(payload)
@@ -2008,9 +2449,31 @@ def run_data_seed(
             "command": [sys.executable, *command],
             "note": "Set execute=true to run bounded data bootstrap with cache/checksum/retry controls.",
         })
-    result = run_python_command(command, timeout_seconds=180)
-    output_lines = [line for line in str(result.get("stdout", "")).splitlines() if line.strip()]
-    return with_correlation(request, {"dry_run": False, **result, "output_lines": output_lines})
+    job = _create_ops_job(
+        store,
+        job_type="data_seed",
+        requested_by=identity.subject,
+        command=command,
+        payload=payload,
+    )
+    worker = threading.Thread(
+        target=_run_ops_job,
+        kwargs={
+            "store": store,
+            "job_id": str(job["job_id"]),
+            "command": command,
+            "timeout_seconds": 180,
+            "parse_notify_json": False,
+        },
+        daemon=True,
+    )
+    worker.start()
+    return with_correlation(request, {
+        "accepted": True,
+        "dry_run": False,
+        "job": job,
+        "poll_path": f"/v1/ops/jobs/{job['job_id']}",
+    })
 
 
 @router.post("/ops/notify/test")
@@ -2019,11 +2482,77 @@ def run_notify_test(
     identity: Annotated[APIIdentity, Depends(require_operator)],
     request: Request,
     cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
     command = build_notify_command(payload)
     execute = bool(payload.get("execute", False))
     if not execute:
         return with_correlation(request, {"dry_run": True, "command": [sys.executable, *command]})
-    result = run_python_command(command, timeout_seconds=90)
-    return with_correlation(request, {"dry_run": False, **result, "parsed": parse_last_json_line(str(result.get("stdout", "")))})
+    job = _create_ops_job(
+        store,
+        job_type="notify_test",
+        requested_by=identity.subject,
+        command=command,
+        payload=payload,
+    )
+    worker = threading.Thread(
+        target=_run_ops_job,
+        kwargs={
+            "store": store,
+            "job_id": str(job["job_id"]),
+            "command": command,
+            "timeout_seconds": 90,
+            "parse_notify_json": True,
+        },
+        daemon=True,
+    )
+    worker.start()
+    return with_correlation(request, {
+        "accepted": True,
+        "dry_run": False,
+        "job": job,
+        "poll_path": f"/v1/ops/jobs/{job['job_id']}",
+    })
+
+
+@router.get("/ops/jobs")
+def list_ops_jobs(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 40,
+    job_type: Annotated[str | None, Query()] = None,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    selected_type = str(job_type or "").strip().lower()
+    selected_status = str(status_filter or "").strip().lower()
+    rows: list[dict[str, Any]] = []
+    for row in store.ops_jobs.values():
+        if not isinstance(row, dict):
+            continue
+        if selected_type and str(row.get("type", "")).strip().lower() != selected_type:
+            continue
+        if selected_status and str(row.get("status", "")).strip().lower() != selected_status:
+            continue
+        rows.append(dict(row))
+    rows.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+    rows = rows[: max(1, int(limit))]
+    return with_correlation(request, {"count": len(rows), "jobs": rows})
+
+
+@router.get("/ops/jobs/{job_id}")
+def get_ops_job(
+    job_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    row = store.ops_jobs.get(str(job_id))
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job not found")
+    return with_correlation(request, {"job": dict(row)})

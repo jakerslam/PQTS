@@ -8,6 +8,7 @@
 [![Release](https://github.com/jakerslam/pqts/actions/workflows/release.yml/badge.svg)](https://github.com/jakerslam/pqts/actions/workflows/release.yml)
 [![Nightly Sandbox](https://github.com/jakerslam/pqts/actions/workflows/nightly-live-sandbox.yml/badge.svg)](https://github.com/jakerslam/pqts/actions/workflows/nightly-live-sandbox.yml)
 [![PyPI](https://img.shields.io/pypi/v/pqts.svg)](https://pypi.org/project/pqts/)
+[![Pricing & Plans](https://img.shields.io/badge/pricing-community%20to%20enterprise-success.svg)](docs/PRICING_AND_PACKAGING.md)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-Paper%20Trading-yellow.svg)]()
 
@@ -141,6 +142,9 @@ One-command local stack (app + API + web + Redis + Postgres):
 ```bash
 docker compose up --build
 
+# Cloud MVP profile (api + web + redis + postgres):
+# make cloud-mvp-up
+
 # Optional operator fallback (Dash):
 # docker compose --profile operator up --build
 
@@ -159,6 +163,18 @@ Docs site (GitHub Pages): [https://jakerslam.github.io/PQTS/](https://jakerslam.
 Leaderboard fallback in-repo page: [docs/leaderboard/index.html](docs/leaderboard/index.html)
 Workflow fallback artifact when Pages is unavailable: `docs-site-fallback` in `Publish Docs Site` runs.
 Latest release: [v0.1.5](https://github.com/jakerslam/PQTS/releases/tag/v0.1.5)
+
+## 💳 Pricing & Cloud
+
+PQTS uses an open-core model: MIT community core + managed cloud/support layers.
+
+- Community: free, self-hosted, paper-first safety defaults
+- Starter Cloud: $49/mo
+- Pro Cloud: $299/mo
+- Enterprise: $999+/mo or annual self-hosted contracts
+- Verified strategy marketplace commission: 25%
+
+Details and guardrails: [Pricing And Packaging](docs/PRICING_AND_PACKAGING.md)
 
 ## 🌐 Web App Dashboard (Next.js)
 
@@ -404,9 +420,9 @@ Public reproducible result bundles live under `results/`.
   - `results/2026-03-09_crypto_market_making_short/`
   - `results/2026-03-09_crypto_funding_arbitrage_short/`
   - `results/2026-03-09_multi_market_market_making_short/`
-  - `results/2026-03-10_reference_crypto_trend_following/`
-  - `results/2026-03-10_reference_crypto_funding_arbitrage/`
-  - `results/2026-03-10_reference_multi_market_making/`
+  - `results/2026-03-12_reference_crypto_trend_following/`
+  - `results/2026-03-12_reference_crypto_funding_arbitrage/`
+  - `results/2026-03-12_reference_multi_market_making/`
 - bundle schema/template: `results/RESULT_TEMPLATE.md`
 - generated latest-reference summary: `results/reference_performance_latest.json`
 
@@ -425,6 +441,12 @@ Trust + provenance program:
 - Monthly benchmark reports: `data/reports/monthly/<YYYY-MM>/`
 - Certified-paper integration report: `data/reports/certifications/latest.json`
 - External beta framework contract: `docs/EXTERNAL_BETA_FRAMEWORK.md`
+
+Release readiness gate (blocks publish when beta/certification/provenance truth fails):
+
+```bash
+make release-readiness
+```
 
 ## 🔔 Notifications (Telegram/Discord)
 

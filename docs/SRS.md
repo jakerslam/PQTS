@@ -5194,3 +5194,100 @@ These requirements assimilate parity-plus improvements across Freqtrade, Nautilu
 - The system SHALL preserve research-to-live parity such that promotions require minimal code-surface divergence and explicit migration deltas when exceptions occur.
 - Source parity reference: Nautilus parity philosophy.
 - Beat mechanism: enforce gate checks on parity drift and require documented exceptions before live promotion.
+
+## 91. Monetization and Commercialization Requirements (March 12, 2026)
+
+### MON-1 Open-Core Packaging Contract
+
+- The system SHALL preserve MIT open-source core access while monetizing managed cloud, support, and governance layers.
+- Plan packaging SHALL be machine-readable through a canonical plan catalog file.
+
+### MON-2 Plan and Pricing Catalog Contract
+
+- The system SHALL encode Community, Starter Cloud, Pro Cloud, and Enterprise plan definitions with explicit price points and feature limits.
+- Plan alias resolution SHALL be deterministic so API and docs resolve to the same canonical plan tokens.
+
+### MON-3 Self-Serve Signup Contract
+
+- The system SHALL expose a signup endpoint that provisions workspace identity, default plan entitlement, and feature flags.
+- Signup SHALL require explicit risk-disclaimer and paper-first-policy acceptance before workspace creation.
+
+### MON-4 Billing Subscription Contract
+
+- The system SHALL expose workspace billing subscribe endpoints that mutate plan/subscription state and preserve audit history.
+- Billing provider mode SHALL support demo-safe dry-run and Stripe-ready checkout session generation.
+
+### MON-5 Workspace Campaign Activation Contract
+
+- The system SHALL expose workspace-scoped campaign start endpoints with paper-first defaults and deterministic command receipts.
+- Execute mode SHALL remain bounded and explicit; dry-run mode SHALL be available by default.
+
+### MON-6 Workspace Ops and Promotion Visibility Contract
+
+- The system SHALL expose workspace-scoped ops-health and promotion-gate status surfaces for commercial onboarding and support workflows.
+- Returned payloads SHALL include risk, sync, kill-switch, and gate status data required for paid-tier operations.
+
+### MON-7 Marketplace Revenue Contract
+
+- The system SHALL support marketplace sale recording and commission accounting with deterministic gross/commission/net outputs.
+- Commission rate SHALL be controlled by plan catalog policy and surfaced through revenue summary endpoints.
+
+### MON-8 Commercial Documentation Truth Contract
+
+- The system SHALL maintain pricing, signup, and README packaging narratives aligned with implemented API surfaces and plan catalog policy.
+- Public pricing claims SHALL map to machine-readable configuration and tested endpoint behavior.
+
+## 92. Release-Readiness and Ops-Job Hardening Requirements (March 12, 2026)
+
+### RLG-1 Unified Release Readiness Gate Contract
+
+- The system SHALL provide one release-readiness gate that evaluates external-beta evidence, integration maturity/certification, benchmark trust contract, and docs truth markers before release publishing.
+- Release workflows SHALL fail closed when any readiness gate fails.
+- Gate evaluation SHALL produce machine-readable summary output for audit and triage.
+
+### RLG-2 External Beta Cohort Gate Contract
+
+- Release readiness SHALL require a cohort row for the current release window with allowed status and minimum external participant counts.
+- Cohort thresholds SHALL be policy-driven through a versioned release-readiness policy file.
+- Missing or stale cohort evidence SHALL block release publication.
+
+### RLG-3 Certified Integration Maturity Gate Contract
+
+- Release readiness SHALL require required venue adapters to meet minimum maturity status and pass latest certification report checks.
+- Required market-class coverage SHALL be validated against the canonical integrations index.
+- Marketing and release claims SHALL not outpace maturity status in the canonical index.
+
+### RLG-4 Benchmark Trust and Provenance Gate Contract
+
+- Release readiness SHALL require `results/reference_performance_latest.json` trust/provenance contract compliance and minimum reference-bundle count.
+- Bundles included in release-ready benchmark claims SHALL meet required trust labels.
+- Docs benchmark pages SHALL include latest benchmark artifact date to preserve truth-surface alignment.
+
+### RLG-5 Backlog Truth Marker Contract
+
+- Backlog documentation SHALL clearly identify archive templates versus canonical active execution sources.
+- Release readiness checks SHALL enforce required archive marker text in `docs/ISSUE_BACKLOG.md`.
+- Active execution ordering SHALL remain in `docs/TODO.md` and requirement source of truth in `docs/SRS.md`.
+
+### OPSJ-1 Typed Ops Job Lifecycle Contract
+
+- API actions for operational subprocess helpers SHALL execute through typed job records (`queued`, `running`, `succeeded`, `failed`) rather than opaque one-shot responses.
+- Job records SHALL persist deterministic identifiers, actor, timestamps, command metadata, payload snapshot, and result payload.
+- Job lifecycle SHALL be observable through API polling endpoints.
+
+### OPSJ-2 Ops Job API Contract
+
+- Runtime SHALL expose list/detail endpoints for ops jobs with filter support (`type`, `status`) and bounded pagination.
+- Execute-style endpoints (for example data-seed and notify-test) SHALL return accepted job envelopes with deterministic poll paths.
+- Dry-run behavior SHALL remain available and explicit.
+
+### OPSJ-3 Ops Job Audit and Result Contract
+
+- Job execution SHALL persist stdout/stderr, return codes, duration, and parsed payload artifacts when applicable.
+- Notify test jobs SHALL parse and expose structured final payloads from command output.
+- Failed job executions SHALL store explicit error fields for operator triage.
+
+### OPSJ-4 Ops Job Retention Contract
+
+- Runtime SHALL enforce bounded in-memory retention for ops jobs and prune oldest records when the cap is exceeded.
+- Retention rules SHALL preserve recent operational evidence without unbounded memory growth.

@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 URLChecker = Callable[[str, float], tuple[bool, int, str]]
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_ALLOWED_STATUS = {"active", "beta", "deprecated", "experimental"}
+_ALLOWED_STATUS = {"active", "beta", "certified", "deprecated", "experimental"}
 _ALLOWED_SURFACE = {"sdk", "cli", "examples", "contracts", "api", "docs"}
 
 

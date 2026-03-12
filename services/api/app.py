@@ -44,6 +44,21 @@ def _render_prometheus_metrics(store: APIRuntimeStore) -> str:
         lines.append(f'pqts_risk_incidents_total{{account_id="{account_id}"}} {incidents}')
         lines.append(f'pqts_kill_switch_active{{account_id="{account_id}"}} {kill_switch}')
         lines.append(f'pqts_net_pnl_usd{{account_id="{account_id}"}} {latest_net:.6f}')
+    subscriptions = [row for row in store.workspace_subscriptions.values() if isinstance(row, dict)]
+    mrr_estimate = sum(float(row.get("price_monthly_usd", 0.0) or 0.0) for row in subscriptions)
+    lines.extend(
+        [
+            "# HELP pqts_workspaces_total Number of provisioned workspaces.",
+            "# TYPE pqts_workspaces_total gauge",
+            f"pqts_workspaces_total {len(store.workspaces)}",
+            "# HELP pqts_workspace_subscriptions_total Number of subscription records.",
+            "# TYPE pqts_workspace_subscriptions_total gauge",
+            f"pqts_workspace_subscriptions_total {len(subscriptions)}",
+            "# HELP pqts_mrr_estimate_usd Sum of workspace subscription monthly prices.",
+            "# TYPE pqts_mrr_estimate_usd gauge",
+            f"pqts_mrr_estimate_usd {mrr_estimate:.6f}",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 

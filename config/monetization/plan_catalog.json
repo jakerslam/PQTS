@@ -1,0 +1,84 @@
+{
+  "default_plan": "community",
+  "aliases": {
+    "starter": "starter_cloud",
+    "starter_cloud": "starter_cloud",
+    "pro": "pro_cloud",
+    "professional": "pro_cloud",
+    "team": "pro_cloud",
+    "enterprise": "enterprise",
+    "community": "community"
+  },
+  "marketplace": {
+    "commission_rate": 0.25,
+    "verified_badge_label": "Institutional Verified"
+  },
+  "plans": {
+    "community": {
+      "display_name": "Community",
+      "price_monthly_usd": 0,
+      "billing_mode": "self_hosted",
+      "description": "MIT open-source core with paper/shadow/canary safety path.",
+      "features": [
+        "Local self-hosted runtime",
+        "Promotion gates",
+        "Rust hotpaths",
+        "Web Studio guided mode"
+      ],
+      "limits": {
+        "live_strategies": 0,
+        "support": "community"
+      }
+    },
+    "starter_cloud": {
+      "display_name": "Starter Cloud",
+      "price_monthly_usd": 49,
+      "billing_mode": "saas",
+      "description": "Hosted PQTS workspace with one live strategy slot and baseline monitoring.",
+      "stripe_price_env": "PQTS_STRIPE_PRICE_STARTER",
+      "features": [
+        "Managed hosting",
+        "1 live strategy",
+        "Basic monitoring"
+      ],
+      "limits": {
+        "live_strategies": 1,
+        "support": "standard"
+      }
+    },
+    "pro_cloud": {
+      "display_name": "Pro Cloud",
+      "price_monthly_usd": 299,
+      "billing_mode": "saas",
+      "description": "Unlimited strategies, advanced ML/explainability, and priority support.",
+      "stripe_price_env": "PQTS_STRIPE_PRICE_PRO",
+      "features": [
+        "Unlimited live strategies",
+        "Advanced ML and explainability dashboards",
+        "Priority support",
+        "Telegram and Discord alert channels"
+      ],
+      "limits": {
+        "live_strategies": 999,
+        "support": "priority"
+      }
+    },
+    "enterprise": {
+      "display_name": "Enterprise",
+      "price_monthly_usd": 999,
+      "billing_mode": "saas_or_self_hosted",
+      "description": "Custom controls, SLA, team governance, and enterprise integrations.",
+      "stripe_price_env": "PQTS_STRIPE_PRICE_ENTERPRISE",
+      "features": [
+        "Custom risk and governance policies",
+        "SLA and dedicated support",
+        "Team controls and audit exports",
+        "Self-hosted option"
+      ],
+      "limits": {
+        "live_strategies": 9999,
+        "support": "dedicated"
+      }
+    }
+  }
+}

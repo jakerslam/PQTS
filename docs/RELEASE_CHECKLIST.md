@@ -12,6 +12,7 @@
 2. Add matching `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`.
 3. Run local verification:
    ```bash
+   make release-readiness
    make arch-check
    make test
    python3 tools/check_public_links.py --pyproject pyproject.toml --required docs/required_public_links.txt

@@ -1,0 +1,29 @@
+{
+  "schema_version": "1",
+  "external_beta": {
+    "registry": "data/validation/external_beta/cohort_registry.json",
+    "user_research": "docs/USER_RESEARCH_2026_03.md",
+    "required_statuses": ["active", "completed"],
+    "require_current_release_window": true,
+    "min_external_beginner_participants": 1,
+    "min_external_pro_participants": 1
+  },
+  "integrations": {
+    "index": "config/integrations/official_integrations.json",
+    "certification_report": "data/reports/certifications/latest.json",
+    "required_venues": ["binance", "coinbase", "alpaca", "oanda"],
+    "required_market_classes": ["crypto", "equities", "forex", "prediction_markets"],
+    "min_status": "beta"
+  },
+  "benchmark": {
+    "reference_performance": "results/reference_performance_latest.json",
+    "min_reference_bundle_count": 3,
+    "required_top_level_trust_label": "reference",
+    "required_bundle_trust_label": "reference"
+  },
+  "docs": {
+    "benchmarks_doc": "docs/BENCHMARKS.md",
+    "issue_backlog": "docs/ISSUE_BACKLOG.md",
+    "require_issue_backlog_archive_marker": "Canonical active execution order is maintained in `docs/TODO.md`."
+  }
+}

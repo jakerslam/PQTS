@@ -1,12 +1,13 @@
 # Monthly User Research Review (2026-03)
 
-Last updated: 2026-03-10 (America/Denver)
+Last updated: 2026-03-12 (America/Denver)
 
 Validation metadata:
 - `release_window: 2026-03`
 - `external_beginner_participants: 0`
 - `external_pro_participants: 0`
 - `internal_proxy_participants: 2`
+- `release_gate_status: blocked_pending_external_cohort`
 
 ## Objective
 

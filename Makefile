@@ -4,7 +4,7 @@ VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 PY_RUN := $(if $(wildcard $(VENV_PY)),$(VENV_PY),$(PYTHON))
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check full-srs-check dod-audit code-only-audit governance-check trust-surface-suite paper-6m paper-6m-compare paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up observability-up doctor onboard status test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check full-srs-check dod-audit code-only-audit governance-check trust-surface-suite release-readiness paper-6m paper-6m-compare paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up cloud-mvp-up cloud-mvp-down observability-up doctor onboard status test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -92,6 +92,9 @@ governance-check:
 trust-surface-suite:
 	$(PY_RUN) tools/run_trust_surface_suite.py --out data/reports/validation/trust_surface_latest.json
 
+release-readiness:
+	$(PY_RUN) tools/check_release_readiness.py --policy config/release/release_readiness_policy.json
+
 codex-enforcer:
 	$(PY_RUN) tools/check_codex_enforcer.py
 
@@ -176,6 +179,12 @@ benchmark-program:
 
 docker-up:
 	docker compose up --build
+
+cloud-mvp-up:
+	docker compose up --build api web redis postgres
+
+cloud-mvp-down:
+	docker compose down
 
 observability-up:
 	docker compose --profile observability up --build

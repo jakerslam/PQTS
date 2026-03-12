@@ -19,3 +19,9 @@ python3 tools/check_official_integrations.py --index config/integrations/officia
 Update policy:
 - Refresh `last_reviewed` when integration contracts are revalidated.
 - Keep provider repo URLs and ownership metadata current.
+- Use status progression: `experimental` -> `beta` -> `active`/`certified` -> `deprecated`.
+- Release gating validates required venue maturity + certification evidence:
+
+```bash
+python3 tools/check_release_readiness.py --policy config/release/release_readiness_policy.json
+```

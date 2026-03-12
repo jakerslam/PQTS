@@ -46,6 +46,12 @@ class APIRuntimeStore:
     agent_receipts: dict[str, dict[str, Any]] = field(default_factory=dict)
     agent_hooks: dict[str, dict[str, Any]] = field(default_factory=dict)
     marketplace_listings: dict[str, dict[str, Any]] = field(default_factory=dict)
+    workspaces: dict[str, dict[str, Any]] = field(default_factory=dict)
+    workspace_subscriptions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    signup_events: list[dict[str, Any]] = field(default_factory=list)
+    billing_events: list[dict[str, Any]] = field(default_factory=list)
+    marketplace_sales: dict[str, dict[str, Any]] = field(default_factory=dict)
+    ops_jobs: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def bootstrap(cls) -> "APIRuntimeStore":
@@ -155,6 +161,35 @@ class APIRuntimeStore:
                     },
                 }
             },
+            workspaces={
+                "ws_demo": {
+                    "workspace_id": "ws_demo",
+                    "name": "PQTS Demo Workspace",
+                    "owner_email": "demo@pqts.local",
+                    "plan": "community",
+                    "risk_disclaimer_accepted": True,
+                    "paper_first_policy_accepted": True,
+                    "created_at": now_iso,
+                    "updated_at": now_iso,
+                }
+            },
+            workspace_subscriptions={
+                "ws_demo": {
+                    "workspace_id": "ws_demo",
+                    "plan": "community",
+                    "status": "active",
+                    "price_monthly_usd": 0.0,
+                    "currency": "USD",
+                    "billing_mode": "self_hosted",
+                    "trial_ends_at": "",
+                    "updated_at": now_iso,
+                    "updated_by": "system",
+                }
+            },
+            signup_events=[],
+            billing_events=[],
+            marketplace_sales={},
+            ops_jobs={},
         )
 
 

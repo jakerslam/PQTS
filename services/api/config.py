@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-import tomllib
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -49,6 +49,15 @@ class APISettings:
     limit_concurrency: int = 256
     keepalive_timeout_seconds: int = 5
     graceful_shutdown_timeout_seconds: int = 30
+    billing_provider: str = "demo"
+    plan_catalog_path: str = "config/monetization/plan_catalog.json"
+    signup_trial_days: int = 14
+    stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_starter: str = ""
+    stripe_price_pro: str = ""
+    stripe_price_enterprise: str = ""
 
     @staticmethod
     def _profile_defaults(profile: str) -> dict[str, int]:
@@ -124,4 +133,16 @@ class APISettings:
                 ),
                 1,
             ),
+            billing_provider=os.getenv("PQTS_BILLING_PROVIDER", cls.billing_provider),
+            plan_catalog_path=os.getenv("PQTS_PLAN_CATALOG_PATH", cls.plan_catalog_path),
+            signup_trial_days=max(
+                int(os.getenv("PQTS_SIGNUP_TRIAL_DAYS", str(cls.signup_trial_days))),
+                0,
+            ),
+            stripe_secret_key=os.getenv("PQTS_STRIPE_SECRET_KEY", ""),
+            stripe_publishable_key=os.getenv("PQTS_STRIPE_PUBLISHABLE_KEY", ""),
+            stripe_webhook_secret=os.getenv("PQTS_STRIPE_WEBHOOK_SECRET", ""),
+            stripe_price_starter=os.getenv("PQTS_STRIPE_PRICE_STARTER", ""),
+            stripe_price_pro=os.getenv("PQTS_STRIPE_PRICE_PRO", ""),
+            stripe_price_enterprise=os.getenv("PQTS_STRIPE_PRICE_ENTERPRISE", ""),
         )

@@ -67,9 +67,9 @@
     "repo_url": "https://github.com/binance/binance-connector-python",
     "surface": "sdk",
     "owner": "integration-team",
-    "status": "experimental",
-    "last_reviewed": "2026-03-10",
-    "notes": "Crypto venue adapter dependency for certified-paper execution paths."
+    "status": "beta",
+    "last_reviewed": "2026-03-12",
+    "notes": "Crypto venue adapter dependency with certified-paper execution evidence."
   },
   {
     "id": "coinbase-advanced-py",
@@ -79,9 +79,9 @@
     "repo_url": "https://github.com/coinbase/coinbase-advanced-py",
     "surface": "sdk",
     "owner": "integration-team",
-    "status": "experimental",
-    "last_reviewed": "2026-03-10",
-    "notes": "Crypto venue adapter dependency for certified-paper execution paths."
+    "status": "beta",
+    "last_reviewed": "2026-03-12",
+    "notes": "Crypto venue adapter dependency with certified-paper execution evidence."
   },
   {
     "id": "alpaca-py",
@@ -91,9 +91,9 @@
     "repo_url": "https://github.com/alpacahq/alpaca-py",
     "surface": "sdk",
     "owner": "integration-team",
-    "status": "experimental",
-    "last_reviewed": "2026-03-10",
-    "notes": "Equities venue adapter dependency for certified-paper execution paths."
+    "status": "beta",
+    "last_reviewed": "2026-03-12",
+    "notes": "Equities venue adapter dependency with certified-paper execution evidence."
   },
   {
     "id": "oanda-v20-python",
@@ -103,8 +103,8 @@
     "repo_url": "https://github.com/oanda/v20-python",
     "surface": "sdk",
     "owner": "integration-team",
-    "status": "experimental",
-    "last_reviewed": "2026-03-10",
-    "notes": "Forex venue adapter dependency for certified-paper execution paths."
+    "status": "beta",
+    "last_reviewed": "2026-03-12",
+    "notes": "Forex venue adapter dependency with certified-paper execution evidence."
   }
 ]
