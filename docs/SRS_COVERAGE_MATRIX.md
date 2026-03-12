@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **675**
-- implemented: **675**
+- Total requirements: **680**
+- implemented: **680**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -64,6 +64,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | NFR | 3 | 0 | 0 | 0 | 0 | 3 |
 | NS | 6 | 0 | 0 | 0 | 0 | 6 |
 | OBBFD | 9 | 0 | 0 | 0 | 0 | 9 |
+| OBSC | 5 | 0 | 0 | 0 | 0 | 5 |
 | PG | 7 | 0 | 0 | 0 | 0 | 7 |
 | PH | 10 | 0 | 0 | 0 | 0 | 10 |
 | PHL | 4 | 0 | 0 | 0 | 0 | 4 |
@@ -290,6 +291,11 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | ASH-2 | Signal-Lead Telemetry Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | ASH-3 | Single-Source Emergency Mode Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | ASH-4 | Source Reliability and Claim Handling | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| OBSC-1 | Live Speech Ingestion and ASR Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| OBSC-2 | Mention-Market Trigger Extraction Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| OBSC-3 | Transcript-to-Order Latency Budget Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| OBSC-4 | Transcript Quality and Revision-Aware Risk Controls | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| OBSC-5 | Source Reliability and Claim Handling | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | AL-1 | LMSR Cost Function Fidelity | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AL-2 | Marginal Price and Probability Coherence | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AL-3 | Liquidity Parameter (`b`) Governance | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |

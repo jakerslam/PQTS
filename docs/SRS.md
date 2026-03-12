@@ -1570,6 +1570,43 @@ Observed source links:
 - Public claims from this source chain about deterministic minute-scale alpha or extreme short-window ROI shall be marked `unverified` unless backed by reproducible trade-level evidence.
 - Requirements adopted from this source chain shall remain limited to observable mechanics and validated controls rather than promotional profitability claims.
 
+## 86. Additional Delta Requirements from External Post Chain (obscicron, March 11, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post focused on low-latency live-speech transcription for mention-market trading.
+
+Observed source links:
+- `https://x.com/obscicron/status/2031704141307805947?s=20`
+- Mentioned ASR provider in post body: `Deepgram Nova-3`
+
+### OBSC-1 Live Speech Ingestion and ASR Contract
+
+- PQTS shall support ingesting live speech/audio streams for event-market workflows through versioned ASR adapters.
+- ASR artifacts shall persist partial and final transcript segments with timestamps, speaker/source identifiers, and provider/model metadata.
+- Transcript ingestion shall expose end-to-end ingest-to-transcript latency metrics for replay and SLO enforcement.
+
+### OBSC-2 Mention-Market Trigger Extraction Contract
+
+- Transcript pipelines shall support mention-trigger extraction for configured entities/topics mapped to mention-market instruments.
+- Trigger extraction shall preserve matched phrase/entity, confidence score, and text-span evidence for each candidate action.
+- Ambiguous or low-confidence mention detections shall default to `hold` unless corroboration thresholds are met.
+
+### OBSC-3 Transcript-to-Order Latency Budget Contract
+
+- Mention-market strategies shall define explicit stage budgets for speech ingest, ASR inference, trigger extraction, and order routing.
+- Runtime shall track latency distribution per stage and publish budget-breach diagnostics with bottleneck stage IDs.
+- If latency budgets are breached, strategy action shall degrade safely (`hold`/throttle/disable) rather than submitting on stale transcript state.
+
+### OBSC-4 Transcript Quality and Revision-Aware Risk Controls
+
+- Strategy decisioning shall account for partial-to-final transcript revisions and prevent irreversible actions on unstable text segments.
+- Actions based on partial transcripts shall require stricter size caps and faster confirmation/exit rules until final transcript confirmation.
+- Error rates from ASR revisions (false triggers, retractions) shall be logged and included in promotion-gate evidence.
+
+### OBSC-5 Source Reliability and Claim Handling
+
+- Public claims from this source chain about deterministic speed advantage or extreme short-window profitability shall be marked `unverified` unless supported by reproducible trade-level evidence.
+- Requirements adopted from this source chain shall remain limited to observable mechanics and validated controls rather than promotional profitability claims.
+
 ## 31. Additional Requirements from External Post Chain (AleiahLock, March 8, 2026)
 
 These requirements are derived from the referenced post and quoted-link chain describing LMSR mechanics, probability-coherent pricing, and liquidity-parameterized market-maker behavior.

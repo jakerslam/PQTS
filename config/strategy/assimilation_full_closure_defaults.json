@@ -602,6 +602,25 @@
         "closure checker pass"
       ]
     },
+    "OBSC": {
+      "refs": [
+        "OBSC-1",
+        "OBSC-2",
+        "OBSC-3",
+        "OBSC-4",
+        "OBSC-5"
+      ],
+      "controls": {
+        "policy_hook": "srs_baseline.obsc",
+        "fail_closed": true,
+        "provenance_required": true
+      },
+      "acceptance_evidence": [
+        "baseline contract configuration entry",
+        "execution map linkage",
+        "closure checker pass"
+      ]
+    },
     "NCLI": {
       "refs": [
         "NCLI-6"

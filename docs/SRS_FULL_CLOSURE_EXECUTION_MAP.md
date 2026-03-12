@@ -171,6 +171,12 @@ contracts for every remaining SRS family-assimilation block.
 - Baseline hook: `srs_baseline.ash`
 - Contract: fail-closed, provenance-required, evidence-logged
 
+## OBSC Family
+
+- Refs: `OBSC-1, OBSC-2, OBSC-3, OBSC-4, OBSC-5`
+- Baseline hook: `srs_baseline.obsc`
+- Contract: fail-closed, provenance-required, evidence-logged
+
 ## NCLI Family
 
 - Refs: `NCLI-6`
