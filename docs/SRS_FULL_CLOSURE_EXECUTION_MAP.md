@@ -153,6 +153,12 @@ contracts for every remaining SRS family-assimilation block.
 - Baseline hook: `srs_baseline.morp`
 - Contract: fail-closed, provenance-required, evidence-logged
 
+## MNC Family
+
+- Refs: `MNC-1, MNC-2, MNC-3, MNC-4, MNC-5`
+- Baseline hook: `srs_baseline.mnc`
+- Contract: fail-closed, provenance-required, evidence-logged
+
 ## NCLI Family
 
 - Refs: `NCLI-6`

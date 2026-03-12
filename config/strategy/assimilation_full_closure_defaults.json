@@ -542,6 +542,25 @@
         "closure checker pass"
       ]
     },
+    "MNC": {
+      "refs": [
+        "MNC-1",
+        "MNC-2",
+        "MNC-3",
+        "MNC-4",
+        "MNC-5"
+      ],
+      "controls": {
+        "policy_hook": "srs_baseline.mnc",
+        "fail_closed": true,
+        "provenance_required": true
+      },
+      "acceptance_evidence": [
+        "baseline contract configuration entry",
+        "execution map linkage",
+        "closure checker pass"
+      ]
+    },
     "NCLI": {
       "refs": [
         "NCLI-6"

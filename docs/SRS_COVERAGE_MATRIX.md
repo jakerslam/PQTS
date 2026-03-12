@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **654**
-- implemented: **654**
+- Total requirements: **659**
+- implemented: **659**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -53,6 +53,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | LEAN | 6 | 0 | 0 | 0 | 0 | 6 |
 | LLE | 11 | 0 | 0 | 0 | 0 | 11 |
 | MARIK | 8 | 0 | 0 | 0 | 0 | 8 |
+| MNC | 5 | 0 | 0 | 0 | 0 | 5 |
 | MOAT | 16 | 0 | 0 | 0 | 0 | 16 |
 | MORP | 4 | 0 | 0 | 0 | 0 | 4 |
 | MTM | 12 | 0 | 0 | 0 | 0 | 12 |
@@ -751,3 +752,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | MORP-2 | Ultra-Low Entry Band and Quote-Precision Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | MORP-3 | Passive Lowball Queueing and Fill-Quality Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | MORP-4 | Source Reliability and Claim Handling | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| MNC-1 | Count-Market Event Ingestion Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| MNC-2 | Velocity Nowcast and Projection Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| MNC-3 | Contiguous Range-Strip Arbitrage Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| MNC-4 | Uncertainty-Collapse Exit Timing Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| MNC-5 | Source Reliability and Claim Handling | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |

@@ -4675,3 +4675,40 @@ Observed source links:
 
 - Public claims from this source chain about extreme single-market ROI or repeatability of near-zero-entry outcomes shall be marked `unverified` unless backed by reproducible trade-level evidence.
 - Requirements adopted from this source chain shall remain limited to observable mechanics and validated controls rather than promotional profitability claims.
+
+## 81. Additional Delta Requirements from External Post Chain (MisterNoComents, March 11, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post focused on count-based event markets and range-strip arbitrage mechanics.
+
+Observed source links:
+- `https://x.com/MisterNoComents/status/2031556318276854171?s=20`
+- `https://polymarket.com` (post body link)
+
+### MNC-1 Count-Market Event Ingestion Contract
+
+- PQTS shall support event-count market strategies that ingest live activity counters from external platforms (for example posts/replies/quotes) via versioned adapters.
+- Counter ingestion shall persist source timestamp, event subtype breakdown, and integrity flags (missing window, API lag, schema drift).
+- Strategies shall fail closed when count-source freshness or integrity falls below configured thresholds.
+
+### MNC-2 Velocity Nowcast and Projection Contract
+
+- For count-based markets, PQTS shall compute rolling event-velocity projections with uncertainty bands and explicit horizon target (for example end-of-week count).
+- Projection artifacts shall include latest observed count, velocity estimate, uncertainty interval, and model version.
+- Trade eligibility shall require projection confidence above stage-configured thresholds.
+
+### MNC-3 Contiguous Range-Strip Arbitrage Contract
+
+- PQTS shall support contiguous-range strip construction across mutually exclusive count buckets and compute total strip cost after fees/slippage.
+- Strip execution shall be allowed only when post-cost strip cost is below configured payout floor and within selected target-window confidence.
+- Range-strip decisions shall store covered bucket set, total cost, guaranteed-payout envelope, and residual out-of-window risk.
+
+### MNC-4 Uncertainty-Collapse Exit Timing Contract
+
+- Count-market strategies shall support early exit policies that monetize uncertainty collapse before final resolution when priced edge converges.
+- Exit policies shall define minimum realized edge, liquidity/depth checks, and latest permissible hold horizon.
+- Time-to-resolution edge decay and realized exit attribution shall be logged for replay and policy tuning.
+
+### MNC-5 Source Reliability and Claim Handling
+
+- Public claims from this source chain about guaranteed returns, extreme compounding, or deterministic overnight gains shall be marked `unverified` unless backed by reproducible trade-level evidence.
+- Requirements adopted from this source chain shall remain limited to observable mechanics and validated controls rather than promotional profitability claims.
