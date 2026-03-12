@@ -4956,3 +4956,69 @@ Observed source links:
 - Onboarding progression shall support: `connect brokerage` -> `aggregate accounts` -> `open personal terminal`.
 - Each step shall emit machine-readable receipts suitable for regression tests.
 - Missing connection prerequisites shall fail closed with explicit next-action guidance.
+
+## 89. Additional Delta Requirements from Agent Pilotability Expansion (March 11, 2026)
+
+These requirements capture the requested agent-pilotability expansion: stronger API control surface, self-service notification hooks, and a first-party Python agent library.
+
+Observed source references:
+- User directive (March 11, 2026): “super pilotable by an agent”
+- Requested vectors: notification hooks, agent library, expanded API surface
+- Operating constraints: `AGENTS.md`
+
+### AGP-1 Canonical Agent Context Contract
+
+- Runtime shall expose a canonical agent context endpoint (`/v1/agent/context`) that returns `system_facts`, `current_state`, and effective agent policy.
+- `system_facts` shall include hard safety rules and allowed pilot action set.
+- `current_state` shall include risk, promotion-stage summaries, and sync-health degradation summary required for pilot gating.
+
+### AGP-2 Agent Capability and Budget Policy Contract
+
+- Runtime shall support per-agent policy documents with explicit capabilities (`read`, `propose`, `simulate`, `execute`, `hooks_manage`).
+- Policies shall include bounded pending-intent quotas and risk-budget fields.
+- Policy updates shall be operator-gated and fail closed on invalid action/market policy payloads.
+
+### AGP-3 Structured Pilot Intent Contract
+
+- Runtime shall expose a canonical intent proposal endpoint (`/v1/agent/intents`) with required fields:
+  `action`, `strategy_id`, `rationale`, `supporting_card_ids`, `current_metrics`, `gate_checks`, `risk_impact`.
+- Unsupported actions or missing required fields shall be rejected with structured validation errors.
+- Proposed intents shall be persisted with deterministic IDs and timestamps.
+
+### AGP-4 Simulate-Before-Execute Gate Contract
+
+- Runtime shall require successful simulation before any agent intent can execute.
+- Simulation shall evaluate stage transition validity plus hard safety checks (kill-switch and sync-health fail-closed state).
+- Failed simulation or failed gate checks shall block execution with explicit reasons.
+
+### AGP-5 Operator-Controlled Execute Contract
+
+- Intent execution shall require both:
+  1) operator/admin identity and
+  2) agent policy `execute=true`.
+- Execute paths shall remain stage-constrained (`backtest -> paper -> shadow -> canary -> live`) and never skip hard gates.
+- Execution shall update canonical promotion history with actor, action, and intent linkage.
+
+### AGP-6 Immutable Agent Receipt Contract
+
+- Propose, simulate, and execute operations shall emit immutable receipts with deterministic `receipt_id`, `intent_id`, `agent_id`, timestamp, and payload.
+- Receipts shall be queryable via a dedicated endpoint (`/v1/agent/receipts/{receipt_id}`).
+- Receipt artifacts shall support audit/replay of pilot decisions.
+
+### AGP-7 Agent Notification Hook Governance Contract
+
+- Runtime shall expose agent hook CRUD endpoints with explicit event typing (`intent_status`, `promotion_update`, `risk_incident`, `sync_health`).
+- Hook registration shall enforce host allowlists, bounded quotas, retry/backoff bounds, and secret fingerprinting (no raw secret storage).
+- Hook deletion shall be soft-delete with timestamped audit fields.
+
+### AGP-8 First-Party Python Agent SDK Contract
+
+- Runtime shall ship a first-party Python SDK wrapper for agent pilot endpoints (context, policy, intents, simulation, execution, receipts, hooks).
+- SDK shall inject bearer auth deterministically and expose stable method names aligned to API resources.
+- SDK behavior shall be covered by contract tests against FastAPI test surfaces.
+
+### AGP-9 Fail-Closed Agent Safety Defaults Contract
+
+- Default agent policy shall deny execution (`execute=false`) until explicitly enabled by operator policy update.
+- Runtime shall deny execute requests for default policies even when caller has operator identity.
+- Invalid hook/event/action payloads shall fail closed rather than silently degrade.

@@ -8,6 +8,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from typing import Annotated, Any
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -58,6 +59,34 @@ _ONBOARDING_EXPERIENCE = {"beginner", "intermediate", "advanced"}
 _ONBOARDING_AUTOMATION = {"manual", "assisted", "auto"}
 _BROKERAGE_STALE_AFTER_SECONDS = 300
 _CAPITAL_ACTION_TOKENS = ("trade", "order", "buy", "sell", "rebalance", "execute")
+_AGENT_ACTIONS = {
+    "promote_to_paper",
+    "promote_to_live_canary",
+    "promote_to_live",
+    "hold",
+    "demote",
+    "kill",
+}
+_AGENT_REQUIRED_FIELDS = (
+    "action",
+    "strategy_id",
+    "rationale",
+    "supporting_card_ids",
+    "current_metrics",
+    "gate_checks",
+    "risk_impact",
+)
+_AGENT_HOOK_EVENTS = {"intent_status", "promotion_update", "risk_incident", "sync_health"}
+_AGENT_HOOK_ALLOWED_HOSTS = (
+    "localhost",
+    "127.0.0.1",
+    "hooks.slack.com",
+    "slack.com",
+    "discord.com",
+    "discordapp.com",
+    "api.telegram.org",
+    "webhook.site",
+)
 
 
 def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
@@ -183,6 +212,203 @@ def _collect_brokerage_sync_health(store: APIRuntimeStore) -> list[dict[str, Any
         })
     rows.sort(key=lambda item: str(item.get("link_id", "")))
     return rows
+
+
+def _default_agent_policy(agent_id: str) -> dict[str, Any]:
+    return {
+        "agent_id": agent_id,
+        "capabilities": {
+            "read": True,
+            "propose": True,
+            "simulate": True,
+            "execute": False,
+            "hooks_manage": True,
+        },
+        "max_pending_intents": 20,
+        "risk_budget_pct": 2.0,
+        "allowed_markets": ["crypto"],
+        "allowed_actions": sorted(_AGENT_ACTIONS),
+        "updated_at": _utc_now_iso(),
+    }
+
+
+def _get_agent_policy(store: APIRuntimeStore, agent_id: str) -> dict[str, Any]:
+    existing = store.agent_policies.get(agent_id)
+    if isinstance(existing, dict):
+        return existing
+    created = _default_agent_policy(agent_id)
+    store.agent_policies[agent_id] = created
+    return created
+
+
+def _count_pending_intents(store: APIRuntimeStore, agent_id: str) -> int:
+    count = 0
+    for intent in store.agent_intents.values():
+        if not isinstance(intent, dict):
+            continue
+        if str(intent.get("agent_id", "")) != agent_id:
+            continue
+        if str(intent.get("status", "")) in {"proposed", "simulated"}:
+            count += 1
+    return count
+
+
+def _ensure_agent_capability(policy: dict[str, Any], capability: str) -> None:
+    capabilities = policy.get("capabilities", {})
+    enabled = False
+    if isinstance(capabilities, dict):
+        enabled = bool(capabilities.get(capability, False))
+    if not enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Agent capability denied: {capability}",
+        )
+
+
+def _validate_agent_intent_payload(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    for key in _AGENT_REQUIRED_FIELDS:
+        if key not in payload:
+            errors.append(f"missing required field: {key}")
+    action = str(payload.get("action", "")).strip().lower()
+    if action not in _AGENT_ACTIONS:
+        errors.append(f"unsupported action: {action}")
+    strategy_id = str(payload.get("strategy_id", "")).strip()
+    if not strategy_id:
+        errors.append("strategy_id must be non-empty")
+    supporting = payload.get("supporting_card_ids", [])
+    if not isinstance(supporting, list) or not supporting:
+        errors.append("supporting_card_ids must be a non-empty array")
+    if not isinstance(payload.get("current_metrics", {}), dict):
+        errors.append("current_metrics must be an object")
+    if not isinstance(payload.get("gate_checks", {}), dict):
+        errors.append("gate_checks must be an object")
+    if not isinstance(payload.get("risk_impact", {}), dict):
+        errors.append("risk_impact must be an object")
+    return errors
+
+
+def _proposed_stage_for_action(*, action: str, current_stage: str) -> str:
+    if action == "hold":
+        return current_stage
+    if action == "kill":
+        return "halted"
+    if action == "demote":
+        return _next_stage(current_stage, "rollback")
+    if action == "promote_to_paper":
+        return "paper"
+    if action == "promote_to_live_canary":
+        return "canary"
+    if action == "promote_to_live":
+        return "live"
+    return current_stage
+
+
+def _is_live_promotion(action: str) -> bool:
+    return action in {"promote_to_live_canary", "promote_to_live"}
+
+
+def _evaluate_stage_gate(*, action: str, current_stage: str, target_stage: str) -> tuple[bool, str]:
+    stage = _coerce_stage(current_stage)
+    if action == "promote_to_paper":
+        if stage in {"backtest", "paper"}:
+            return True, "ok"
+        return False, f"invalid promote_to_paper transition from {stage}"
+    if action == "promote_to_live_canary":
+        if stage in {"paper", "shadow", "canary"}:
+            return True, "ok"
+        return False, f"invalid promote_to_live_canary transition from {stage}"
+    if action == "promote_to_live":
+        if stage in {"canary", "live"}:
+            return True, "ok"
+        return False, f"invalid promote_to_live transition from {stage}"
+    if action == "demote":
+        if stage in {"backtest"}:
+            return False, "cannot demote below backtest"
+        return True, "ok"
+    if action in {"hold", "kill"}:
+        return True, "ok"
+    return False, f"unsupported action: {action}"
+
+
+def _build_agent_gate_checks(intent: dict[str, Any], store: APIRuntimeStore) -> dict[str, Any]:
+    strategy_id = str(intent.get("strategy_id", "")).strip()
+    action = str(intent.get("action", "")).strip().lower()
+    promotion = store.promotion_records.get(strategy_id) or _default_promotion_record(strategy_id)
+    current_stage = _coerce_stage(str(promotion.get("stage", "paper")))
+    target_stage = _proposed_stage_for_action(action=action, current_stage=current_stage)
+    stage_ok, stage_reason = _evaluate_stage_gate(action=action, current_stage=current_stage, target_stage=target_stage)
+
+    risk = store.risk_states.get("paper-main")
+    kill_switch_active = bool(getattr(risk, "kill_switch_active", False)) if risk is not None else False
+    sync_rows = _collect_brokerage_sync_health(store)
+    degraded = [row for row in sync_rows if bool(row.get("fail_closed_trade_block"))]
+    has_links = len(sync_rows) > 0
+
+    checks = {
+        "stage_gate_passed": stage_ok,
+        "stage_gate_reason": stage_reason,
+        "target_stage": target_stage,
+        "kill_switch_clear": not kill_switch_active,
+        "sync_health_clear": len(degraded) == 0,
+        "has_brokerage_links": has_links,
+    }
+    reasons: list[str] = []
+    if not stage_ok:
+        reasons.append(stage_reason)
+    if _is_live_promotion(action) and kill_switch_active:
+        reasons.append("kill_switch_active")
+    if _is_live_promotion(action) and not has_links:
+        reasons.append("missing_brokerage_link")
+    if _is_live_promotion(action) and degraded:
+        reasons.append("sync_fail_closed")
+    checks["blocked_reasons"] = reasons
+    checks["passed"] = len(reasons) == 0
+    return checks
+
+
+def _record_agent_receipt(
+    store: APIRuntimeStore,
+    *,
+    receipt_type: str,
+    intent_id: str,
+    agent_id: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    receipt = {
+        "receipt_id": f"rcpt_{uuid4().hex[:10]}",
+        "type": receipt_type,
+        "intent_id": intent_id,
+        "agent_id": agent_id,
+        "timestamp": _utc_now_iso(),
+        "payload": payload,
+    }
+    store.agent_receipts[receipt["receipt_id"]] = receipt
+    return receipt
+
+
+def _normalize_hook_url(raw: str) -> tuple[str, str]:
+    parsed = urlparse(raw.strip())
+    if parsed.scheme not in {"https", "http"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hook URL must be http(s)")
+    host = str(parsed.hostname or "").strip().lower()
+    if not host:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hook URL missing host")
+    if parsed.scheme == "http" and host not in {"localhost", "127.0.0.1"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="http hooks are limited to localhost")
+    if not any(host == allowed or host.endswith(f".{allowed}") for allowed in _AGENT_HOOK_ALLOWED_HOSTS):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hook host not allowlisted")
+    return parsed.geturl(), host
+
+
+def _identity_is_operator(identity: APIIdentity) -> bool:
+    return identity.role.value in {"operator", "admin"}
+
+
+def _assert_agent_access(identity: APIIdentity, agent_id: str) -> None:
+    if identity.subject == agent_id or _identity_is_operator(identity):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="agent scope denied")
 
 
 def _normalize_experience(value: Any) -> str:
@@ -771,6 +997,393 @@ def apply_promotion_action(
         key=lambda row: str(row.get("strategy_id", "")),
     )
     return with_correlation(request, {"updated": updated, "records": records})
+
+
+@router.get("/agent/context")
+def get_agent_context(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    agent_id: Annotated[str | None, Query()] = None,
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    resolved_agent_id = str(agent_id or identity.subject).strip() or identity.subject
+    _assert_agent_access(identity, resolved_agent_id)
+    policy = _get_agent_policy(store, resolved_agent_id)
+    account = store.accounts.get("paper-main")
+    risk = store.risk_states.get("paper-main")
+    sync_rows = _collect_brokerage_sync_health(store)
+    degraded = len([row for row in sync_rows if bool(row.get("fail_closed_trade_block"))])
+    promotions = sorted(
+        [
+            {
+                "strategy_id": str(row.get("strategy_id", "")),
+                "stage": str(row.get("stage", "")),
+                "updated_at": str(row.get("updated_at", "")),
+            }
+            for row in store.promotion_records.values()
+            if isinstance(row, dict)
+        ],
+        key=lambda row: row["strategy_id"],
+    )
+    return with_correlation(request, {
+        "agent_id": resolved_agent_id,
+        "system_facts": {
+            "hard_rules": [
+                "orders_must_flow_via_risk_aware_router",
+                "kill_switch_and_risk_limits_non_bypassable",
+                "promotion_stage_skips_disallowed_by_gate_policy",
+            ],
+            "allowed_actions": sorted(_AGENT_ACTIONS),
+        },
+        "current_state": {
+            "account": account.to_dict() if account is not None else None,
+            "risk_state": risk.to_dict() if risk is not None else None,
+            "sync_health": {
+                "degraded_count": degraded,
+                "all_clear": degraded == 0,
+            },
+            "promotion_stages": promotions,
+        },
+        "policy": policy,
+    })
+
+
+@router.get("/agent/policies/{agent_id}")
+def get_agent_policy(
+    agent_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    resolved = str(agent_id).strip()
+    _assert_agent_access(identity, resolved)
+    policy = _get_agent_policy(store, resolved)
+    return with_correlation(request, {"policy": policy})
+
+
+@router.put("/agent/policies/{agent_id}")
+def upsert_agent_policy(
+    agent_id: str,
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    resolved = str(agent_id).strip()
+    if not resolved:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="agent_id is required")
+    current = _get_agent_policy(store, resolved)
+    capabilities = payload.get("capabilities", current.get("capabilities", {}))
+    if not isinstance(capabilities, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="capabilities must be an object")
+    sanitized_capabilities = {
+        "read": bool(capabilities.get("read", True)),
+        "propose": bool(capabilities.get("propose", True)),
+        "simulate": bool(capabilities.get("simulate", True)),
+        "execute": bool(capabilities.get("execute", False)),
+        "hooks_manage": bool(capabilities.get("hooks_manage", True)),
+    }
+    max_pending = int(payload.get("max_pending_intents", current.get("max_pending_intents", 20)))
+    risk_budget = float(payload.get("risk_budget_pct", current.get("risk_budget_pct", 2.0)))
+    allowed_markets = payload.get("allowed_markets", current.get("allowed_markets", ["crypto"]))
+    allowed_actions = payload.get("allowed_actions", current.get("allowed_actions", sorted(_AGENT_ACTIONS)))
+    if not isinstance(allowed_markets, list) or not all(isinstance(item, str) for item in allowed_markets):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="allowed_markets must be string array")
+    if not isinstance(allowed_actions, list) or not all(isinstance(item, str) for item in allowed_actions):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="allowed_actions must be string array")
+    normalized_actions = sorted({str(item).strip().lower() for item in allowed_actions if str(item).strip()})
+    unknown_actions = [item for item in normalized_actions if item not in _AGENT_ACTIONS]
+    if unknown_actions:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"unknown actions: {unknown_actions}")
+    updated = {
+        "agent_id": resolved,
+        "capabilities": sanitized_capabilities,
+        "max_pending_intents": max(1, min(max_pending, 500)),
+        "risk_budget_pct": max(0.1, min(risk_budget, 100.0)),
+        "allowed_markets": sorted({str(item).strip().lower() for item in allowed_markets if str(item).strip()}),
+        "allowed_actions": normalized_actions,
+        "updated_at": _utc_now_iso(),
+        "updated_by": identity.subject,
+    }
+    store.agent_policies[resolved] = updated
+    return with_correlation(request, {"policy": updated})
+
+
+@router.post("/agent/intents")
+def create_agent_intent(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    resolved_agent_id = str(payload.get("agent_id", identity.subject)).strip() or identity.subject
+    _assert_agent_access(identity, resolved_agent_id)
+    policy = _get_agent_policy(store, resolved_agent_id)
+    _ensure_agent_capability(policy, "propose")
+    if _count_pending_intents(store, resolved_agent_id) >= int(policy.get("max_pending_intents", 20)):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="pending intent quota reached")
+
+    errors = _validate_agent_intent_payload(payload)
+    if errors:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"errors": errors})
+    action = str(payload.get("action", "")).strip().lower()
+    if action not in set(policy.get("allowed_actions", [])):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="action denied by agent policy")
+    intent_id = f"intent_{uuid4().hex[:12]}"
+    intent = {
+        "intent_id": intent_id,
+        "agent_id": resolved_agent_id,
+        "action": action,
+        "strategy_id": str(payload.get("strategy_id", "")).strip(),
+        "rationale": str(payload.get("rationale", "")).strip(),
+        "supporting_card_ids": list(payload.get("supporting_card_ids", [])),
+        "current_metrics": dict(payload.get("current_metrics", {})),
+        "gate_checks": dict(payload.get("gate_checks", {})),
+        "risk_impact": dict(payload.get("risk_impact", {})),
+        "status": "proposed",
+        "created_at": _utc_now_iso(),
+        "updated_at": _utc_now_iso(),
+        "created_by": identity.subject,
+    }
+    store.agent_intents[intent_id] = intent
+    receipt = _record_agent_receipt(
+        store,
+        receipt_type="intent_proposed",
+        intent_id=intent_id,
+        agent_id=resolved_agent_id,
+        payload={"status": "proposed", "action": action},
+    )
+    return with_correlation(request, {"intent": intent, "receipt": receipt})
+
+
+@router.get("/agent/intents/{intent_id}")
+def get_agent_intent(
+    intent_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    intent = store.agent_intents.get(str(intent_id).strip())
+    if not isinstance(intent, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="intent not found")
+    _assert_agent_access(identity, str(intent.get("agent_id", "")))
+    return with_correlation(request, {"intent": intent})
+
+
+@router.post("/agent/intents/{intent_id}/simulate")
+def simulate_agent_intent(
+    intent_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    intent = store.agent_intents.get(str(intent_id).strip())
+    if not isinstance(intent, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="intent not found")
+    agent_id = str(intent.get("agent_id", ""))
+    _assert_agent_access(identity, agent_id)
+    policy = _get_agent_policy(store, agent_id)
+    _ensure_agent_capability(policy, "simulate")
+    if str(intent.get("action", "")) not in set(policy.get("allowed_actions", [])):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="action denied by agent policy")
+    checks = _build_agent_gate_checks(intent, store)
+    simulation = {
+        "simulated_at": _utc_now_iso(),
+        "passed": bool(checks.get("passed", False)),
+        "gate_checks": checks,
+    }
+    intent["last_simulation"] = simulation
+    intent["status"] = "simulated" if simulation["passed"] else "rejected"
+    intent["updated_at"] = _utc_now_iso()
+    store.agent_intents[str(intent.get("intent_id"))] = intent
+    receipt = _record_agent_receipt(
+        store,
+        receipt_type="intent_simulated",
+        intent_id=str(intent.get("intent_id", "")),
+        agent_id=agent_id,
+        payload={"passed": simulation["passed"], "gate_checks": checks},
+    )
+    return with_correlation(request, {"intent": intent, "simulation": simulation, "receipt": receipt})
+
+
+@router.post("/agent/intents/{intent_id}/execute")
+def execute_agent_intent(
+    intent_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    if not _identity_is_operator(identity):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="operator role required for execute")
+    intent = store.agent_intents.get(str(intent_id).strip())
+    if not isinstance(intent, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="intent not found")
+    agent_id = str(intent.get("agent_id", ""))
+    policy = _get_agent_policy(store, agent_id)
+    _ensure_agent_capability(policy, "execute")
+
+    checks = _build_agent_gate_checks(intent, store)
+    simulation = intent.get("last_simulation", {})
+    simulated_passed = bool(simulation.get("passed", False)) if isinstance(simulation, dict) else False
+    if not simulated_passed:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="intent requires successful simulation")
+    if not bool(checks.get("passed", False)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": "gate checks failed", "reasons": checks.get("blocked_reasons", [])},
+        )
+
+    strategy_id = str(intent.get("strategy_id", ""))
+    action = str(intent.get("action", "hold")).strip().lower()
+    current = store.promotion_records.get(strategy_id) or _default_promotion_record(strategy_id)
+    stage_before = _coerce_stage(str(current.get("stage", "paper")))
+    stage_after = _proposed_stage_for_action(action=action, current_stage=stage_before)
+    history_rows = current.get("history", [])
+    history = history_rows if isinstance(history_rows, list) else []
+    event = {
+        "action": action,
+        "actor": identity.subject,
+        "note": "agent execute",
+        "from_stage": stage_before,
+        "to_stage": stage_after,
+        "at": _utc_now_iso(),
+        "intent_id": str(intent.get("intent_id", "")),
+    }
+    updated = {
+        **current,
+        "strategy_id": strategy_id,
+        "stage": stage_after,
+        "updated_at": _utc_now_iso(),
+        "history": [event, *history][:100],
+    }
+    store.promotion_records[strategy_id] = updated
+    intent["status"] = "executed"
+    intent["executed_at"] = _utc_now_iso()
+    intent["updated_at"] = _utc_now_iso()
+    store.agent_intents[str(intent.get("intent_id"))] = intent
+    receipt = _record_agent_receipt(
+        store,
+        receipt_type="intent_executed",
+        intent_id=str(intent.get("intent_id", "")),
+        agent_id=agent_id,
+        payload={"stage_before": stage_before, "stage_after": stage_after, "strategy_id": strategy_id},
+    )
+    return with_correlation(request, {"intent": intent, "promotion": updated, "receipt": receipt})
+
+
+@router.get("/agent/receipts/{receipt_id}")
+def get_agent_receipt(
+    receipt_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    receipt = store.agent_receipts.get(str(receipt_id).strip())
+    if not isinstance(receipt, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="receipt not found")
+    _assert_agent_access(identity, str(receipt.get("agent_id", "")))
+    return with_correlation(request, {"receipt": receipt})
+
+
+@router.get("/agent/hooks")
+def list_agent_hooks(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    agent_id: Annotated[str | None, Query()] = None,
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    resolved_agent_id = str(agent_id or identity.subject).strip() or identity.subject
+    _assert_agent_access(identity, resolved_agent_id)
+    rows = [
+        dict(row)
+        for row in store.agent_hooks.values()
+        if isinstance(row, dict) and str(row.get("agent_id", "")) == resolved_agent_id and str(row.get("status", "")) != "deleted"
+    ]
+    rows.sort(key=lambda row: str(row.get("hook_id", "")))
+    return with_correlation(request, {"hooks": rows, "count": len(rows)})
+
+
+@router.post("/agent/hooks")
+def create_agent_hook(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    resolved_agent_id = str(payload.get("agent_id", identity.subject)).strip() or identity.subject
+    _assert_agent_access(identity, resolved_agent_id)
+    policy = _get_agent_policy(store, resolved_agent_id)
+    _ensure_agent_capability(policy, "hooks_manage")
+
+    event_type = str(payload.get("event_type", "")).strip().lower()
+    if event_type not in _AGENT_HOOK_EVENTS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unsupported event_type")
+    target_url_raw = str(payload.get("target_url", "")).strip()
+    if not target_url_raw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_url is required")
+    target_url, host = _normalize_hook_url(target_url_raw)
+    existing = [
+        row
+        for row in store.agent_hooks.values()
+        if isinstance(row, dict) and str(row.get("agent_id", "")) == resolved_agent_id and str(row.get("status", "")) != "deleted"
+    ]
+    if len(existing) >= 20:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="hook quota reached")
+    hook = {
+        "hook_id": f"hook_{uuid4().hex[:10]}",
+        "agent_id": resolved_agent_id,
+        "event_type": event_type,
+        "target_url": target_url,
+        "target_host": host,
+        "status": "active",
+        "secret_fingerprint": _fingerprint_secret(str(payload.get("secret", "")).strip()),
+        "retry_max": max(0, min(int(payload.get("retry_max", 3)), 10)),
+        "backoff_seconds": max(1, min(int(payload.get("backoff_seconds", 5)), 300)),
+        "created_at": _utc_now_iso(),
+        "updated_at": _utc_now_iso(),
+    }
+    store.agent_hooks[hook["hook_id"]] = hook
+    return with_correlation(request, {"hook": hook})
+
+
+@router.delete("/agent/hooks/{hook_id}")
+def delete_agent_hook(
+    hook_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    row = store.agent_hooks.get(str(hook_id).strip())
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="hook not found")
+    _assert_agent_access(identity, str(row.get("agent_id", "")))
+    row["status"] = "deleted"
+    row["deleted_at"] = _utc_now_iso()
+    row["updated_at"] = _utc_now_iso()
+    store.agent_hooks[str(hook_id).strip()] = row
+    return with_correlation(request, {"hook": row})
 
 
 @router.post("/integrations/brokerage/plaid/link/start")

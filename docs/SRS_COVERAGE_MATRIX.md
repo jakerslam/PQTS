@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **690**
-- implemented: **690**
+- Total requirements: **699**
+- implemented: **699**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -17,6 +17,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 |---|---:|---:|---:|---:|---:|---:|
 | AC | 3 | 0 | 0 | 0 | 0 | 3 |
 | AEG | 6 | 0 | 0 | 0 | 0 | 6 |
+| AGP | 9 | 0 | 0 | 0 | 0 | 9 |
 | AHF | 12 | 0 | 0 | 0 | 0 | 12 |
 | AL | 14 | 0 | 0 | 0 | 0 | 14 |
 | ANTP | 8 | 0 | 0 | 0 | 0 | 8 |
@@ -793,3 +794,12 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | JG-5 | Sync Health and Fail-Closed Contract | implemented | done | docs/TODO.md |
 | JG-6 | Assistant Action Audit Contract | implemented | done | docs/TODO.md |
 | JG-7 | Onboarding Sequence for Linked Portfolio Terminal | implemented | done | docs/TODO.md |
+| AGP-1 | Canonical Agent Context Contract | implemented | done | docs/TODO.md |
+| AGP-2 | Agent Capability and Budget Policy Contract | implemented | done | docs/TODO.md |
+| AGP-3 | Structured Pilot Intent Contract | implemented | done | docs/TODO.md |
+| AGP-4 | Simulate-Before-Execute Gate Contract | implemented | done | docs/TODO.md |
+| AGP-5 | Operator-Controlled Execute Contract | implemented | done | docs/TODO.md |
+| AGP-6 | Immutable Agent Receipt Contract | implemented | done | docs/TODO.md |
+| AGP-7 | Agent Notification Hook Governance Contract | implemented | done | docs/TODO.md |
+| AGP-8 | First-Party Python Agent SDK Contract | implemented | done | docs/TODO.md |
+| AGP-9 | Fail-Closed Agent Safety Defaults Contract | implemented | done | docs/TODO.md |

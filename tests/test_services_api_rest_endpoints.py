@@ -320,3 +320,163 @@ def test_terminal_and_assistant_audit_surface_are_persisted() -> None:
     events = audit.json()["events"]
     assert len(events) >= 1
     assert events[0]["id"].startswith("ast_")
+
+
+def test_agent_context_intent_simulate_execute_and_receipts() -> None:
+    client = TestClient(create_app(_settings()))
+
+    me = client.get("/v1/auth/me", headers=_viewer())
+    assert me.status_code == 200
+    agent_id = me.json()["identity"]["subject"]
+
+    policy_write = client.put(
+        f"/v1/agent/policies/{agent_id}",
+        json={
+            "capabilities": {
+                "read": True,
+                "propose": True,
+                "simulate": True,
+                "execute": True,
+                "hooks_manage": True,
+            }
+        },
+        headers=_operator(),
+    )
+    assert policy_write.status_code == 200
+    assert policy_write.json()["policy"]["capabilities"]["execute"] is True
+
+    context = client.get("/v1/agent/context", headers=_viewer())
+    assert context.status_code == 200
+    context_payload = context.json()
+    assert context_payload["agent_id"] == agent_id
+    assert "system_facts" in context_payload
+    assert "current_state" in context_payload
+
+    create_intent = client.post(
+        "/v1/agent/intents",
+        json={
+            "action": "demote",
+            "strategy_id": "trend_following",
+            "rationale": "Reduce exposure while preserving paper-first controls.",
+            "supporting_card_ids": ["card-001"],
+            "current_metrics": {"reject_rate": 0.01, "fill_rate": 0.99},
+            "gate_checks": {"readiness": True},
+            "risk_impact": {"expected_drawdown_delta": -0.01},
+        },
+        headers=_viewer(),
+    )
+    assert create_intent.status_code == 200
+    intent = create_intent.json()["intent"]
+    intent_id = intent["intent_id"]
+    assert intent["status"] == "proposed"
+
+    sim = client.post(f"/v1/agent/intents/{intent_id}/simulate", headers=_viewer())
+    assert sim.status_code == 200
+    sim_payload = sim.json()
+    assert sim_payload["simulation"]["passed"] is True
+    sim_receipt_id = sim_payload["receipt"]["receipt_id"]
+
+    receipt = client.get(f"/v1/agent/receipts/{sim_receipt_id}", headers=_viewer())
+    assert receipt.status_code == 200
+    assert receipt.json()["receipt"]["type"] == "intent_simulated"
+
+    execute = client.post(f"/v1/agent/intents/{intent_id}/execute", headers=_operator())
+    assert execute.status_code == 200
+    execute_payload = execute.json()
+    assert execute_payload["intent"]["status"] == "executed"
+    assert execute_payload["promotion"]["strategy_id"] == "trend_following"
+    assert execute_payload["receipt"]["type"] == "intent_executed"
+
+
+def test_agent_hooks_allowlist_and_delete_flow() -> None:
+    client = TestClient(create_app(_settings()))
+
+    bad = client.post(
+        "/v1/agent/hooks",
+        json={"event_type": "intent_status", "target_url": "https://evil.example.com/hook"},
+        headers=_viewer(),
+    )
+    assert bad.status_code == 400
+
+    created = client.post(
+        "/v1/agent/hooks",
+        json={
+            "event_type": "intent_status",
+            "target_url": "https://hooks.slack.com/services/T000/B000/XYZ",
+            "secret": "top-secret-token",
+        },
+        headers=_viewer(),
+    )
+    assert created.status_code == 200
+    hook = created.json()["hook"]
+    hook_id = hook["hook_id"]
+    assert hook["status"] == "active"
+    assert hook["secret_fingerprint"] != ""
+
+    listed = client.get("/v1/agent/hooks", headers=_viewer())
+    assert listed.status_code == 200
+    assert listed.json()["count"] >= 1
+    assert any(row["hook_id"] == hook_id for row in listed.json()["hooks"])
+
+    deleted = client.delete(f"/v1/agent/hooks/{hook_id}", headers=_viewer())
+    assert deleted.status_code == 200
+    assert deleted.json()["hook"]["status"] == "deleted"
+
+
+def test_agent_execute_requires_operator_role_even_with_policy() -> None:
+    client = TestClient(create_app(_settings()))
+    me = client.get("/v1/auth/me", headers=_viewer())
+    assert me.status_code == 200
+    agent_id = me.json()["identity"]["subject"]
+    client.put(
+        f"/v1/agent/policies/{agent_id}",
+        json={"capabilities": {"read": True, "propose": True, "simulate": True, "execute": True, "hooks_manage": True}},
+        headers=_operator(),
+    )
+
+    create_intent = client.post(
+        "/v1/agent/intents",
+        json={
+            "action": "hold",
+            "strategy_id": "market_making",
+            "rationale": "No-op validation action.",
+            "supporting_card_ids": ["card-002"],
+            "current_metrics": {"reject_rate": 0.0},
+            "gate_checks": {"ready": True},
+            "risk_impact": {"expected_drawdown_delta": 0.0},
+        },
+        headers=_viewer(),
+    )
+    assert create_intent.status_code == 200
+    intent_id = create_intent.json()["intent"]["intent_id"]
+    sim = client.post(f"/v1/agent/intents/{intent_id}/simulate", headers=_viewer())
+    assert sim.status_code == 200
+
+    denied = client.post(f"/v1/agent/intents/{intent_id}/execute", headers=_viewer())
+    assert denied.status_code == 403
+
+
+def test_agent_default_policy_blocks_execute_even_for_operator() -> None:
+    client = TestClient(create_app(_settings()))
+    created = client.post(
+        "/v1/agent/intents",
+        json={
+            "action": "promote_to_paper",
+            "strategy_id": "trend_following",
+            "rationale": "default policy should still deny execute",
+            "supporting_card_ids": ["card-1"],
+            "current_metrics": {"fill_rate": 0.9},
+            "gate_checks": {"paper_days": 30},
+            "risk_impact": {"delta_var_pct": 0.2},
+        },
+        headers=_viewer(),
+    )
+    assert created.status_code == 200
+    intent_id = created.json()["intent"]["intent_id"]
+
+    simulated = client.post(f"/v1/agent/intents/{intent_id}/simulate", headers=_viewer())
+    assert simulated.status_code == 200
+    assert simulated.json()["simulation"]["passed"] is True
+
+    denied = client.post(f"/v1/agent/intents/{intent_id}/execute", headers=_operator())
+    assert denied.status_code == 403

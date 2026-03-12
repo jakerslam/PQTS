@@ -87,6 +87,14 @@ Dependency order: ranking automation -> release truth gates -> security/runtime 
 
 - [x] Convert latest dominance strategy into explicit `SRS` vs `human_only` execution classes and validate SRS side remains fully executed (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: MOAT-1, MOAT-2, MOAT-3, MOAT-4, MOAT-5, MOAT-6, MOAT-7, MOAT-10, MOAT-11, MOAT-12, MOAT-13, MOAT-14, COMP-5, COMP-7, COMP-8, COMP-9, COMP-11, COMP-13, COMP-17, UI-001, UI-002, UI-004, UI-005, UI-006, UI-014, UI-015, UI-028, UI-029`, `Evidence: docs/DOMINANCE_SRS_HUMAN_SPLIT.md; make full-srs-check; make dod-audit; make governance-check`, `Impact: 9`)
 
+## 02u. Agent Pilotability Expansion Sprint (2026-03-11)
+
+Dependency order: canonical context/policy API -> intent gate lifecycle -> hook governance -> first-party Python SDK.
+
+- [x] Implement canonical agent context/policy/intent/execute/receipt API contracts with fail-closed gate evaluation and operator-controlled execute semantics (`ROI: very_high`, `Type: engineering`, `Track: moat`, `Ref: AGP-1, AGP-2, AGP-3, AGP-4, AGP-5, AGP-6, AGP-9`, `Evidence: services/api/routes/core.py; services/api/state.py; tests/test_services_api_rest_endpoints.py; pytest -q tests/test_services_api_rest_endpoints.py`, `Impact: 10`)
+- [x] Implement agent notification hook governance (allowlist + event types + quotas + secret fingerprints + soft-delete) and validate with API tests (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: AGP-7, AGP-9`, `Evidence: services/api/routes/core.py; tests/test_services_api_rest_endpoints.py; pytest -q tests/test_services_api_rest_endpoints.py`, `Impact: 9`)
+- [x] Ship first-party Python agent SDK wrapper and contract tests for context/policy/intents/receipts/hooks workflows (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: AGP-8`, `Evidence: src/app/agent_pilot_client.py; src/app/__init__.py; tests/test_agent_pilot_client.py; pytest -q tests/test_agent_pilot_client.py`, `Impact: 8`)
+
 ## 00. Completed Foundation (Pinned)
 
 - [x] Docs/metadata link gate in CI and release (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-1`, `Impact: 10`, `Evidence: tools/check_public_links.py; .github/workflows/ci.yml; .github/workflows/release.yml`)

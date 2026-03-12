@@ -583,6 +583,7 @@ Repository layout guide: `docs/REPO_STRUCTURE.md`
 - [Top 100 ROI Moves](docs/TOP_100_ROI_MOVES.md)
 - [Development Summary](docs/DEVELOPMENT_SUMMARY.md)
 - [Native Hotpath](docs/NATIVE_HOTPATH.md)
+- [Agent Pilot API + SDK](docs/AGENT_PILOT_API.md)
 - [Live Money Roadmap](docs/ROADMAP_LIVE_MONEY.md)
 - [System Overview](docs/OVERVIEW.md)
 - [World-Class Execution Pack](docs/WORLD_CLASS_EXECUTION_PACK.md)
