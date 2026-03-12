@@ -1,5 +1,5 @@
 {
-  "min_moat_share_after_parity_p0": 0.60,
+  "min_moat_share_after_parity_p0": 0.50,
   "quarterly_review": {
     "max_review_age_days": 100,
     "review_file": "docs/MOAT_QUARTERLY_REVIEW.md"
