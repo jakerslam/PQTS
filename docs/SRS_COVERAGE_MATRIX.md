@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **671**
-- implemented: **671**
+- Total requirements: **675**
+- implemented: **675**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -21,6 +21,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | AL | 14 | 0 | 0 | 0 | 0 | 14 |
 | ANTP | 8 | 0 | 0 | 0 | 0 | 8 |
 | AR | 12 | 0 | 0 | 0 | 0 | 12 |
+| ASH | 4 | 0 | 0 | 0 | 0 | 4 |
 | AX | 10 | 0 | 0 | 0 | 0 | 10 |
 | BF | 6 | 0 | 0 | 0 | 0 | 6 |
 | BTR | 5 | 0 | 0 | 0 | 0 | 5 |
@@ -285,6 +286,10 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | WK-11 | LLM-Assisted Strategy Authoring Provenance Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | WK-12 | Stage-Level Sub-Second Pipeline Budget Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | WK-13 | Copytrade Endpoint Allowlist and Revocation Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| ASH-1 | Geopolitical Claim-Event Extraction Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| ASH-2 | Signal-Lead Telemetry Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| ASH-3 | Single-Source Emergency Mode Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| ASH-4 | Source Reliability and Claim Handling | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | AL-1 | LMSR Cost Function Fidelity | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AL-2 | Marginal Price and Probability Coherence | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AL-3 | Liquidity Parameter (`b`) Governance | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |

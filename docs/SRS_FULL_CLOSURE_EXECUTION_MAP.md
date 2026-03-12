@@ -165,6 +165,12 @@ contracts for every remaining SRS family-assimilation block.
 - Baseline hook: `srs_baseline.dlm`
 - Contract: fail-closed, provenance-required, evidence-logged
 
+## ASH Family
+
+- Refs: `ASH-1, ASH-2, ASH-3, ASH-4`
+- Baseline hook: `srs_baseline.ash`
+- Contract: fail-closed, provenance-required, evidence-logged
+
 ## NCLI Family
 
 - Refs: `NCLI-6`

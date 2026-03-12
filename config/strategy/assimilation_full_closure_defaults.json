@@ -584,6 +584,24 @@
         "closure checker pass"
       ]
     },
+    "ASH": {
+      "refs": [
+        "ASH-1",
+        "ASH-2",
+        "ASH-3",
+        "ASH-4"
+      ],
+      "controls": {
+        "policy_hook": "srs_baseline.ash",
+        "fail_closed": true,
+        "provenance_required": true
+      },
+      "acceptance_evidence": [
+        "baseline contract configuration entry",
+        "execution map linkage",
+        "closure checker pass"
+      ]
+    },
     "NCLI": {
       "refs": [
         "NCLI-6"

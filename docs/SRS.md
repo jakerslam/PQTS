@@ -1538,6 +1538,38 @@ Observed source links:
 - Operator controls shall support immediate endpoint revocation/disable with auditable reason and timestamp.
 - Trades originating from copytrade pathways shall include endpoint ID provenance for replay, incident triage, and compliance auditing.
 
+## 85. Additional Delta Requirements from External Post Chain (0xashensoul, March 11, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post focused on real-time geopolitical catalyst detection and lead-time exploitation for event markets.
+
+Observed source links:
+- `https://x.com/0xashensoul/status/2031813947343483198?s=20`
+- `https://polymarket.com/event/will-the-us-conduct-a-cyberattack-on-iran-by-march-31?via=9999`
+- Mentioned signal source in post body: `@glintintel`
+
+### ASH-1 Geopolitical Claim-Event Extraction Contract
+
+- Event-intel ingestion shall support extraction of adversarial attribution/claim events (for example "actor X claimed responsibility for operation Y") with normalized actor, target, and claim-type fields.
+- Claim events shall preserve evidence payload pointers, detection timestamp, and source account/provider metadata.
+- Ambiguous or conflicting claim parsing shall degrade to `hold` with explicit ambiguity reason codes.
+
+### ASH-2 Signal-Lead Telemetry Contract
+
+- For catalyst-driven markets, runtime shall persist `first_signal_ts`, `first_market_move_ts`, and derived lead-time metrics per opportunity.
+- Lead-time analytics shall bucket realized edge by latency window (for example `0-30s`, `30-60s`, `60-120s`, `>120s`) and publish execution-quality attribution.
+- Strategies shall auto-throttle when median lead-time edge decays below configured viability thresholds.
+
+### ASH-3 Single-Source Emergency Mode Contract
+
+- When corroboration is unavailable but urgency is high, event-intel execution may enter a constrained single-source mode with stricter limits.
+- Single-source mode shall enforce reduced size caps, shorter max hold horizon, and mandatory post-event evidence review.
+- Promotion to broader capital allocation requires reproducible evidence that single-source mode remains net-positive after costs and false-positive impact.
+
+### ASH-4 Source Reliability and Claim Handling
+
+- Public claims from this source chain about deterministic minute-scale alpha or extreme short-window ROI shall be marked `unverified` unless backed by reproducible trade-level evidence.
+- Requirements adopted from this source chain shall remain limited to observable mechanics and validated controls rather than promotional profitability claims.
+
 ## 31. Additional Requirements from External Post Chain (AleiahLock, March 8, 2026)
 
 These requirements are derived from the referenced post and quoted-link chain describing LMSR mechanics, probability-coherent pricing, and liquidity-parameterized market-maker behavior.
