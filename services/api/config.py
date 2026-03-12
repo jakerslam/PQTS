@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import os
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+try:  # Python 3.11+
+    import tomllib  # type: ignore[attr-defined]
+except ModuleNotFoundError:  # pragma: no cover - fallback for local/dev runtimes
+    import tomli as tomllib  # type: ignore[no-redef]
 
 
 def _env_bool(name: str, default: bool) -> bool:

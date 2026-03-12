@@ -1,0 +1,59 @@
+{
+  "schema_version": "1",
+  "defaults": {
+    "paper_ok": false,
+    "required_status_by_stage": {
+      "paper": "beta",
+      "canary": "certified",
+      "live": "certified"
+    },
+    "latency_budget": {
+      "paper_p95_ms": 250,
+      "canary_p95_ms": 180,
+      "live_p95_ms": 150
+    },
+    "reliability_budget": {
+      "min_uptime_pct": 99.0,
+      "max_incidents_30d": 2
+    },
+    "incident_profile": {
+      "recent_incidents": 0,
+      "severity": "low"
+    }
+  },
+  "providers": {
+    "polymarket": {
+      "paper_ok": true,
+      "required_status_by_stage": {
+        "paper": "active",
+        "canary": "active",
+        "live": "active"
+      },
+      "latency_budget": {
+        "paper_p95_ms": 180,
+        "canary_p95_ms": 140,
+        "live_p95_ms": 120
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.5,
+        "max_incidents_30d": 1
+      },
+      "incident_profile": {
+        "recent_incidents": 0,
+        "severity": "low"
+      }
+    },
+    "binance": {
+      "paper_ok": true
+    },
+    "coinbase": {
+      "paper_ok": true
+    },
+    "alpaca": {
+      "paper_ok": true
+    },
+    "oanda": {
+      "paper_ok": true
+    }
+  }
+}

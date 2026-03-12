@@ -131,6 +131,48 @@ def test_promotions_action_flow() -> None:
     assert len(updated["history"]) >= 1
 
 
+def test_promotion_action_blocks_non_certified_adapter_for_canary() -> None:
+    client = TestClient(create_app(_settings()))
+    strategy_id = "adapter_lockout_beta"
+    first = client.post(
+        "/v1/promotions/actions",
+        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "binance", "actor": "ops"},
+        headers=_operator(),
+    )
+    assert first.status_code == 200
+    assert first.json()["updated"]["stage"] == "shadow"
+
+    blocked = client.post(
+        "/v1/promotions/actions",
+        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "binance", "actor": "ops"},
+        headers=_operator(),
+    )
+    assert blocked.status_code == 409
+    payload = blocked.json()["detail"]
+    assert payload["message"] == "adapter_stage_lockout"
+    assert payload["provider"] == "binance"
+
+
+def test_promotion_action_allows_provider_meeting_stage_requirement() -> None:
+    client = TestClient(create_app(_settings()))
+    strategy_id = "adapter_lockout_active"
+    first = client.post(
+        "/v1/promotions/actions",
+        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "polymarket", "actor": "ops"},
+        headers=_operator(),
+    )
+    assert first.status_code == 200
+    assert first.json()["updated"]["stage"] == "shadow"
+
+    second = client.post(
+        "/v1/promotions/actions",
+        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "polymarket", "actor": "ops"},
+        headers=_operator(),
+    )
+    assert second.status_code == 200
+    assert second.json()["updated"]["stage"] == "canary"
+
+
 def test_ops_diagnostics_surfaces_return_payload_shapes() -> None:
     client = TestClient(create_app(_settings()))
 

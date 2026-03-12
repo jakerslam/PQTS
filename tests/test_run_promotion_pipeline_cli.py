@@ -68,6 +68,7 @@ def test_build_campaign_cmd_includes_research_validation_and_thresholds():
     assert "--promotion-min-purged-cv-sharpe 1.0" in joined
     assert "--promotion-min-parameter-stability-score 0.55" in joined
     assert "--promotion-min-ci95-lower-realized-net-alpha-bps 0.0" in joined
+    assert "--tca-db-path data/tca_records.csv" in joined
     assert "--symbols BTCUSDT,ETHUSDT" in joined
     assert "--switch tca_calibration_feedback=off" in joined
 

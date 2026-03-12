@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import hashlib
+from pathlib import Path
 import sys
 import threading
 import time
@@ -14,6 +16,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from analytics.readiness_gates import (
+    evaluate_adapter_stage_lockout,
     evaluate_backtest_readiness,
     evaluate_paper_trade_readiness,
     evaluate_promotion_gate,
@@ -114,6 +117,8 @@ _AGENT_HOOK_ALLOWED_HOSTS = (
 _OPS_JOB_TYPES = {"data_seed", "notify_test"}
 _OPS_JOB_TERMINAL_STATUS = {"succeeded", "failed"}
 _OPS_JOB_RETENTION = 300
+_OFFICIAL_INTEGRATIONS_PATH = Path("config/integrations/official_integrations.json")
+_OFFICIAL_INTEGRATION_REQUIREMENTS_PATH = Path("config/integrations/official_integration_requirements.json")
 
 
 def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
@@ -125,6 +130,61 @@ def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
         "updated_at": _utc_now_iso(),
         "history": [],
     }
+
+
+def _load_json_file(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _resolve_adapter_stage_requirements(provider: str) -> dict[str, Any]:
+    provider_key = str(provider).strip().lower()
+    payload = _load_json_file(_OFFICIAL_INTEGRATION_REQUIREMENTS_PATH)
+    if not isinstance(payload, dict):
+        return {}
+    providers = payload.get("providers", {})
+    defaults = payload.get("defaults", {})
+    if not isinstance(providers, dict):
+        providers = {}
+    if not isinstance(defaults, dict):
+        defaults = {}
+    entry = providers.get(provider_key, {})
+    if not isinstance(entry, dict):
+        entry = {}
+    return {
+        "paper_ok": bool(entry.get("paper_ok", defaults.get("paper_ok", False))),
+        "required_status_by_stage": dict(
+            entry.get("required_status_by_stage", defaults.get("required_status_by_stage", {}))
+            if isinstance(entry.get("required_status_by_stage", defaults.get("required_status_by_stage", {})), dict)
+            else {}
+        ),
+    }
+
+
+def _resolve_adapter_status(provider: str) -> str:
+    provider_key = str(provider).strip().lower()
+    rows = _load_json_file(_OFFICIAL_INTEGRATIONS_PATH)
+    if not isinstance(rows, list):
+        return ""
+    best_status = ""
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        row_provider = str(row.get("provider", "")).strip().lower()
+        if row_provider != provider_key:
+            continue
+        status = str(row.get("status", "")).strip().lower()
+        if not status:
+            continue
+        # Prefer the strongest status when multiple entries exist for one provider.
+        if status == "certified":
+            return status
+        if status == "active" and best_status not in {"certified"}:
+            best_status = status
+        elif status == "beta" and best_status not in {"active", "certified"}:
+            best_status = status
+        elif status == "experimental" and not best_status:
+            best_status = status
+    return best_status
 
 
 def _fingerprint_secret(token: str) -> str:
@@ -380,6 +440,24 @@ def _build_agent_gate_checks(intent: dict[str, Any], store: APIRuntimeStore) -> 
         "sync_health_clear": len(degraded) == 0,
         "has_brokerage_links": has_links,
     }
+    adapter_provider = str(intent.get("adapter_provider", "")).strip().lower()
+    if adapter_provider and target_stage in {"paper", "canary", "live"}:
+        adapter_status = _resolve_adapter_status(adapter_provider)
+        requirements = _resolve_adapter_stage_requirements(adapter_provider)
+        adapter_gate = evaluate_adapter_stage_lockout(
+            target_stage=target_stage,
+            adapter_provider=adapter_provider,
+            adapter_status=adapter_status,
+            paper_ok=bool(requirements.get("paper_ok", False)),
+            required_status_by_stage=dict(requirements.get("required_status_by_stage", {})),
+        )
+        checks["adapter_gate"] = {
+            "provider": adapter_provider,
+            "status": adapter_status,
+            "result": adapter_gate.as_dict(),
+        }
+    else:
+        adapter_gate = None
     reasons: list[str] = []
     if not stage_ok:
         reasons.append(stage_reason)
@@ -389,6 +467,8 @@ def _build_agent_gate_checks(intent: dict[str, Any], store: APIRuntimeStore) -> 
         reasons.append("missing_brokerage_link")
     if _is_live_promotion(action) and degraded:
         reasons.append("sync_fail_closed")
+    if adapter_gate is not None and not adapter_gate.passed:
+        reasons.extend(list(adapter_gate.reasons))
     checks["blocked_reasons"] = reasons
     checks["passed"] = len(reasons) == 0
     return checks
@@ -1427,6 +1507,46 @@ def apply_promotion_action(
     current = store.promotion_records.get(strategy_id) or _default_promotion_record(strategy_id)
     stage_before = _coerce_stage(str(current.get("stage", "paper")))
     stage_after = _next_stage(stage_before, action)
+    adapter_provider = str(payload.get("adapter_provider", current.get("adapter_provider", ""))).strip().lower()
+    adapter_status = str(current.get("adapter_status", "")).strip().lower()
+    adapter_gate_payload: dict[str, Any] | None = None
+    if adapter_provider and stage_after in {"paper", "canary", "live"}:
+        adapter_status = _resolve_adapter_status(adapter_provider)
+        if not adapter_status:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "adapter_stage_lockout",
+                    "provider": adapter_provider,
+                    "reasons": ["adapter_not_indexed"],
+                },
+            )
+        requirements = _resolve_adapter_stage_requirements(adapter_provider)
+        gate = evaluate_adapter_stage_lockout(
+            target_stage=stage_after,
+            adapter_provider=adapter_provider,
+            adapter_status=adapter_status,
+            paper_ok=bool(requirements.get("paper_ok", False)),
+            required_status_by_stage=dict(requirements.get("required_status_by_stage", {})),
+        )
+        adapter_gate_payload = {
+            "provider": adapter_provider,
+            "status": adapter_status,
+            "target_stage": stage_after,
+            "paper_ok": bool(requirements.get("paper_ok", False)),
+            "required_status_by_stage": dict(requirements.get("required_status_by_stage", {})),
+            "gate": gate.as_dict(),
+        }
+        if not gate.passed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "message": "adapter_stage_lockout",
+                    "provider": adapter_provider,
+                    "target_stage": stage_after,
+                    "reasons": list(gate.reasons),
+                },
+            )
     history = current.get("history", [])
     history_rows = history if isinstance(history, list) else []
     event = {
@@ -1441,6 +1561,8 @@ def apply_promotion_action(
         **current,
         "strategy_id": strategy_id,
         "stage": stage_after,
+        "adapter_provider": adapter_provider,
+        "adapter_status": adapter_status,
         "updated_at": _utc_now_iso(),
         "history": [event, *history_rows][:100],
     }
@@ -1452,7 +1574,10 @@ def apply_promotion_action(
         [dict(item) for item in store.promotion_records.values()],
         key=lambda row: str(row.get("strategy_id", "")),
     )
-    return with_correlation(request, {"updated": updated, "records": records})
+    response = {"updated": updated, "records": records}
+    if adapter_gate_payload is not None:
+        response["adapter_gate"] = adapter_gate_payload
+    return with_correlation(request, response)
 
 
 @router.post("/promotions/gate-evaluate")
@@ -1487,9 +1612,24 @@ def evaluate_promotion_gate_bundle(
         stress_replay_passed=bool(metrics.get("stress_replay_passed", False)),
         portfolio_limits_intact=bool(metrics.get("portfolio_limits_intact", True)),
     )
-    passed = bool(backtest.passed and paper.passed and promotion.passed)
+    adapter_provider = str(payload.get("adapter_provider", "")).strip().lower()
+    adapter_gate = None
+    adapter_gate_passed = True
+    if adapter_provider:
+        adapter_status = _resolve_adapter_status(adapter_provider)
+        requirements = _resolve_adapter_stage_requirements(adapter_provider)
+        target_stage = str(payload.get("target_stage", "paper")).strip().lower() or "paper"
+        adapter_gate = evaluate_adapter_stage_lockout(
+            target_stage=target_stage,
+            adapter_provider=adapter_provider,
+            adapter_status=adapter_status,
+            paper_ok=bool(requirements.get("paper_ok", False)),
+            required_status_by_stage=dict(requirements.get("required_status_by_stage", {})),
+        )
+        adapter_gate_passed = bool(adapter_gate.passed)
+    passed = bool(backtest.passed and paper.passed and promotion.passed and adapter_gate_passed)
     recommendation = "advance" if passed else "hold"
-    return with_correlation(request, {
+    response = {
         "strategy_id": strategy_id,
         "decision": recommendation,
         "passed": passed,
@@ -1498,7 +1638,10 @@ def evaluate_promotion_gate_bundle(
             "paper": paper.as_dict(),
             "promotion": promotion.as_dict(),
         },
-    })
+    }
+    if adapter_gate is not None:
+        response["gates"]["adapter"] = adapter_gate.as_dict()
+    return with_correlation(request, response)
 
 
 @router.get("/agent/context")

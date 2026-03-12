@@ -9,9 +9,25 @@ Provide a repeatable path to validate PQTS with real external beginners and prof
 ## Canonical Artifacts
 
 - Cohort registry: `data/validation/external_beta/cohort_registry.json`
+- Cohort harness: `scripts/run_external_beta_harness.py`
 - Monthly findings: `docs/USER_RESEARCH_2026_03.md` (rolling monthly update)
 - Validation gate: `tools/check_external_beta_framework.py`
 - Release-readiness gate: `tools/check_release_readiness.py`
+
+Harness usage:
+
+```bash
+python3 scripts/run_external_beta_harness.py \
+  --write-templates \
+  --update-registry
+```
+
+The harness validates two separate persona reports (`beginner`, `professional`) and enforces:
+- `participant_count`
+- `task_completion_rate`
+- `median_time_to_first_meaningful_result_minutes`
+- `top_blockers`
+- `channels`
 
 ## Cohort Model
 

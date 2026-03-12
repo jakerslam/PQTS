@@ -8,6 +8,22 @@
     "surface": "sdk",
     "owner": "integration-team",
     "status": "active",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 180,
+        "canary_p95_ms": 140,
+        "live_p95_ms": 120
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.5,
+        "max_incidents_30d": 1
+      },
+      "incident_profile": {
+        "recent_incidents": 0,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-10",
     "notes": "Python CLOB client for read-only and authenticated workflows."
   },
@@ -20,6 +36,22 @@
     "surface": "sdk",
     "owner": "integration-team",
     "status": "active",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 180,
+        "canary_p95_ms": 140,
+        "live_p95_ms": 120
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.5,
+        "max_incidents_30d": 1
+      },
+      "incident_profile": {
+        "recent_incidents": 0,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-10",
     "notes": "Rust CLOB client with typed auth states and websocket features."
   },
@@ -32,6 +64,22 @@
     "surface": "cli",
     "owner": "integration-team",
     "status": "active",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 180,
+        "canary_p95_ms": 140,
+        "live_p95_ms": 120
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.5,
+        "max_incidents_30d": 1
+      },
+      "incident_profile": {
+        "recent_incidents": 0,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-10",
     "notes": "Official command-line surface for market data and order flows."
   },
@@ -44,6 +92,22 @@
     "surface": "examples",
     "owner": "integration-team",
     "status": "active",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 180,
+        "canary_p95_ms": 140,
+        "live_p95_ms": 120
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.5,
+        "max_incidents_30d": 1
+      },
+      "incident_profile": {
+        "recent_incidents": 0,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-10",
     "notes": "Wallet-mode example implementations for proxy and safe flows."
   },
@@ -56,6 +120,22 @@
     "surface": "contracts",
     "owner": "integration-team",
     "status": "active",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 180,
+        "canary_p95_ms": 140,
+        "live_p95_ms": 120
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.5,
+        "max_incidents_30d": 1
+      },
+      "incident_profile": {
+        "recent_incidents": 0,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-10",
     "notes": "CTF exchange contracts for hybrid matching and on-chain settlement."
   },
@@ -68,6 +148,22 @@
     "surface": "sdk",
     "owner": "integration-team",
     "status": "beta",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 230,
+        "canary_p95_ms": 180,
+        "live_p95_ms": 150
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.0,
+        "max_incidents_30d": 2
+      },
+      "incident_profile": {
+        "recent_incidents": 1,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-12",
     "notes": "Crypto venue adapter dependency with certified-paper execution evidence."
   },
@@ -80,6 +176,22 @@
     "surface": "sdk",
     "owner": "integration-team",
     "status": "beta",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 230,
+        "canary_p95_ms": 180,
+        "live_p95_ms": 150
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.0,
+        "max_incidents_30d": 2
+      },
+      "incident_profile": {
+        "recent_incidents": 1,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-12",
     "notes": "Crypto venue adapter dependency with certified-paper execution evidence."
   },
@@ -92,6 +204,22 @@
     "surface": "sdk",
     "owner": "integration-team",
     "status": "beta",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 250,
+        "canary_p95_ms": 190,
+        "live_p95_ms": 160
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.0,
+        "max_incidents_30d": 2
+      },
+      "incident_profile": {
+        "recent_incidents": 1,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-12",
     "notes": "Equities venue adapter dependency with certified-paper execution evidence."
   },
@@ -104,6 +232,22 @@
     "surface": "sdk",
     "owner": "integration-team",
     "status": "beta",
+    "readiness": {
+      "paper_ok": true,
+      "latency_budget": {
+        "paper_p95_ms": 250,
+        "canary_p95_ms": 190,
+        "live_p95_ms": 160
+      },
+      "reliability_budget": {
+        "min_uptime_pct": 99.0,
+        "max_incidents_30d": 2
+      },
+      "incident_profile": {
+        "recent_incidents": 1,
+        "severity": "low"
+      }
+    },
     "last_reviewed": "2026-03-12",
     "notes": "Forex venue adapter dependency with certified-paper execution evidence."
   }

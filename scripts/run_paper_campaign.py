@@ -11,17 +11,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path[:] = [str(REPO_ROOT), *sys.path]
+
 import numpy as np
 import yaml
+from python_bootstrap import ensure_min_python, ensure_repo_python_path
 
-ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "src"
-if SRC.exists():
-    src_str = str(SRC)
-    if src_str not in sys.path:
-        sys.path[:] = [src_str, *sys.path]
-if str(ROOT) not in sys.path:
-    sys.path[:] = [str(ROOT), *sys.path]
+ROOT = REPO_ROOT
+
+
+def _ensure_runtime() -> None:
+    ensure_min_python()
+    ensure_repo_python_path()
 
 from analytics.ops_health import OpsThresholds, evaluate_operational_health  # noqa: E402
 from analytics.promotion_gates import (  # noqa: E402
@@ -768,6 +770,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
 
 
 def main() -> int:
+    _ensure_runtime()
     args = build_arg_parser().parse_args()
     final = asyncio.run(_run(args))
     print(json.dumps(final, sort_keys=True))

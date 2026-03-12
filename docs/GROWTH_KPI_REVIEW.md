@@ -6,6 +6,15 @@ Last updated: 2026-03-11 (America/Denver)
 
 Track monthly traction targets and deltas for external validation signals.
 
+Automation:
+
+```bash
+python3 scripts/compute_growth_kpi_targets.py \
+  --history config/growth/community_kpi_history.json \
+  --review-doc docs/GROWTH_KPI_REVIEW.md \
+  --out-json docs/GROWTH_KPI_DIGEST.json
+```
+
 ## Baseline Snapshot (2026-03-11)
 
 Source: GitHub repository metrics (`jakerslam/PQTS`).
@@ -43,3 +52,18 @@ For each month, publish:
 - Baseline month initialized.
 - Release + PyPI + docs workflow surfaces are active.
 - Next action: publish first recurring monthly delta entry at month close.
+
+<!-- GROWTH_KPI_DIGEST:START -->
+## Automated KPI Digest
+
+- `latest_month`: 2026-05
+- `windows_evaluated`: 3
+- `max_consecutive_miss_windows`: 3
+- `roadmap_reprioritization_required`: true
+
+### Recommended Actions
+
+- Prioritize onboarding/usability conversion work over new feature expansion for next sprint.
+- Require roadmap review memo linked to latest KPI digest before closing growth-related TODO items.
+
+<!-- GROWTH_KPI_DIGEST:END -->

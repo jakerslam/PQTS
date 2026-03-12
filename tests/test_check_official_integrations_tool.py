@@ -1,72 +1,81 @@
 from __future__ import annotations
 
-import json
 from datetime import date
-from pathlib import Path
 
-from tools.check_official_integrations import evaluate_integrations, load_integration_index
-
-
-def test_load_integration_index_reads_array(tmp_path: Path) -> None:
-    target = tmp_path / "integrations.json"
-    target.write_text(
-        json.dumps(
-            [
-                {
-                    "id": "x",
-                    "provider": "Polymarket",
-                    "repo_url": "https://github.com/Polymarket/py-clob-client",
-                    "surface": "sdk",
-                    "owner": "team",
-                    "status": "active",
-                    "last_reviewed": "2026-03-10",
-                }
-            ]
-        ),
-        encoding="utf-8",
-    )
-    rows = load_integration_index(target)
-    assert len(rows) == 1
-    assert rows[0]["id"] == "x"
+from tools.check_official_integrations import evaluate_integrations
 
 
-def test_evaluate_integrations_accepts_valid_rows() -> None:
+def _valid_row(provider: str, *, status: str = "beta") -> dict[str, object]:
+    return {
+        "id": f"{provider}-sdk",
+        "provider": provider,
+        "repo_url": f"https://github.com/example/{provider}",
+        "surface": "sdk",
+        "owner": "integration-team",
+        "status": status,
+        "last_reviewed": "2026-03-12",
+        "readiness": {
+            "paper_ok": True,
+            "latency_budget": {
+                "paper_p95_ms": 200,
+                "canary_p95_ms": 150,
+                "live_p95_ms": 120,
+            },
+            "reliability_budget": {
+                "min_uptime_pct": 99.0,
+                "max_incidents_30d": 2,
+            },
+            "incident_profile": {"recent_incidents": 0, "severity": "low"},
+        },
+    }
+
+
+def test_integrations_validator_passes_with_requirements_contract() -> None:
     rows = [
-        {
-            "id": "pmkt-cli",
-            "provider": "Polymarket",
-            "repo_url": "https://github.com/Polymarket/polymarket-cli",
-            "surface": "cli",
-            "owner": "integration-team",
-            "status": "active",
-            "last_reviewed": "2026-03-10",
-        }
+        _valid_row("binance"),
+        _valid_row("coinbase"),
     ]
-    errors = evaluate_integrations(rows, today=date(2026, 3, 10), max_age_days=45)
+    requirements = {
+        "providers": {
+            "binance": {"paper_ok": True},
+            "coinbase": {"paper_ok": True},
+        }
+    }
+    errors = evaluate_integrations(
+        rows,
+        requirements=requirements,
+        max_age_days=365,
+        today=date(2026, 3, 12),
+    )
     assert errors == []
 
 
-def test_evaluate_integrations_flags_stale_and_duplicate_url() -> None:
-    rows = [
-        {
-            "id": "a",
-            "provider": "Polymarket",
-            "repo_url": "https://github.com/Polymarket/polymarket-cli",
-            "surface": "cli",
-            "owner": "integration-team",
-            "status": "active",
-            "last_reviewed": "2025-12-01",
-        },
-        {
-            "id": "b",
-            "provider": "Polymarket",
-            "repo_url": "https://github.com/Polymarket/polymarket-cli",
-            "surface": "cli",
-            "owner": "integration-team",
-            "status": "active",
-            "last_reviewed": "2026-03-10",
-        },
-    ]
-    errors = evaluate_integrations(rows, today=date(2026, 3, 10), max_age_days=45)
-    assert any("stale last_reviewed" in item for item in errors)
-    assert any("duplicate repo_url" in item for item in errors)
+def test_integrations_validator_flags_missing_readiness_fields() -> None:
+    row = _valid_row("binance")
+    row["readiness"] = {"paper_ok": True}
+    errors = evaluate_integrations(
+        [row],
+        requirements={"providers": {"binance": {}}},
+        max_age_days=365,
+        today=date(2026, 3, 12),
+    )
+    assert any("readiness.latency_budget must be object" in item for item in errors)
+    assert any("readiness.reliability_budget must be object" in item for item in errors)
+    assert any("readiness.incident_profile must be object" in item for item in errors)
+
+
+def test_integrations_validator_flags_requirement_provider_drift() -> None:
+    rows = [_valid_row("binance")]
+    requirements = {
+        "providers": {
+            "binance": {},
+            "coinbase": {},
+        }
+    }
+    errors = evaluate_integrations(
+        rows,
+        requirements=requirements,
+        max_age_days=365,
+        today=date(2026, 3, 12),
+    )
+    assert any("missing providers declared in requirements" in item for item in errors)

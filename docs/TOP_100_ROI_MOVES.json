@@ -15,19 +15,6 @@
   {
     "rank": 2,
     "score": 490.0,
-    "title": "Create a standardized external-beginner/pro beta protocol (`onboarding + first-success + promotion`) with artifact schema for retention, first-result latency, and blocker taxonomy",
-    "roi": "very_high",
-    "impact": 10,
-    "track": "moat",
-    "item_type": "engineering",
-    "refs": "COMP-19",
-    "depends": "",
-    "section": "02x. Competitive Gap Closure Sprint (2026-03-12)",
-    "line_no": 126
-  },
-  {
-    "rank": 3,
-    "score": 490.0,
     "title": "Run at least one external beginner cohort and one external pro cohort for each release window and archive completed evidence in monthly user research artifacts",
     "roi": "very_high",
     "impact": 10,
@@ -39,46 +26,7 @@
     "line_no": 127
   },
   {
-    "rank": 4,
-    "score": 490.0,
-    "title": "Add stage-specific adapter lockout in promotion evaluators so non-certified adapters cannot advance to paper/canary/live",
-    "roi": "very_high",
-    "impact": 10,
-    "track": "moat",
-    "item_type": "engineering",
-    "refs": "COMP-20",
-    "depends": "",
-    "section": "02x. Competitive Gap Closure Sprint (2026-03-12)",
-    "line_no": 129
-  },
-  {
-    "rank": 5,
-    "score": 384.0,
-    "title": "Add canonical integration readiness fields (`paper_ok`, `latency_budget`, `reliability_budget`, `incident_profile`) and enforce stage-aware certification in integration validator and promotion checks",
-    "roi": "high",
-    "impact": 8,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "COMP-20",
-    "depends": "",
-    "section": "02x. Competitive Gap Closure Sprint (2026-03-12)",
-    "line_no": 128
-  },
-  {
-    "rank": 6,
-    "score": 384.0,
-    "title": "Add recurring user-growth KPI digest generation and threshold-based roadmap reprioritization when two months of key metrics miss target",
-    "roi": "high",
-    "impact": 8,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "COMP-21",
-    "depends": "",
-    "section": "02x. Competitive Gap Closure Sprint (2026-03-12)",
-    "line_no": 130
-  },
-  {
-    "rank": 7,
+    "rank": 3,
     "score": 384.0,
     "title": "Perform legal/compliance review for copy-trade workflows in target jurisdictions before enabling live copy-follow mode",
     "roi": "high",
@@ -91,7 +39,7 @@
     "line_no": 228
   },
   {
-    "rank": 8,
+    "rank": 4,
     "score": 384.0,
     "title": "Own canonical docs-surface migration and update package/release/docs links after cutover",
     "roi": "high",
@@ -104,7 +52,7 @@
     "line_no": 377
   },
   {
-    "rank": 9,
+    "rank": 5,
     "score": 382.0,
     "title": "Run monthly user interviews for casual and professional cohorts and feed roadmap deltas",
     "roi": "high",
@@ -117,7 +65,7 @@
     "line_no": 374
   },
   {
-    "rank": 10,
+    "rank": 6,
     "score": 268.0,
     "title": "Perform third-party bot/operator security due-diligence checklist before adding external signal adapters to production allowlist",
     "roi": "medium",

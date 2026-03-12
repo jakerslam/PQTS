@@ -1,4 +1,5 @@
 from analytics.readiness_gates import (
+    evaluate_adapter_stage_lockout,
     evaluate_backtest_readiness,
     evaluate_paper_trade_readiness,
     evaluate_promotion_gate,
@@ -63,3 +64,36 @@ def test_promotion_gate_contract() -> None:
     )
     assert not bad.passed
     assert "paper_campaign_not_passed" in bad.reasons
+
+
+def test_adapter_stage_lockout_blocks_non_certified_canary() -> None:
+    result = evaluate_adapter_stage_lockout(
+        target_stage="canary",
+        adapter_provider="binance",
+        adapter_status="beta",
+        paper_ok=True,
+    )
+    assert not result.passed
+    assert any(item.startswith("adapter_stage_lockout:binance:canary") for item in result.reasons)
+
+
+def test_adapter_stage_lockout_allows_certified_live() -> None:
+    result = evaluate_adapter_stage_lockout(
+        target_stage="live",
+        adapter_provider="coinbase",
+        adapter_status="certified",
+        paper_ok=True,
+    )
+    assert result.passed
+    assert result.reasons == ()
+
+
+def test_adapter_stage_lockout_requires_paper_ok_for_paper_stage() -> None:
+    result = evaluate_adapter_stage_lockout(
+        target_stage="paper",
+        adapter_provider="oanda",
+        adapter_status="beta",
+        paper_ok=False,
+    )
+    assert not result.passed
+    assert "adapter_paper_not_ready" in result.reasons

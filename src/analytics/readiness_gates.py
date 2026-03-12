@@ -4,6 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+_STAGE_STATUS_ORDER = {
+    "experimental": 0,
+    "beta": 1,
+    "active": 2,
+    "certified": 3,
+    "deprecated": -1,
+}
+
+_DEFAULT_REQUIRED_STATUS_BY_STAGE = {
+    "paper": "beta",
+    "canary": "certified",
+    "live": "certified",
+}
+
 
 @dataclass(frozen=True)
 class GateResult:
@@ -26,6 +40,41 @@ class PaperThresholds:
     min_realized_alpha: float = 0.0
     min_sample_size: int = 100
     max_slippage_mape: float = 0.25
+
+
+def _status_at_least(actual: str, required: str) -> bool:
+    actual_score = _STAGE_STATUS_ORDER.get(str(actual).strip().lower(), -99)
+    required_score = _STAGE_STATUS_ORDER.get(str(required).strip().lower(), -99)
+    return actual_score >= required_score
+
+
+def evaluate_adapter_stage_lockout(
+    *,
+    target_stage: str,
+    adapter_provider: str,
+    adapter_status: str,
+    paper_ok: bool,
+    required_status_by_stage: dict[str, str] | None = None,
+) -> GateResult:
+    stage = str(target_stage).strip().lower()
+    if stage not in {"paper", "canary", "live"}:
+        return GateResult(True, ())
+
+    provider = str(adapter_provider).strip().lower()
+    status = str(adapter_status).strip().lower()
+    requirements = dict(required_status_by_stage or _DEFAULT_REQUIRED_STATUS_BY_STAGE)
+    required_status = str(requirements.get(stage, "")).strip().lower()
+
+    reasons: list[str] = []
+    if stage == "paper" and not bool(paper_ok):
+        reasons.append("adapter_paper_not_ready")
+    if not required_status:
+        reasons.append("adapter_stage_requirement_missing")
+    elif not _status_at_least(status, required_status):
+        reasons.append(
+            f"adapter_stage_lockout:{provider}:{stage}:status={status}:required={required_status}"
+        )
+    return GateResult(not reasons, tuple(reasons))
 
 
 def evaluate_backtest_readiness(

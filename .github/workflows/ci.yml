@@ -217,6 +217,7 @@ jobs:
         run: |
           python3 tools/check_official_integrations.py \
             --index config/integrations/official_integrations.json \
+            --requirements config/integrations/official_integration_requirements.json \
             --max-age-days 45
 
       - name: Integration claim parity checks (gating)
@@ -287,6 +288,14 @@ jobs:
 
       - name: Roadmap governance checks (gating)
         run: python3 tools/check_roadmap_governance.py
+
+      - name: Growth KPI digest contract checks (gating)
+        run: |
+          python3 scripts/compute_growth_kpi_targets.py \
+            --history config/growth/community_kpi_history.json \
+            --review-doc docs/GROWTH_KPI_REVIEW.md \
+            --out-json docs/GROWTH_KPI_DIGEST.json \
+            --check
 
       - name: Wallet-mode example smoke checks (gating)
         run: |

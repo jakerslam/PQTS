@@ -63,6 +63,7 @@ def test_build_campaign_cmd_contains_expected_flags():
     assert "--cycles 120" in joined
     assert "--notional-usd 150.0" in joined
     assert "--paper-stress-multiplier 3.0" in joined
+    assert "--tca-db-path data/tca_records.csv" in joined
     assert "--risk-profile balanced" in joined
     assert "--switch capacity_curves=off" in joined
 

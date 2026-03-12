@@ -107,9 +107,11 @@ def _evaluate_external_beta(policy: dict[str, Any], errors: list[str]) -> dict[s
 def _evaluate_integrations(policy: dict[str, Any], errors: list[str]) -> dict[str, Any]:
     index_path = Path(str(policy.get("index", "")))
     report_path = Path(str(policy.get("certification_report", "")))
+    requirements_path = Path(str(policy.get("requirements", "")))
     required_venues = [str(token).strip().lower() for token in list(policy.get("required_venues") or []) if str(token).strip()]
     required_market_classes = {str(token).strip().lower() for token in list(policy.get("required_market_classes") or []) if str(token).strip()}
     min_status = str(policy.get("min_status", "beta")).strip().lower()
+    required_stage = str(policy.get("required_stage", "paper")).strip().lower()
 
     index_payload = _load_json(index_path)
     if not isinstance(index_payload, list):
@@ -142,6 +144,71 @@ def _evaluate_integrations(policy: dict[str, Any], errors: list[str]) -> dict[st
                 "integrations: venue maturity gate failed "
                 f"(venue={venue}, status={status}, required_min={min_status})"
             )
+        readiness = row.get("readiness", {})
+        if not isinstance(readiness, dict):
+            errors.append(f"integrations: readiness object missing for venue={venue}")
+            continue
+        if not isinstance(readiness.get("paper_ok"), bool):
+            errors.append(f"integrations: readiness.paper_ok missing/invalid for venue={venue}")
+        latency_budget = readiness.get("latency_budget")
+        if not isinstance(latency_budget, dict):
+            errors.append(f"integrations: readiness.latency_budget missing for venue={venue}")
+        reliability_budget = readiness.get("reliability_budget")
+        if not isinstance(reliability_budget, dict):
+            errors.append(f"integrations: readiness.reliability_budget missing for venue={venue}")
+        incident_profile = readiness.get("incident_profile")
+        if not isinstance(incident_profile, dict):
+            errors.append(f"integrations: readiness.incident_profile missing for venue={venue}")
+        if required_stage == "paper" and not bool(readiness.get("paper_ok", False)):
+            errors.append(f"integrations: readiness.paper_ok gate failed for venue={venue}")
+
+    requirements_payload: dict[str, Any] = {}
+    provider_requirements: dict[str, Any] = {}
+    defaults: dict[str, Any] = {}
+    if requirements_path.exists():
+        loaded = _load_json(requirements_path)
+        if not isinstance(loaded, dict):
+            errors.append(f"integrations: requirements must be JSON object: {requirements_path}")
+        else:
+            requirements_payload = loaded
+            defaults = dict(loaded.get("defaults") or {})
+            raw_provider_requirements = loaded.get("providers") or {}
+            if isinstance(raw_provider_requirements, dict):
+                provider_requirements = {
+                    str(key).strip().lower(): value
+                    for key, value in raw_provider_requirements.items()
+                    if str(key).strip()
+                }
+    for venue in required_venues:
+        row = by_provider.get(venue)
+        if row is None:
+            continue
+        readiness = row.get("readiness", {})
+        if not isinstance(readiness, dict):
+            continue
+        cfg = provider_requirements.get(venue, {})
+        if not isinstance(cfg, dict):
+            cfg = {}
+        required_status_by_stage = cfg.get("required_status_by_stage", defaults.get("required_status_by_stage", {}))
+        if not isinstance(required_status_by_stage, dict):
+            required_status_by_stage = {}
+        required_status = str(required_status_by_stage.get(required_stage, min_status)).strip().lower()
+        status = str(row.get("status", "")).strip().lower()
+        if required_status and not _status_at_least(status, required_status):
+            errors.append(
+                "integrations: stage requirement gate failed "
+                f"(venue={venue}, stage={required_stage}, status={status}, required={required_status})"
+            )
+
+    if not report_path.exists():
+        errors.append(f"integrations: certification report missing: {report_path}")
+        return {
+            "required_venues": required_venues,
+            "required_market_classes": sorted(required_market_classes),
+            "min_status": min_status,
+            "required_stage": required_stage,
+            "requirements_loaded": bool(requirements_payload),
+        }
 
     report_payload = _load_json(report_path)
     if not isinstance(report_payload, dict):
@@ -170,6 +237,8 @@ def _evaluate_integrations(policy: dict[str, Any], errors: list[str]) -> dict[st
         "required_venues": required_venues,
         "required_market_classes": sorted(required_market_classes),
         "min_status": min_status,
+        "required_stage": required_stage,
+        "requirements_loaded": bool(requirements_payload),
     }
 
 
@@ -244,11 +313,27 @@ def evaluate_release_readiness(policy_path: Path) -> tuple[list[str], dict[str, 
         "policy": str(policy_path),
         "schema_version": str(policy.get("schema_version", "")),
     }
-    summary["external_beta"] = _evaluate_external_beta(dict(policy.get("external_beta") or {}), errors)
-    summary["integrations"] = _evaluate_integrations(dict(policy.get("integrations") or {}), errors)
-    benchmark_summary = _evaluate_benchmark(dict(policy.get("benchmark") or {}), errors)
+    try:
+        summary["external_beta"] = _evaluate_external_beta(dict(policy.get("external_beta") or {}), errors)
+    except Exception as exc:  # pragma: no cover - defensive path
+        errors.append(f"external_beta: evaluation error: {exc}")
+        summary["external_beta"] = {}
+    try:
+        summary["integrations"] = _evaluate_integrations(dict(policy.get("integrations") or {}), errors)
+    except Exception as exc:  # pragma: no cover - defensive path
+        errors.append(f"integrations: evaluation error: {exc}")
+        summary["integrations"] = {}
+    try:
+        benchmark_summary = _evaluate_benchmark(dict(policy.get("benchmark") or {}), errors)
+    except Exception as exc:  # pragma: no cover - defensive path
+        errors.append(f"benchmark: evaluation error: {exc}")
+        benchmark_summary = {}
     summary["benchmark"] = benchmark_summary
-    summary["docs"] = _evaluate_docs(dict(policy.get("docs") or {}), benchmark_summary, errors)
+    try:
+        summary["docs"] = _evaluate_docs(dict(policy.get("docs") or {}), benchmark_summary, errors)
+    except Exception as exc:  # pragma: no cover - defensive path
+        errors.append(f"docs: evaluation error: {exc}")
+        summary["docs"] = {}
     summary["passed"] = len(errors) == 0
     summary["error_count"] = len(errors)
     return errors, summary

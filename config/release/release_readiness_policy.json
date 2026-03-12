@@ -10,10 +10,12 @@
   },
   "integrations": {
     "index": "config/integrations/official_integrations.json",
+    "requirements": "config/integrations/official_integration_requirements.json",
     "certification_report": "data/reports/certifications/latest.json",
     "required_venues": ["binance", "coinbase", "alpaca", "oanda"],
     "required_market_classes": ["crypto", "equities", "forex", "prediction_markets"],
-    "min_status": "beta"
+    "min_status": "beta",
+    "required_stage": "paper"
   },
   "benchmark": {
     "reference_performance": "results/reference_performance_latest.json",

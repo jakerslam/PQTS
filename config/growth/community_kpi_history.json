@@ -1,0 +1,62 @@
+{
+  "schema_version": "1",
+  "months": [
+    {
+      "month": "2026-03",
+      "stars": {
+        "actual": 0,
+        "target": 10
+      },
+      "forks": {
+        "actual": 0,
+        "target": 2
+      },
+      "docs_engagement": {
+        "actual": 18,
+        "target": 40
+      },
+      "onboarding_conversion_pct": {
+        "actual": 0.32,
+        "target": 0.45
+      }
+    },
+    {
+      "month": "2026-04",
+      "stars": {
+        "actual": 5,
+        "target": 25
+      },
+      "forks": {
+        "actual": 1,
+        "target": 5
+      },
+      "docs_engagement": {
+        "actual": 29,
+        "target": 55
+      },
+      "onboarding_conversion_pct": {
+        "actual": 0.36,
+        "target": 0.50
+      }
+    },
+    {
+      "month": "2026-05",
+      "stars": {
+        "actual": 14,
+        "target": 60
+      },
+      "forks": {
+        "actual": 3,
+        "target": 12
+      },
+      "docs_engagement": {
+        "actual": 44,
+        "target": 70
+      },
+      "onboarding_conversion_pct": {
+        "actual": 0.38,
+        "target": 0.52
+      }
+    }
+  ]
+}

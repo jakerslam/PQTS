@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass as _raw_dataclass, field, fields
 from datetime import datetime, timezone
 from enum import Enum
+from sys import version_info
 from typing import Any, Mapping, Sequence
+
+
+def dataclass(*args: Any, **kwargs: Any) -> Any:
+    """Compatibility wrapper for environments without dataclass slots."""
+    if version_info < (3, 10):
+        kwargs.pop("slots", None)
+    return _raw_dataclass(*args, **kwargs)
 
 
 def _now_utc() -> datetime:

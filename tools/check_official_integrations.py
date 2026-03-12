@@ -16,6 +16,8 @@ URLChecker = Callable[[str, float], tuple[bool, int, str]]
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _ALLOWED_STATUS = {"active", "beta", "certified", "deprecated", "experimental"}
 _ALLOWED_SURFACE = {"sdk", "cli", "examples", "contracts", "api", "docs"}
+_REQUIRED_STAGE_KEYS = ("paper_p95_ms", "canary_p95_ms", "live_p95_ms")
+_REQUIRED_STATUS_BY_STAGE = ("paper", "canary", "live")
 
 
 def _utc_today() -> date:
@@ -57,6 +59,7 @@ def _parse_date(value: str) -> date | None:
 def evaluate_integrations(
     rows: Iterable[dict[str, Any]],
     *,
+    requirements: dict[str, Any] | None = None,
     max_age_days: int = 45,
     today: date | None = None,
     check_urls: bool = False,
@@ -67,6 +70,12 @@ def evaluate_integrations(
     errors: list[str] = []
     today = today or _utc_today()
     checker = checker or _default_url_checker
+    requirements = dict(requirements or {})
+    required_providers: set[str] = set()
+    providers_cfg = requirements.get("providers", {})
+    if isinstance(providers_cfg, dict):
+        required_providers = {str(key).strip().lower() for key in providers_cfg if str(key).strip()}
+    observed_providers: set[str] = set()
 
     seen_ids: set[str] = set()
     seen_urls: set[str] = set()
@@ -89,6 +98,8 @@ def evaluate_integrations(
 
         if not provider:
             errors.append(f"{prefix}: missing provider")
+        else:
+            observed_providers.add(provider.lower())
         if not owner:
             errors.append(f"{prefix}: missing owner")
 
@@ -109,6 +120,34 @@ def evaluate_integrations(
             errors.append(
                 f"{prefix}: invalid surface '{surface}' (allowed: {sorted(_ALLOWED_SURFACE)})"
             )
+        readiness = row.get("readiness", {})
+        if not isinstance(readiness, dict):
+            errors.append(f"{prefix}: missing readiness object")
+            readiness = {}
+        paper_ok = readiness.get("paper_ok")
+        if not isinstance(paper_ok, bool):
+            errors.append(f"{prefix}: readiness.paper_ok must be boolean")
+        latency_budget = readiness.get("latency_budget")
+        if not isinstance(latency_budget, dict):
+            errors.append(f"{prefix}: readiness.latency_budget must be object")
+            latency_budget = {}
+        for key in _REQUIRED_STAGE_KEYS:
+            value = latency_budget.get(key)
+            if not isinstance(value, (int, float)) or float(value) <= 0:
+                errors.append(f"{prefix}: readiness.latency_budget.{key} must be positive number")
+        reliability_budget = readiness.get("reliability_budget")
+        if not isinstance(reliability_budget, dict):
+            errors.append(f"{prefix}: readiness.reliability_budget must be object")
+            reliability_budget = {}
+        uptime = reliability_budget.get("min_uptime_pct")
+        incidents = reliability_budget.get("max_incidents_30d")
+        if not isinstance(uptime, (int, float)) or float(uptime) <= 0 or float(uptime) > 100:
+            errors.append(f"{prefix}: readiness.reliability_budget.min_uptime_pct must be in (0, 100]")
+        if not isinstance(incidents, int) or incidents < 0:
+            errors.append(f"{prefix}: readiness.reliability_budget.max_incidents_30d must be non-negative integer")
+        incident_profile = readiness.get("incident_profile")
+        if not isinstance(incident_profile, dict):
+            errors.append(f"{prefix}: readiness.incident_profile must be object")
 
         reviewed_on = _parse_date(last_reviewed)
         if reviewed_on is None:
@@ -131,6 +170,10 @@ def evaluate_integrations(
                     f"{prefix}: repo_url check failed ({status_code}, {reason}) for {repo_url}"
                 )
 
+    missing_providers = sorted(required_providers - observed_providers)
+    if missing_providers:
+        errors.append(f"missing providers declared in requirements: {missing_providers}")
+
     return errors
 
 
@@ -146,6 +189,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--index",
         default="config/integrations/official_integrations.json",
         help="Path to integration index JSON file.",
+    )
+    parser.add_argument(
+        "--requirements",
+        default="config/integrations/official_integration_requirements.json",
+        help="Path to integration requirements JSON file.",
     )
     parser.add_argument(
         "--max-age-days",
@@ -165,8 +213,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_arg_parser().parse_args()
     rows = load_integration_index(args.index)
+    requirements_path = Path(args.requirements)
+    requirements_payload: dict[str, Any] = {}
+    if requirements_path.exists():
+        loaded = json.loads(requirements_path.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            requirements_payload = loaded
     errors = evaluate_integrations(
         rows,
+        requirements=requirements_payload,
         max_age_days=int(args.max_age_days),
         check_urls=bool(args.check_urls),
         timeout=float(args.timeout),
