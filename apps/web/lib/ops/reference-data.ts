@@ -12,6 +12,15 @@ export interface ReferenceBundleSummary {
   leaderboard_path: string;
   markets: string;
   strategies: string;
+  trust_label?: "reference" | "diagnostic_only" | "unverified";
+  provenance?: {
+    generated_at?: string;
+    generated_by?: string;
+    command?: string;
+    source_policy?: string;
+    code_version?: string;
+    environment?: string;
+  };
   summary: {
     avg_fill_rate: number;
     avg_quality_score: number;
@@ -93,7 +102,7 @@ function inferTrustLabel(bundle: ReferenceBundleSummary | null): "reference" | "
   if (!bundle) {
     return "unverified";
   }
-  const explicit = String((bundle as Record<string, unknown>).trust_label ?? "").trim();
+  const explicit = String(bundle.trust_label ?? "").trim();
   if (explicit === "reference" || explicit === "diagnostic_only" || explicit === "unverified") {
     return explicit;
   }
