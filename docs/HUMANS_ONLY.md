@@ -74,3 +74,5 @@ This file tracks tasks that cannot be reliably automated and require direct huma
 - Publish external beginner/pro validation evidence with participant mix, outcomes, and friction themes before major UX claim upgrades.
 - Maintain dated competitor comparison narratives and keep public claim language aligned with verifiable evidence.
 - Execute distribution/outreach campaigns (Show HN, X thread launches, community posts, partner outreach) and track outcomes.
+- Set explicit monthly traction KPI targets (stars/forks/issues/downloads) and publish a recurring growth review note.
+- Own canonical docs-surface migration and keep docs URLs synchronized across README, package metadata, and release notes after cutover.

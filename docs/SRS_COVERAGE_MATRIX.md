@@ -503,7 +503,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | LANG-4 | Research Data Plane Standard | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | LANG-5 | API and Configuration Contract Hardening | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | LANG-6 | UI Surface Coherence Requirement | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
-| LANG-7 | FastAPI-Centered Control Plane | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
+| LANG-7 | FastAPI-Centered Control Plane | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | LANG-8 | Storage-Tier Policy | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
 | LANG-9 | Engine-Loop and Dashboard Responsiveness SLOs | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | LANG-10 | Interop Packaging and Distribution | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
@@ -546,13 +546,13 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | NCLI-4 | Deployment Run-Mode Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
 | NCLI-5 | Agent Memory/Journal/Judge Artifact Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
 | NCLI-6 | Source Reliability and Claim Handling | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
-| COMP-15 | Distribution and Install-Path Truth Consistency | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
-| COMP-16 | Version and Maturity Posture Consistency Gate | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
+| COMP-15 | Distribution and Install-Path Truth Consistency | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
+| COMP-16 | Version and Maturity Posture Consistency Gate | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | LANG-13 | Dashboard Runtime Safety and Port Consistency | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | COMP-17 | Benchmark Program Coverage and Cadence | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
-| PMKT-16 | Marketing-to-Verified Integration Parity Gate | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
+| PMKT-16 | Marketing-to-Verified Integration Parity Gate | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | LANG-14 | Public Surface Canonicalization Contract | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
-| COMP-18 | External User-Validation Evidence Contract | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
+| COMP-18 | External User-Validation Evidence Contract | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | RCG-1 | Time-Bucket Market Discovery and Asset Resolution | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | RCG-2 | Live-Market Dry-Run Parity Mode | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | RCG-3 | Complementary Bundle Edge Gate with Fee Realism | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
@@ -573,13 +573,13 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | UI-010 | Guided Strategy Lab | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
 | UI-011 | Metric Explainability | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
 | UI-012 | Safe Capital-Affecting Action Patterns | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
-| UI-013 | Portfolio Surface Requirements | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
+| UI-013 | Portfolio Surface Requirements | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | UI-014 | Execution Surface Requirements | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | UI-015 | Risk and Incident Surface Requirements | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | UI-016 | Promotion Lifecycle Surface Requirements | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | UI-017 | Artifact Provenance Visibility | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
 | UI-018 | Benchmarks Above the Fold | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
-| UI-019 | WebSocket-First Live UX | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
+| UI-019 | WebSocket-First Live UX | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | UI-020 | No Silent Demo Data on Production Surfaces | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | UI-021 | Graceful Degradation and Loud Failure | implemented | done | config/srs/assimilation_registry.json, data/reports/roi/top_100_roi_moves.json, docs/TODO.md |
 | UI-022 | Tokenized Design System Requirement | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TODO_SORTED.json |
@@ -727,14 +727,14 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | LCS-4 | Self-Impact-Adjusted Edge Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | LCS-5 | Capacity and Crowding Stress Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | LCS-6 | Liquidity Realism Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
-| CGPT-1 | Canonical Web/API Contract Closure | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
-| CGPT-2 | Thin-Client Runtime Integrity | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
-| CGPT-3 | Onboarding Single-Truth Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
-| CGPT-4 | Documentation Product Surface Reliability | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
-| CGPT-5 | Integration Maturity Claim Parity | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
-| CGPT-6 | External Validation Readiness Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
+| CGPT-1 | Canonical Web/API Contract Closure | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
+| CGPT-2 | Thin-Client Runtime Integrity | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
+| CGPT-3 | Onboarding Single-Truth Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
+| CGPT-4 | Documentation Product Surface Reliability | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
+| CGPT-5 | Integration Maturity Claim Parity | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
+| CGPT-6 | External Validation Readiness Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | CGPT-7 | Benchmark Continuity and Progress Integrity | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
-| CGPT-8 | Distribution Truth and Version Cohesion Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
+| CGPT-8 | Distribution Truth and Version Cohesion Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | AEG-1 | In-Position Forecast Drift Exit Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AEG-2 | Minute-Cadence Monitoring Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |
 | AEG-3 | City-Month-Bucket Self-Calibration Contract | implemented | done | config/srs/assimilation_registry.json, config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md |

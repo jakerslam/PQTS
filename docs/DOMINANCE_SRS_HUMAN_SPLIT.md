@@ -39,3 +39,24 @@ make full-srs-check
 make dod-audit
 make governance-check
 ```
+
+## ChatGPT Reassessment Extraction (2026-03-11)
+
+The March 11 reassessment is largely already assimilated. The technical concerns map
+to current SRS families and do not require a new requirement family.
+
+### Mapped to existing SRS (no new IDs required)
+
+- Canonical web contract + route drift: `CGPT-1`, `LANG-7`, `UI-001`, `UI-013`, `UI-014`, `UI-015`
+- Thin-client purity (no file/process runtime shortcuts in production paths): `CGPT-2`, `UI-019`
+- Single onboarding truth across README/quickstart/package docs: `CGPT-3`, `COMP-11`, `COMP-15`
+- Canonical docs surface reliability: `CGPT-4`, `COMP-1`
+- Integration maturity claim parity: `CGPT-5`, `PMKT-16`
+- External cohort evidence before noob/pro claims: `CGPT-6`, `COMP-18`
+- Benchmark continuity with trust labels and historical integrity: `CGPT-7`, `COMP-17`, `MOAT-12`
+- Version/package/release/API cohesion: `CGPT-8`, `COMP-16`
+
+### Net-new human ownership items extracted
+
+- Set explicit monthly traction KPIs (stars/forks/issues/downloads) and run a documented growth review cadence.
+- Own canonical docs-surface migration (non-repo-tree docs URL) and keep package/release docs links synchronized after cutover.

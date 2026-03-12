@@ -302,6 +302,8 @@ Dependency order: ranking automation -> release truth gates -> security/runtime 
 - [ ] Approve trust-label policy language for public artifacts (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: MOAT-13`, `Impact: 9`, `Evidence: docs/SRS_DOD_AUDIT_2026_03_11.md; make dod-audit; data/reports/srs_coverage/srs_coverage.json`)
 - [ ] Run monthly user interviews for casual and professional cohorts and feed roadmap deltas (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: COMP-7, COMP-8, MOAT-8`, `Impact: 9`, `Evidence: docs/SRS_DOD_AUDIT_2026_03_11.md; make dod-audit; data/reports/srs_coverage/srs_coverage.json`)
 - [ ] Publish quarterly moat efficacy review and adjust parity/moat capacity target (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: MOAT-15`, `Impact: 9`, `Evidence: docs/SRS_DOD_AUDIT_2026_03_11.md; make dod-audit; data/reports/srs_coverage/srs_coverage.json`)
+- [ ] Set monthly traction KPI targets (stars/forks/issues/downloads), publish a recurring growth review, and track delta vs prior month (`ROI: high`, `Type: human_only`, `Track: moat`, `Ref: COMP-7, COMP-8, MOAT-15`, `Impact: 9`, `Evidence: docs/DOMINANCE_SRS_HUMAN_SPLIT.md; docs/HUMANS_ONLY.md`)
+- [ ] Own canonical docs-surface migration and update package/release/docs links after cutover (`ROI: high`, `Type: human_only`, `Track: parity`, `Ref: COMP-1, CGPT-4, COMP-15`, `Impact: 8`, `Evidence: docs/DOMINANCE_SRS_HUMAN_SPLIT.md; docs/HUMANS_ONLY.md`)
 
 ## 04. Tracking and Issue Hygiene
 

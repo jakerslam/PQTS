@@ -40,6 +40,19 @@
   },
   {
     "rank": 4,
+    "score": 384.0,
+    "title": "Own canonical docs-surface migration and update package/release/docs links after cutover",
+    "roi": "high",
+    "impact": 8,
+    "track": "parity",
+    "item_type": "human_only",
+    "refs": "COMP-1, CGPT-4, COMP-15",
+    "depends": "",
+    "section": "03. Human-Only Parallel Lane",
+    "line_no": 306
+  },
+  {
+    "rank": 5,
     "score": 382.0,
     "title": "Approve trust-label policy language for public artifacts",
     "roi": "high",
@@ -52,7 +65,7 @@
     "line_no": 302
   },
   {
-    "rank": 5,
+    "rank": 6,
     "score": 382.0,
     "title": "Run monthly user interviews for casual and professional cohorts and feed roadmap deltas",
     "roi": "high",
@@ -65,7 +78,7 @@
     "line_no": 303
   },
   {
-    "rank": 6,
+    "rank": 7,
     "score": 382.0,
     "title": "Publish quarterly moat efficacy review and adjust parity/moat capacity target",
     "roi": "high",
@@ -76,5 +89,18 @@
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
     "line_no": 304
+  },
+  {
+    "rank": 8,
+    "score": 382.0,
+    "title": "Set monthly traction KPI targets (stars/forks/issues/downloads), publish a recurring growth review, and track delta vs prior month",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "human_only",
+    "refs": "COMP-7, COMP-8, MOAT-15",
+    "depends": "",
+    "section": "03. Human-Only Parallel Lane",
+    "line_no": 305
   }
 ]
