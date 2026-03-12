@@ -97,6 +97,12 @@ make governance-check
 ## 8) Benchmark + Campaign Harnesses
 
 ```bash
+# 6-month monthly-slice harness
+make paper-6m
+
+# 6-month agent-vs-standard comparison harness
+make paper-6m-compare
+
 # 90-day campaign harness
 make paper-90d
 

@@ -284,6 +284,17 @@ make paper-6m
 Artifacts are written under `data/reports/paper_6m/`, including one consolidated
 `paper_6m_harness_<timestamp>.json` report.
 
+Agent-vs-standard six-month comparison harness:
+
+```bash
+python3 scripts/run_paper_6m_agent_comparison.py --months 6 --cycles-per-month 12 --sleep-seconds 0
+# or:
+make paper-6m-compare
+```
+
+Comparison artifacts are written under `data/reports/paper_6m_compare/`, including
+`paper_6m_agent_vs_standard_<timestamp>.json`.
+
 Ninety-day paper-trading harness (3 monthly slices, external-beta oriented):
 
 ```bash

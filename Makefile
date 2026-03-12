@@ -4,7 +4,7 @@ VENV ?= .venv
 VENV_PY := $(VENV)/bin/python
 PY_RUN := $(if $(wildcard $(VENV_PY)),$(VENV_PY),$(PYTHON))
 
-.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check full-srs-check dod-audit code-only-audit governance-check trust-surface-suite paper-6m paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up observability-up doctor onboard status test lint clean
+.PHONY: setup setup-lock demo sim-suite stream-worker ws-ingestion tournament canary-ramp reconcile slo-report error-budget control-plane arch-check arch-map scaffold-module leaderboard-site codex-enforcer assimilation-66-71-check unmapped-srs-check full-srs-check dod-audit code-only-audit governance-check trust-surface-suite paper-6m paper-6m-compare paper-90d nightly-review run-mode native bench-exec reference-bundles reference-performance certified-paper chaos-suite benchmark-program docker-up observability-up doctor onboard status test lint clean
 
 setup:
 	bash scripts/bootstrap_env.sh --python "$(PYTHON)" --venv "$(VENV)"
@@ -133,6 +133,9 @@ code-only-audit:
 
 paper-6m:
 	$(VENV_PY) scripts/run_paper_6m_harness.py --months 6 --cycles-per-month 12 --sleep-seconds 0 --risk-profile balanced
+
+paper-6m-compare:
+	$(VENV_PY) scripts/run_paper_6m_agent_comparison.py --months 6 --cycles-per-month 12 --sleep-seconds 0 --risk-profile balanced
 
 paper-90d:
 	$(PY_RUN) scripts/run_paper_90d_harness.py --days 90 --cycles-per-month 12 --sleep-seconds 0 --risk-profile balanced
