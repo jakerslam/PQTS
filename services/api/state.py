@@ -37,6 +37,10 @@ class APIRuntimeStore:
     operator_actions: list[dict[str, Any]] = field(default_factory=list)
     promotion_records: dict[str, dict[str, Any]] = field(default_factory=dict)
     onboarding_runs: dict[str, dict[str, Any]] = field(default_factory=dict)
+    brokerage_links: dict[str, dict[str, Any]] = field(default_factory=dict)
+    brokerage_accounts: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    terminal_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
+    assistant_audit: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def bootstrap(cls) -> "APIRuntimeStore":
@@ -120,6 +124,10 @@ class APIRuntimeStore:
                 },
             },
             onboarding_runs={},
+            brokerage_links={},
+            brokerage_accounts={},
+            terminal_profiles={},
+            assistant_audit=[],
         )
 
 

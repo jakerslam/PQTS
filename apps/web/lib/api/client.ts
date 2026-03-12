@@ -1,6 +1,9 @@
 import { webEnv } from "@/lib/env";
 import type {
   AccountSummary,
+  AssistantAuditEvent,
+  BrokerageAccount,
+  BrokerageSyncHealthRow,
   ExecutionQualityRow,
   Fill,
   Order,
@@ -9,6 +12,8 @@ import type {
   ReplayPayload,
   ReferencePerformance,
   RiskState,
+  TerminalPayload,
+  TerminalProfile,
 } from "@/lib/api/types";
 
 async function apiGet<T>(path: string): Promise<T> {
@@ -96,6 +101,26 @@ interface OrderTruthEnvelope {
   rows: ExecutionQualityEnvelope["rows"];
   explanation: string[];
   evidence_bundle?: OrderTruthPayload["evidence_bundle"];
+}
+
+interface BrokerageAccountsEnvelope {
+  accounts: BrokerageAccount[];
+  totals: {
+    accounts: number;
+    total_balance_current_usd: number;
+    total_balance_available_usd: number;
+  };
+}
+
+interface BrokerageSyncHealthEnvelope {
+  connections: BrokerageSyncHealthRow[];
+  degraded_count: number;
+  all_clear: boolean;
+}
+
+interface AssistantAuditEnvelope {
+  events: AssistantAuditEvent[];
+  count: number;
 }
 
 export async function getAccountSummary(): Promise<AccountSummary> {
@@ -202,4 +227,38 @@ export async function getOrderTruth(orderId?: string): Promise<OrderTruthPayload
 export async function getReplay(limit = 120): Promise<ReplayPayload> {
   const bounded = Math.min(Math.max(Math.floor(limit), 1), 1000);
   return apiGet<ReplayPayload>(`/v1/ops/replay?limit=${bounded}`);
+}
+
+export async function getBrokerageAccounts(): Promise<BrokerageAccountsEnvelope> {
+  return apiGet<BrokerageAccountsEnvelope>(`/v1/integrations/brokerage/accounts`);
+}
+
+export async function getBrokerageSyncHealth(): Promise<BrokerageSyncHealthEnvelope> {
+  return apiGet<BrokerageSyncHealthEnvelope>(`/v1/integrations/brokerage/sync-health`);
+}
+
+export async function getTerminal(): Promise<TerminalPayload> {
+  return apiGet<TerminalPayload>(`/v1/studio/terminal`);
+}
+
+export async function getAssistantAudit(limit = 100): Promise<AssistantAuditEnvelope> {
+  const bounded = Math.min(Math.max(Math.floor(limit), 1), 500);
+  return apiGet<AssistantAuditEnvelope>(`/v1/assistant/audit?limit=${bounded}`);
+}
+
+export async function updateTerminalPreferences(profile: Partial<TerminalProfile>): Promise<TerminalProfile> {
+  const response = await fetch(`${webEnv.NEXT_PUBLIC_API_BASE_URL}/v1/studio/terminal/preferences`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${webEnv.NEXT_PUBLIC_API_TOKEN}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(profile),
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed (${response.status}): /v1/studio/terminal/preferences`);
+  }
+  const payload = (await response.json()) as { profile: TerminalProfile };
+  return payload.profile;
 }

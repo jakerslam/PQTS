@@ -301,6 +301,15 @@ Dependency order: ranking automation -> release truth gates -> security/runtime 
 - [x] Restore canonical package-first beginner path in quickstart and enforce marker checks when PyPI distribution is available (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: CGPTR-2`, `Impact: 8`, `Evidence: docs/QUICKSTART_5_MIN.md; tools/check_truth_surface.py; config/release/truth_surface_policy.json; tests/test_check_truth_surface_tool.py`)
 - [x] Preserve backlog truth partition messaging to prevent stale template contradictions with active execution order (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: CGPTR-3`, `Impact: 6`, `Evidence: docs/ISSUE_BACKLOG.md`)
 
+## 02q. JG Portfolio-Computer Execution Sprint (2026-03-11)
+
+- [x] Implement Plaid-style brokerage link lifecycle endpoints with secure token fingerprinting and read-only defaults (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: JG-1, JG-4`, `Impact: 10`, `Evidence: services/api/routes/core.py; services/api/state.py; tests/test_services_api_rest_endpoints.py`)
+- [x] Implement linked multi-account aggregation payload with portfolio-level totals and timestamps (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: JG-2`, `Impact: 8`, `Evidence: services/api/routes/core.py; tests/test_services_api_rest_endpoints.py`)
+- [x] Implement sync-health + fail-closed indicators and operator sync receipt endpoint (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: JG-5`, `Impact: 9`, `Evidence: services/api/routes/core.py; tests/test_services_api_rest_endpoints.py`)
+- [x] Implement personal always-on terminal payload and persisted terminal preferences by authenticated subject (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: JG-3`, `Impact: 8`, `Evidence: services/api/routes/core.py; services/api/state.py; tests/test_services_api_rest_endpoints.py`)
+- [x] Implement assistant action audit endpoint and enforce confirmation-required policy for capital-affecting intents (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: JG-4, JG-6`, `Impact: 9`, `Evidence: services/api/routes/core.py; services/api/state.py; tests/test_services_api_rest_endpoints.py`)
+- [x] Expose web API client/type support for brokerage accounts, sync-health, terminal, and assistant-audit surfaces (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: JG-2, JG-3, JG-6, JG-7`, `Impact: 6`, `Evidence: apps/web/lib/api/client.ts; apps/web/lib/api/types.ts`)
+
 ## 03. Human-Only Parallel Lane
 
 - [x] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`, `Impact: 10`, `Evidence: docs/HUMAN_DECISIONS_LOG.md`)

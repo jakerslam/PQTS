@@ -128,3 +128,67 @@ export interface ReplayPayload {
   event_types: ReplayEventTypeCount[];
   events: Array<Record<string, unknown>>;
 }
+
+export interface BrokerageAccount {
+  account_id: string;
+  connection_id: string;
+  provider: string;
+  institution: string;
+  name: string;
+  type: string;
+  subtype: string;
+  currency: string;
+  balance_current: number;
+  balance_available: number;
+  as_of: string;
+}
+
+export interface BrokerageSyncHealthRow {
+  link_id: string;
+  connection_id: string;
+  provider: string;
+  institution: string;
+  last_sync_at: string;
+  status: "ok" | "stale" | "down";
+  is_stale: boolean;
+  stale_seconds: number | null;
+  stale_after_seconds: number;
+  fail_closed_trade_block: boolean;
+}
+
+export interface TerminalProfile {
+  density: string;
+  watchlist: string[];
+  refresh_seconds: number;
+  theme: string;
+  updated_at?: string;
+}
+
+export interface TerminalPayload {
+  subject: string;
+  always_on: boolean;
+  profile: TerminalProfile;
+  portfolio_totals: {
+    accounts: number;
+    total_balance_current_usd: number;
+    total_balance_available_usd: number;
+  };
+  sync_health: {
+    degraded_count: number;
+    all_clear: boolean;
+  };
+  next_actions: string[];
+  generated_at: string;
+}
+
+export interface AssistantAuditEvent {
+  id: string;
+  subject: string;
+  message: string;
+  requested_action: string;
+  capital_affecting: boolean;
+  requires_confirmation: boolean;
+  executed: boolean;
+  timestamp: string;
+  suggestion_count: number;
+}

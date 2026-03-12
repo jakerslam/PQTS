@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import threading
 import time
@@ -22,8 +23,6 @@ from contracts.api import (
 from services.api.auth import APIIdentity, require_identity, require_operator
 from services.api.cache import APICache, enforce_rate_limit, get_cache
 from services.api.correlation import read_request_correlation, with_correlation
-from services.api.persistence import APIPersistence, get_persistence
-from services.api.state import APIRuntimeStore, StreamHub, get_store, get_stream_hub
 from services.api.ops_data import (
     build_data_seed_command,
     build_notify_command,
@@ -37,6 +36,8 @@ from services.api.ops_data import (
     summarize_execution_quality,
     summarize_replay,
 )
+from services.api.persistence import APIPersistence, get_persistence
+from services.api.state import APIRuntimeStore, StreamHub, get_store, get_stream_hub
 
 router = APIRouter(prefix="/v1", tags=["core"])
 
@@ -55,6 +56,8 @@ def _utc_now_iso() -> str:
 _PROMOTION_STAGE_ORDER = ("backtest", "paper", "shadow", "canary", "live")
 _ONBOARDING_EXPERIENCE = {"beginner", "intermediate", "advanced"}
 _ONBOARDING_AUTOMATION = {"manual", "assisted", "auto"}
+_BROKERAGE_STALE_AFTER_SECONDS = 300
+_CAPITAL_ACTION_TOKENS = ("trade", "order", "buy", "sell", "rebalance", "execute")
 
 
 def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
@@ -66,6 +69,120 @@ def _default_promotion_record(strategy_id: str) -> dict[str, Any]:
         "updated_at": _utc_now_iso(),
         "history": [],
     }
+
+
+def _fingerprint_secret(token: str) -> str:
+    normalized = token.strip()
+    if not normalized:
+        return ""
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def _build_demo_brokerage_accounts(*, connection_id: str, institution: str) -> list[dict[str, Any]]:
+    seed = int(hashlib.sha256(connection_id.encode("utf-8")).hexdigest()[:8], 16)
+    cash = 12_000.0 + float(seed % 3500)
+    margin = 8_500.0 + float(seed % 2200)
+    return [
+        {
+            "account_id": f"{connection_id}_cash",
+            "connection_id": connection_id,
+            "provider": "plaid",
+            "institution": institution,
+            "name": "Brokerage Cash",
+            "type": "brokerage",
+            "subtype": "cash",
+            "currency": "USD",
+            "balance_current": round(cash, 2),
+            "balance_available": round(cash, 2),
+            "as_of": _utc_now_iso(),
+        },
+        {
+            "account_id": f"{connection_id}_margin",
+            "connection_id": connection_id,
+            "provider": "plaid",
+            "institution": institution,
+            "name": "Brokerage Margin",
+            "type": "brokerage",
+            "subtype": "margin",
+            "currency": "USD",
+            "balance_current": round(margin, 2),
+            "balance_available": round(max(margin - 500.0, 0.0), 2),
+            "as_of": _utc_now_iso(),
+        },
+    ]
+
+
+def _portfolio_totals(accounts: list[dict[str, Any]]) -> dict[str, float]:
+    current = 0.0
+    available = 0.0
+    for row in accounts:
+        try:
+            current += float(row.get("balance_current", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            pass
+        try:
+            available += float(row.get("balance_available", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            pass
+    return {
+        "accounts": float(len(accounts)),
+        "total_balance_current_usd": round(current, 2),
+        "total_balance_available_usd": round(available, 2),
+    }
+
+
+def _compute_sync_state(link: dict[str, Any]) -> dict[str, Any]:
+    last_sync = str(link.get("last_sync_at", "")).strip()
+    stale_after = int(link.get("stale_after_seconds", _BROKERAGE_STALE_AFTER_SECONDS))
+    is_stale = True
+    stale_seconds: int | None = None
+    if last_sync:
+        try:
+            synced_at = datetime.fromisoformat(last_sync)
+            stale_seconds = max(int((datetime.now(timezone.utc) - synced_at).total_seconds()), 0)
+            is_stale = stale_seconds > stale_after
+        except ValueError:
+            is_stale = True
+    status = "ok"
+    if bool(link.get("status", "") == "revoked"):
+        status = "down"
+    elif is_stale:
+        status = "stale"
+    return {
+        "status": status,
+        "is_stale": is_stale,
+        "stale_seconds": stale_seconds,
+        "stale_after_seconds": stale_after,
+        "fail_closed_trade_block": is_stale or status == "down",
+    }
+
+
+def _collect_brokerage_accounts(store: APIRuntimeStore) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for accounts in store.brokerage_accounts.values():
+        for row in accounts:
+            if isinstance(row, dict):
+                rows.append(dict(row))
+    rows.sort(key=lambda item: str(item.get("account_id", "")))
+    return rows
+
+
+def _collect_brokerage_sync_health(store: APIRuntimeStore) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for link in store.brokerage_links.values():
+        if not isinstance(link, dict):
+            continue
+        state = _compute_sync_state(link)
+        rows.append({
+            "link_id": str(link.get("link_id", "")),
+            "connection_id": str(link.get("connection_id", "")),
+            "provider": str(link.get("provider", "plaid")),
+            "institution": str(link.get("institution", "")),
+            "last_sync_at": str(link.get("last_sync_at", "")),
+            **state,
+        })
+    rows.sort(key=lambda item: str(item.get("link_id", "")))
+    return rows
 
 
 def _normalize_experience(value: Any) -> str:
@@ -656,12 +773,247 @@ def apply_promotion_action(
     return with_correlation(request, {"updated": updated, "records": records})
 
 
+@router.post("/integrations/brokerage/plaid/link/start")
+def start_plaid_link(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    requested_scope = str(payload.get("scope", "read_only")).strip().lower()
+    scope = requested_scope if requested_scope in {"read_only", "trade_enabled"} else "read_only"
+    if scope == "trade_enabled":
+        scope = "read_only"
+    institution = str(payload.get("institution", "demo_broker")).strip() or "demo_broker"
+    link_id = f"plaid_link_{uuid4().hex[:10]}"
+    link_token = f"link-sandbox-{uuid4().hex[:12]}"
+    row = {
+        "link_id": link_id,
+        "provider": "plaid",
+        "institution": institution,
+        "status": "link_token_created",
+        "scope": scope,
+        "permissions": ["accounts:read"],
+        "trade_permission_enabled": False,
+        "created_by": identity.subject,
+        "created_at": _utc_now_iso(),
+        "updated_at": _utc_now_iso(),
+        "last_sync_at": "",
+        "stale_after_seconds": _BROKERAGE_STALE_AFTER_SECONDS,
+        "token_fingerprint": "",
+    }
+    store.brokerage_links[link_id] = row
+    return with_correlation(request, {
+        "link_id": link_id,
+        "link_token": link_token,
+        "provider": "plaid",
+        "scope": scope,
+        "permissions": row["permissions"],
+        "trade_permission_enabled": False,
+        "next": ["complete_link"],
+    })
+
+
+@router.post("/integrations/brokerage/plaid/link/complete")
+def complete_plaid_link(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    link_id = str(payload.get("link_id", "")).strip()
+    public_token = str(payload.get("public_token", "")).strip()
+    if not link_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="link_id is required")
+    if not public_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="public_token is required")
+
+    existing = store.brokerage_links.get(link_id)
+    if existing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="link_id not found")
+
+    requested_trade = bool(payload.get("request_trade_permission", False))
+    acknowledge = bool(payload.get("acknowledge_trade_risk", False))
+    if requested_trade and not acknowledge:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="acknowledge_trade_risk=true required for trade permission",
+        )
+
+    connection_id = f"conn_{uuid4().hex[:10]}"
+    institution = str(payload.get("institution", existing.get("institution", "demo_broker"))).strip() or "demo_broker"
+    accounts = _build_demo_brokerage_accounts(connection_id=connection_id, institution=institution)
+    now_iso = _utc_now_iso()
+    updated = {
+        **existing,
+        "connection_id": connection_id,
+        "institution": institution,
+        "status": "connected",
+        "updated_at": now_iso,
+        "last_sync_at": now_iso,
+        "token_fingerprint": _fingerprint_secret(public_token),
+        "trade_permission_enabled": bool(requested_trade and acknowledge),
+        "permissions": ["accounts:read"] + (["orders:trade"] if requested_trade and acknowledge else []),
+        "completed_by": identity.subject,
+    }
+    store.brokerage_links[link_id] = updated
+    store.brokerage_accounts[connection_id] = accounts
+    sync_state = _compute_sync_state(updated)
+    return with_correlation(request, {
+        "connection": updated,
+        "accounts": accounts,
+        "sync": sync_state,
+    })
+
+
+@router.get("/integrations/brokerage/accounts")
+def list_brokerage_accounts(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    rows = _collect_brokerage_accounts(store)
+    return with_correlation(request, {
+        "accounts": rows,
+        "totals": _portfolio_totals(rows),
+    })
+
+
+@router.get("/integrations/brokerage/sync-health")
+def get_brokerage_sync_health(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    rows = _collect_brokerage_sync_health(store)
+    degraded = [row for row in rows if bool(row.get("fail_closed_trade_block"))]
+    return with_correlation(request, {
+        "connections": rows,
+        "degraded_count": len(degraded),
+        "all_clear": len(degraded) == 0,
+    })
+
+
+@router.post("/integrations/brokerage/sync")
+def sync_brokerage_accounts(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    target = str(payload.get("link_id", "")).strip()
+    now_iso = _utc_now_iso()
+    touched: list[str] = []
+    for link_id, row in list(store.brokerage_links.items()):
+        if target and link_id != target:
+            continue
+        if not isinstance(row, dict) or str(row.get("status", "")) != "connected":
+            continue
+        row["last_sync_at"] = now_iso
+        row["updated_at"] = now_iso
+        store.brokerage_links[link_id] = row
+        touched.append(link_id)
+        connection_id = str(row.get("connection_id", "")).strip()
+        if connection_id and connection_id in store.brokerage_accounts:
+            refreshed: list[dict[str, Any]] = []
+            for account in store.brokerage_accounts[connection_id]:
+                entry = dict(account)
+                entry["as_of"] = now_iso
+                refreshed.append(entry)
+            store.brokerage_accounts[connection_id] = refreshed
+    if target and not touched:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="link_id not found")
+    return with_correlation(request, {"synced_links": touched, "synced_at": now_iso})
+
+
+@router.get("/studio/terminal")
+def get_personal_terminal(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    profile = dict(store.terminal_profiles.get(identity.subject, {}))
+    defaults = {
+        "density": "guided",
+        "watchlist": ["BTC-USD", "ETH-USD"],
+        "refresh_seconds": 5,
+        "theme": "system",
+    }
+    merged = {**defaults, **profile}
+    account_rows = _collect_brokerage_accounts(store)
+    sync_rows = _collect_brokerage_sync_health(store)
+    degraded_count = len([row for row in sync_rows if bool(row.get("fail_closed_trade_block"))])
+    return with_correlation(request, {
+        "subject": identity.subject,
+        "always_on": True,
+        "profile": merged,
+        "portfolio_totals": _portfolio_totals(account_rows),
+        "sync_health": {
+            "degraded_count": degraded_count,
+            "all_clear": degraded_count == 0,
+        },
+        "next_actions": [
+            "connect_brokerage_accounts" if not account_rows else "open_execution_console",
+            "review_sync_health",
+            "run_paper_campaign",
+        ],
+        "generated_at": _utc_now_iso(),
+    })
+
+
+@router.put("/studio/terminal/preferences")
+def update_terminal_preferences(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    allowed = {"density", "watchlist", "refresh_seconds", "theme"}
+    sanitized: dict[str, Any] = {}
+    for key in allowed:
+        if key in payload:
+            sanitized[key] = payload[key]
+    existing = dict(store.terminal_profiles.get(identity.subject, {}))
+    updated = {**existing, **sanitized, "updated_at": _utc_now_iso()}
+    store.terminal_profiles[identity.subject] = updated
+    return with_correlation(request, {"profile": updated})
+
+
+@router.get("/assistant/audit")
+def list_assistant_audit(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    rows = [dict(item) for item in store.assistant_audit if str(item.get("subject", "")) == identity.subject]
+    rows = rows[:limit]
+    return with_correlation(request, {"events": rows, "count": len(rows)})
+
+
 @router.post("/assistant/turn")
 def assistant_turn(
     payload: dict[str, Any],
     identity: Annotated[APIIdentity, Depends(require_identity)],
     request: Request,
     cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
 ) -> dict[str, Any]:
     _enforce_read_limit(request, cache, identity)
     message = str(payload.get("message", "")).strip()
@@ -669,6 +1021,12 @@ def assistant_turn(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="message is required")
 
     message_lc = message.lower()
+    requested_action = str(payload.get("requested_action", "")).strip().lower()
+    capital_affecting = any(token in message_lc for token in _CAPITAL_ACTION_TOKENS) or requested_action in {
+        "trade",
+        "rebalance",
+        "execute",
+    }
     suggestions: list[dict[str, str]] = []
     if "risk" in message_lc or "kill" in message_lc:
         suggestions.append({"title": "Open risk surface", "href": "/dashboard/risk"})
@@ -681,12 +1039,31 @@ def assistant_turn(
             {"title": "Open command center", "href": "/dashboard"},
             {"title": "Start guided onboarding", "href": "/onboarding"},
         ]
+    audit_row = {
+        "id": f"ast_{uuid4().hex[:10]}",
+        "subject": identity.subject,
+        "message": message,
+        "requested_action": requested_action or "analysis",
+        "capital_affecting": capital_affecting,
+        "requires_confirmation": capital_affecting,
+        "executed": False,
+        "timestamp": _utc_now_iso(),
+        "suggestion_count": len(suggestions),
+    }
+    store.assistant_audit.insert(0, audit_row)
+    del store.assistant_audit[500:]
     return with_correlation(request, {
         "assistant_message": (
             "Recommendation generated using constrained operator policy. "
             "Review linked surfaces before any capital-affecting action."
         ),
         "suggestions": suggestions,
+        "action_policy": {
+            "mode": "analysis_only" if not capital_affecting else "requires_confirmation",
+            "capital_affecting": capital_affecting,
+            "executed": False,
+        },
+        "audit_id": audit_row["id"],
     })
 
 

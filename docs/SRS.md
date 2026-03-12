@@ -4905,3 +4905,54 @@ Observed source links:
 - `docs/ISSUE_BACKLOG.md` shall remain explicitly labeled as historical issue templates when canonical active execution is tracked elsewhere.
 - The canonical active execution order shall be documented in exactly one source (`docs/TODO.md`) and referenced from `docs/ISSUE_BACKLOG.md`.
 - Any stale “future scaffold” references in backlog templates shall include status guidance preventing contradiction with implemented code paths.
+
+## 88. Additional Delta Requirements from External Post Chain (Jeff Grimes portfolio-computer post, March 11, 2026)
+
+These requirements capture applicable, testable deltas from the referenced post while preserving paper-first and hard safety controls.
+
+Observed source links:
+- `https://x.com/jeffgrimes9/status/2031839260069019894?s=20`
+- `https://twitter.com/jeffgrimes9/status/2031839260069019894/video/1`
+- Mentioned integration in post body: `@Plaid`
+
+### JG-1 Plaid Brokerage Link Contract
+
+- Runtime shall support a secure Plaid brokerage-link workflow exposed through canonical API endpoints.
+- Link initiation shall issue bounded link-session tokens and persist link metadata without storing raw credentials.
+- Link completion shall persist token fingerprints and connection metadata with explicit provider identity.
+
+### JG-2 Multi-Account Portfolio Aggregation Contract
+
+- Runtime shall aggregate balances across all linked brokerage accounts into one canonical portfolio totals payload.
+- Aggregation output shall expose per-account and portfolio-level balances with timestamps.
+- Aggregation responses shall remain available in read-only mode without requiring trading permissions.
+
+### JG-3 Personal Always-On Terminal Contract
+
+- Runtime shall expose a personalized terminal payload keyed by authenticated subject with persisted profile preferences.
+- Terminal payload shall include account totals, sync health summary, and actionable next steps.
+- Terminal surface shall advertise `always_on=true` semantics and deterministic refresh fields.
+
+### JG-4 Read-Only-First Permission Contract
+
+- Brokerage-link flows shall default to read-only permissions.
+- Requests for trade-enabled permissions shall require explicit acknowledgement flags and remain blocked otherwise.
+- Assistant responses shall remain analysis-only by default and never execute capital-affecting actions implicitly.
+
+### JG-5 Sync Health and Fail-Closed Contract
+
+- Linked brokerage connections shall expose sync-health status (`ok`, `stale`, `down`) with stale thresholds.
+- Stale/down sync state shall set explicit fail-closed trade-block indicators.
+- Manual sync actions shall emit deterministic receipts including synced IDs and timestamps.
+
+### JG-6 Assistant Action Audit Contract
+
+- Assistant turns shall write immutable audit rows with subject, requested action, capital-affecting flag, and timestamp.
+- Capital-affecting intents shall be marked `requires_confirmation` and `executed=false` by default.
+- Audit rows shall be queryable via a dedicated API surface for operator/compliance review.
+
+### JG-7 Onboarding Sequence for Linked Portfolio Terminal
+
+- Onboarding progression shall support: `connect brokerage` -> `aggregate accounts` -> `open personal terminal`.
+- Each step shall emit machine-readable receipts suitable for regression tests.
+- Missing connection prerequisites shall fail closed with explicit next-action guidance.

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import time
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
@@ -217,3 +217,106 @@ def test_onboarding_run_start_and_status_progression() -> None:
             break
         time.sleep(0.2)
     assert latest_status == "completed"
+
+
+def test_plaid_link_flow_defaults_to_read_only_and_aggregates_accounts() -> None:
+    client = TestClient(create_app(_settings()))
+
+    start = client.post(
+        "/v1/integrations/brokerage/plaid/link/start",
+        json={"institution": "alpaca", "scope": "trade_enabled"},
+        headers=_viewer(),
+    )
+    assert start.status_code == 200
+    start_payload = start.json()
+    assert start_payload["provider"] == "plaid"
+    assert start_payload["scope"] == "read_only"
+    assert start_payload["trade_permission_enabled"] is False
+    link_id = start_payload["link_id"]
+
+    complete = client.post(
+        "/v1/integrations/brokerage/plaid/link/complete",
+        json={"link_id": link_id, "public_token": "public-sandbox-token"},
+        headers=_viewer(),
+    )
+    assert complete.status_code == 200
+    completed = complete.json()
+    assert completed["connection"]["status"] == "connected"
+    assert completed["connection"]["trade_permission_enabled"] is False
+    assert len(completed["accounts"]) >= 1
+
+    listed = client.get("/v1/integrations/brokerage/accounts", headers=_viewer())
+    assert listed.status_code == 200
+    accounts = listed.json()["accounts"]
+    assert len(accounts) >= 1
+    assert listed.json()["totals"]["total_balance_current_usd"] > 0
+
+
+def test_brokerage_sync_health_fail_closed_and_manual_sync_receipt() -> None:
+    client = TestClient(create_app(_settings()))
+
+    start = client.post(
+        "/v1/integrations/brokerage/plaid/link/start",
+        json={"institution": "coinbase"},
+        headers=_viewer(),
+    )
+    link_id = start.json()["link_id"]
+    complete = client.post(
+        "/v1/integrations/brokerage/plaid/link/complete",
+        json={"link_id": link_id, "public_token": "token-1"},
+        headers=_viewer(),
+    )
+    assert complete.status_code == 200
+
+    stale_state = client.get("/v1/integrations/brokerage/sync-health", headers=_viewer())
+    assert stale_state.status_code == 200
+    rows = stale_state.json()["connections"]
+    assert any(row["link_id"] == link_id for row in rows)
+
+    sync = client.post("/v1/integrations/brokerage/sync", json={"link_id": link_id}, headers=_operator())
+    assert sync.status_code == 200
+    assert link_id in sync.json()["synced_links"]
+    assert "synced_at" in sync.json()
+
+    refreshed = client.get("/v1/integrations/brokerage/sync-health", headers=_viewer())
+    assert refreshed.status_code == 200
+    updated = [row for row in refreshed.json()["connections"] if row["link_id"] == link_id][0]
+    assert updated["status"] in {"ok", "stale"}
+    assert updated["stale_after_seconds"] >= 1
+
+
+def test_terminal_and_assistant_audit_surface_are_persisted() -> None:
+    client = TestClient(create_app(_settings()))
+
+    prefs = client.put(
+        "/v1/studio/terminal/preferences",
+        json={"density": "pro", "watchlist": ["BTC-USD", "SOL-USD"], "refresh_seconds": 3},
+        headers=_viewer(),
+    )
+    assert prefs.status_code == 200
+    assert prefs.json()["profile"]["density"] == "pro"
+
+    terminal = client.get("/v1/studio/terminal", headers=_viewer())
+    assert terminal.status_code == 200
+    terminal_payload = terminal.json()
+    assert terminal_payload["always_on"] is True
+    assert terminal_payload["profile"]["density"] == "pro"
+    assert "portfolio_totals" in terminal_payload
+
+    assistant = client.post(
+        "/v1/assistant/turn",
+        json={"message": "please rebalance positions", "requested_action": "rebalance"},
+        headers=_viewer(),
+    )
+    assert assistant.status_code == 200
+    payload = assistant.json()
+    assert payload["action_policy"]["capital_affecting"] is True
+    assert payload["action_policy"]["executed"] is False
+    assert payload["action_policy"]["mode"] == "requires_confirmation"
+    assert payload["audit_id"].startswith("ast_")
+
+    audit = client.get("/v1/assistant/audit", headers=_viewer())
+    assert audit.status_code == 200
+    events = audit.json()["events"]
+    assert len(events) >= 1
+    assert events[0]["id"].startswith("ast_")

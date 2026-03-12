@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **683**
-- implemented: **683**
+- Total requirements: **690**
+- implemented: **690**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -50,6 +50,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | HKO | 8 | 0 | 0 | 0 | 0 | 8 |
 | HL | 7 | 0 | 0 | 0 | 0 | 7 |
 | HM | 7 | 0 | 0 | 0 | 0 | 7 |
+| JG | 7 | 0 | 0 | 0 | 0 | 7 |
 | KL | 7 | 0 | 0 | 0 | 0 | 7 |
 | LANG | 14 | 0 | 0 | 0 | 0 | 14 |
 | LCS | 6 | 0 | 0 | 0 | 0 | 6 |
@@ -785,3 +786,10 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | CGPTR-1 | Embedded Reference Artifact Trust/Provenance Contract | implemented | done | docs/TODO.md |
 | CGPTR-2 | Package-First Quickstart Contract Enforcement | implemented | done | docs/TODO.md |
 | CGPTR-3 | Backlog Truth Partition Contract | implemented | done | docs/TODO.md |
+| JG-1 | Plaid Brokerage Link Contract | implemented | done | docs/TODO.md |
+| JG-2 | Multi-Account Portfolio Aggregation Contract | implemented | done | docs/TODO.md |
+| JG-3 | Personal Always-On Terminal Contract | implemented | done | docs/TODO.md |
+| JG-4 | Read-Only-First Permission Contract | implemented | done | docs/TODO.md |
+| JG-5 | Sync Health and Fail-Closed Contract | implemented | done | docs/TODO.md |
+| JG-6 | Assistant Action Audit Contract | implemented | done | docs/TODO.md |
+| JG-7 | Onboarding Sequence for Linked Portfolio Terminal | implemented | done | docs/TODO.md |
