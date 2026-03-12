@@ -4,12 +4,15 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.coverage
+.coverage.*
+coverage.xml
 env/
 venv/
 ENV/
 build/
-develop-eggs/
 dist/
+develop-eggs/
 downloads/
 eggs/
 .eggs/
@@ -52,6 +55,14 @@ models/*.joblib
 # Logs
 logs/
 *.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
 
 # Generated static sites
 site/
