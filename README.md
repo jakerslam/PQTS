@@ -44,14 +44,14 @@ PQTS is designed as a **deployment trust operating system**:
 
 ### Reference Performance Snapshot
 
-Latest top reference bundle (`2026-03-11_reference_multi_market_making`):
+Latest top reference bundle (`2026-03-12_reference_multi_market_making`):
 
 Evidence:
-- [Bundle README](results/2026-03-11_reference_multi_market_making/README.md)
-- [Leaderboard CSV](results/2026-03-11_reference_multi_market_making/simulation_leaderboard_20260311T054538975060Z.csv)
-- [Suite report JSON](results/2026-03-11_reference_multi_market_making/simulation_suite_20260311T054538975060Z.json)
+- [Bundle README](results/2026-03-12_reference_multi_market_making/README.md)
+- [Leaderboard CSV](results/2026-03-12_reference_multi_market_making/simulation_leaderboard_20260312T043826475506Z.csv)
+- [Suite report JSON](results/2026-03-12_reference_multi_market_making/simulation_suite_20260312T043826475506Z.json)
 
-- `avg_quality_score=0.8403`
+- `avg_quality_score=0.8275`
 - `avg_fill_rate=1.0000`
 - `avg_reject_rate=0.0000`
 - `total_filled=90` / `total_submitted=90`
@@ -507,19 +507,19 @@ Fallback access at `http://localhost:8501`
 
 Reference callout from latest `reference` bundle (auto-generated from `results/reference_performance_latest.json`):
 <!-- REFERENCE_PERFORMANCE:START -->
-_Last generated (UTC): 2026-03-11 05:45:39_
+_Last generated (UTC): 2026-03-12 04:38:23_
 
-- `2026-03-11_reference_multi_market_making` ([bundle](results/2026-03-11_reference_multi_market_making/README.md), [csv](results/2026-03-11_reference_multi_market_making/simulation_leaderboard_20260311T054538975060Z.csv), [report](results/2026-03-11_reference_multi_market_making/simulation_suite_20260311T054538975060Z.json))
-  - `avg_quality_score=0.8403`
+- `2026-03-12_reference_multi_market_making` ([bundle](results/2026-03-12_reference_multi_market_making/README.md), [csv](results/2026-03-12_reference_multi_market_making/simulation_leaderboard_20260312T043826475506Z.csv), [report](results/2026-03-12_reference_multi_market_making/simulation_suite_20260312T043826475506Z.json))
+  - `avg_quality_score=0.8275`
   - `avg_fill_rate=1.0000`
   - `avg_reject_rate=0.0000`
   - `total_filled=90` / `total_submitted=90`
 
 | Bundle | Markets | Strategy | Quality | Fill | Reject |
 |---|---|---|---:|---:|---:|
-| `2026-03-11_reference_crypto_funding_arbitrage` | `crypto` | `funding_arbitrage` | `0.8120` | `1.0000` | `0.0000` |
-| `2026-03-11_reference_crypto_trend_following` | `crypto` | `trend_following` | `0.8128` | `1.0000` | `0.0000` |
-| `2026-03-11_reference_multi_market_making` | `crypto,equities,forex` | `market_making` | `0.8403` | `1.0000` | `0.0000` |
+| `2026-03-12_reference_crypto_funding_arbitrage` | `crypto` | `funding_arbitrage` | `0.8248` | `1.0000` | `0.0000` |
+| `2026-03-12_reference_crypto_trend_following` | `crypto` | `trend_following` | `0.8273` | `1.0000` | `0.0000` |
+| `2026-03-12_reference_multi_market_making` | `crypto,equities,forex` | `market_making` | `0.8275` | `1.0000` | `0.0000` |
 <!-- REFERENCE_PERFORMANCE:END -->
 
 | Strategy | Timeframe | Edge |

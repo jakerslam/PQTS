@@ -1,6 +1,15 @@
 # 5-Minute Quickstart
 
-## 1) Install + Initialize (Source Path)
+## 1) Install + Initialize (Package-First Path)
+
+```bash
+pip install -U pqts
+pqts quickstart --execute
+```
+
+This is the canonical beginner path. It creates a safe local workspace (`data/`, `results/`, `logs/`) and runs the guided first-success sequence.
+
+Source/development fallback (advanced users):
 
 ```bash
 git clone https://github.com/jakerslam/pqts.git
@@ -13,8 +22,6 @@ pqts init
 # fallback if console scripts are unavailable:
 python main.py init
 ```
-
-This creates a safe local workspace (`data/`, `results/`, `logs/`) and copies `.env.example` when available.
 
 ## 2) Run a Meaningful Demo
 

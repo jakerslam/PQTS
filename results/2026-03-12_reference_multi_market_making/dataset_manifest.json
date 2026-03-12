@@ -1,0 +1,22 @@
+{
+  "artifacts": {
+    "leaderboard_csv": "simulation_leaderboard_20260312T043826475506Z.csv",
+    "leaderboard_sha256": "37a63781abfb91e43359fbe9b6f5d069ffa763eaff0781adf4def1bb66e95037",
+    "report_json": "simulation_suite_20260312T043826475506Z.json",
+    "report_sha256": "2107e4f8820dcb5e0f57dad558e05d179e7c120712de1045b1d487e8c300a89f"
+  },
+  "commands": [
+    ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto,equities,forex --strategies market_making --cycles-per-scenario 30 --symbols-per-market 1 --readiness-every 10 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-12_reference_multi_market_making --telemetry-log results/2026-03-12_reference_multi_market_making/simulation_events.jsonl --tca-dir results/2026-03-12_reference_multi_market_making/tca"
+  ],
+  "dataset_version": "dataset-20260312-reference-v2",
+  "generated_at": "2026-03-12T04:38:26.594014+00:00",
+  "notes": "Reference bundle with non-zero fills and reproducible command surface.",
+  "schema_version": "1",
+  "sources": [
+    {
+      "config": "config/paper.yaml",
+      "name": "pqts_simulation_engine",
+      "type": "synthetic"
+    }
+  ]
+}

@@ -18,6 +18,10 @@
     "quickstart_required_markers": [
       "Primary public web surface: Next.js (`apps/web`).",
       "Dash fallback (operator/internal)"
+    ],
+    "quickstart_package_markers": [
+      "pip install -U pqts",
+      "pqts quickstart --execute"
     ]
   }
 }

@@ -126,6 +126,13 @@ def evaluate_truth_surface(
     for marker in quickstart_markers:
         if marker not in quickstart:
             errors.append(f"QUICKSTART_5_MIN missing required UI marker: {marker}")
+    if pypi_available:
+        package_markers = [
+            str(x).strip() for x in list(ui.get("quickstart_package_markers") or []) if str(x).strip()
+        ]
+        for marker in package_markers:
+            if marker not in quickstart:
+                errors.append(f"QUICKSTART_5_MIN missing required package-first marker: {marker}")
 
     dashboard_port = int(ui.get("dashboard_port", 8501))
     dashboard_start = _read_text(dashboard_start_path)

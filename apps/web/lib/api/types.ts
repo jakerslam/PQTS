@@ -45,6 +45,14 @@ export interface ReferenceBundleSummary {
   leaderboard_path: string;
   markets: string;
   strategies: string;
+  trust_label?: "reference" | "diagnostic_only" | "unverified";
+  provenance?: {
+    generated_at?: string;
+    generator?: string;
+    dataset_manifest_path?: string;
+    config_snapshot_path?: string;
+    metrics_chart_path?: string;
+  };
   summary: {
     avg_fill_rate: number;
     avg_quality_score: number;
@@ -65,8 +73,10 @@ export interface ReferenceProvenance {
 }
 
 export interface ReferencePerformance {
+  schema_version?: string;
   generated_at: string;
   bundle_count: number;
+  trust_label?: "reference" | "diagnostic_only" | "unverified";
   bundles: ReferenceBundleSummary[];
   provenance?: ReferenceProvenance;
 }

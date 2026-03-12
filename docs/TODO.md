@@ -295,6 +295,12 @@ Dependency order: ranking automation -> release truth gates -> security/runtime 
 - [x] Replace file-backed web diagnostics routes (`execution-quality`, `order-truth`, `replay`, `template-gallery`) with canonical backend services (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: MOAT-1, MOAT-2, UI-017, UI-018`, `Impact: 9`, `Evidence: apps/web/app/api/execution-quality/route.ts; apps/web/app/api/order-truth/route.ts; apps/web/app/api/replay/route.ts; apps/web/app/api/template-gallery/route.ts`)
 - [x] Complete web thin-client cutover by removing remaining Python-spawn route handlers from web API layer (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: LANG-7, UI-019`, `Impact: 8`, `Evidence: apps/web/lib/api/server-proxy.ts; apps/web/app/api/**/*.ts`)
 
+## 02o. External Review Delta Closure (2026-03-12)
+
+- [x] Enforce explicit trust/provenance contract fields in `results/reference_performance_latest.json` and add governance validator (`ROI: very_high`, `Type: engineering`, `Track: moat`, `Ref: CGPTR-1`, `Impact: 10`, `Evidence: scripts/publish_reference_bundles.py; tools/check_reference_performance_contract.py; tests/test_check_reference_performance_contract_tool.py; results/reference_performance_latest.json; Makefile; tools/run_trust_surface_suite.py`)
+- [x] Restore canonical package-first beginner path in quickstart and enforce marker checks when PyPI distribution is available (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: CGPTR-2`, `Impact: 8`, `Evidence: docs/QUICKSTART_5_MIN.md; tools/check_truth_surface.py; config/release/truth_surface_policy.json; tests/test_check_truth_surface_tool.py`)
+- [x] Preserve backlog truth partition messaging to prevent stale template contradictions with active execution order (`ROI: medium`, `Type: engineering`, `Track: parity`, `Ref: CGPTR-3`, `Impact: 6`, `Evidence: docs/ISSUE_BACKLOG.md`)
+
 ## 03. Human-Only Parallel Lane
 
 - [x] Finalize and sign blocking decisions in [docs/HUMAN_DECISIONS_LOG.md](/Users/jay/Document%20(Lcl)/Coding/PQTS/docs/HUMAN_DECISIONS_LOG.md) (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: COMP-10, LANG-6, LANG-3, COMP-14`, `Impact: 10`, `Evidence: docs/HUMAN_DECISIONS_LOG.md`)

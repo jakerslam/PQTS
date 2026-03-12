@@ -16,6 +16,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parent.parent
+REFERENCE_MIN_QUALITY = 0.25
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,16 @@ def _quality_summary(payload: dict[str, Any]) -> dict[str, float]:
         "avg_fill_rate": avg_fill_rate,
         "avg_reject_rate": avg_reject_rate,
     }
+
+
+def _trust_label_from_summary(summary: dict[str, float]) -> str:
+    quality = float(summary.get("avg_quality_score", 0.0) or 0.0)
+    fill = float(summary.get("avg_fill_rate", 0.0) or 0.0)
+    if quality >= REFERENCE_MIN_QUALITY and fill > 0.0:
+        return "reference"
+    if fill > 0.0:
+        return "diagnostic_only"
+    return "unverified"
 
 
 def _render_metrics_chart(path: Path, *, quality: float, fill_rate: float, reject_rate: float) -> None:
@@ -253,6 +264,7 @@ def _write_dataset_manifest(path: Path, *, payload: dict[str, Any], command: str
 
 def publish_bundles(*, config: str, out_root: Path, scenarios: tuple[ReferenceScenario, ...]) -> dict[str, Any]:
     date_prefix = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    generated_at = datetime.now(timezone.utc).isoformat()
     generated: list[dict[str, Any]] = []
     for scenario in scenarios:
         bundle_name = f"{date_prefix}_{scenario.slug}"
@@ -286,9 +298,15 @@ def publish_bundles(*, config: str, out_root: Path, scenarios: tuple[ReferenceSc
         ]
         payload = _run(command)
         summary = _quality_summary(payload)
+        trust_label = _trust_label_from_summary(summary)
         if summary["total_filled"] <= 0:
             raise RuntimeError(
                 f"Reference bundle {bundle_name} has zero fills; refusing to publish as reference."
+            )
+        if trust_label != "reference":
+            raise RuntimeError(
+                f"Reference bundle {bundle_name} classified as {trust_label}; "
+                f"requires quality>={REFERENCE_MIN_QUALITY} and non-zero fills."
             )
 
         config_snapshot = bundle / "config_paper_snapshot.yaml"
@@ -323,12 +341,29 @@ def publish_bundles(*, config: str, out_root: Path, scenarios: tuple[ReferenceSc
                 "markets": scenario.markets,
                 "strategies": scenario.strategies,
                 "command": " ".join(command).replace(str(ROOT) + "/", ""),
+                "trust_label": trust_label,
+                "provenance": {
+                    "generated_at": generated_at,
+                    "generator": "scripts/publish_reference_bundles.py",
+                    "dataset_manifest_path": str(bundle / "dataset_manifest.json"),
+                    "config_snapshot_path": str(bundle / "config_paper_snapshot.yaml"),
+                    "metrics_chart_path": str(bundle / "metrics_chart.svg"),
+                },
             }
         )
 
     output = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "schema_version": "2",
+        "generated_at": generated_at,
         "bundle_count": len(generated),
+        "trust_label": "reference",
+        "provenance": {
+            "generated_at": generated_at,
+            "generator": "scripts/publish_reference_bundles.py",
+            "source_policy": "docs/BENCHMARKS.md",
+            "artifact_path": str(out_root / "reference_performance_latest.json"),
+            "bundle_count": len(generated),
+        },
         "bundles": generated,
     }
     summary_path = out_root / "reference_performance_latest.json"

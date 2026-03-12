@@ -1,0 +1,22 @@
+{
+  "artifacts": {
+    "leaderboard_csv": "simulation_leaderboard_20260312T043824598336Z.csv",
+    "leaderboard_sha256": "52490ca6b05f120f31b8fc93adb49bac9b9b204fb19fddf96ba98de47a4046f5",
+    "report_json": "simulation_suite_20260312T043824598336Z.json",
+    "report_sha256": "e2094acd0497d37dc8bce525b4d13b0aca143123a5dcb7e854cd6389f81fb9e2"
+  },
+  "commands": [
+    ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto --strategies trend_following --cycles-per-scenario 36 --symbols-per-market 1 --readiness-every 12 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-12_reference_crypto_trend_following --telemetry-log results/2026-03-12_reference_crypto_trend_following/simulation_events.jsonl --tca-dir results/2026-03-12_reference_crypto_trend_following/tca"
+  ],
+  "dataset_version": "dataset-20260312-reference-v2",
+  "generated_at": "2026-03-12T04:38:24.692164+00:00",
+  "notes": "Reference bundle with non-zero fills and reproducible command surface.",
+  "schema_version": "1",
+  "sources": [
+    {
+      "config": "config/paper.yaml",
+      "name": "pqts_simulation_engine",
+      "type": "synthetic"
+    }
+  ]
+}

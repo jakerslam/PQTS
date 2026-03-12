@@ -4876,3 +4876,32 @@ Observed source links:
 
 - Public claims from this source chain about win-rate, PnL, or guaranteed profitability shall be marked `unverified` unless backed by reproducible trade-level evidence.
 - Requirements adopted from this source chain shall remain limited to observable mechanics and validated controls rather than promotional profitability claims.
+
+## 87. Additional Delta Requirements from External Review Feedback (ChatGPT reassessment, March 12, 2026)
+
+These requirements capture net-new, applicable deltas from the latest reassessment that were not yet explicit in prior CGPT closure requirements.
+
+Observed source links:
+- `https://github.com/jakerslam/pqts`
+- `https://raw.githubusercontent.com/jakerslam/pqts/main/docs/BENCHMARKS.md`
+- `https://raw.githubusercontent.com/jakerslam/pqts/main/results/reference_performance_latest.json`
+- `https://raw.githubusercontent.com/jakerslam/pqts/main/docs/QUICKSTART_5_MIN.md`
+- `https://raw.githubusercontent.com/jakerslam/pqts/main/docs/ISSUE_BACKLOG.md`
+
+### CGPTR-1 Embedded Reference Artifact Trust/Provenance Contract
+
+- `results/reference_performance_latest.json` shall carry explicit top-level `trust_label` and `provenance` fields as part of the canonical artifact contract.
+- Each bundle entry in `reference_performance_latest.json` shall carry explicit `trust_label` and per-bundle `provenance` metadata fields.
+- Governance/trust-surface checks shall fail when these fields are missing or invalid.
+
+### CGPTR-2 Package-First Quickstart Contract Enforcement
+
+- When `pypi.available=true`, `docs/QUICKSTART_5_MIN.md` shall include package-first commands (`pip install -U pqts`, `pqts quickstart --execute`) as the canonical beginner path.
+- Source/developer setup shall remain available only as clearly-labeled advanced fallback.
+- Truth-surface checks shall fail if package-first markers are missing while package distribution is declared available.
+
+### CGPTR-3 Backlog Truth Partition Contract
+
+- `docs/ISSUE_BACKLOG.md` shall remain explicitly labeled as historical issue templates when canonical active execution is tracked elsewhere.
+- The canonical active execution order shall be documented in exactly one source (`docs/TODO.md`) and referenced from `docs/ISSUE_BACKLOG.md`.
+- Any stale “future scaffold” references in backlog templates shall include status guidance preventing contradiction with implemented code paths.

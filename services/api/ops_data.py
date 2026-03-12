@@ -65,27 +65,28 @@ def load_best_reference_bundle() -> dict[str, Any] | None:
 def load_reference_provenance() -> dict[str, Any]:
     payload = load_reference_performance()
     best = load_best_reference_bundle()
+    payload_provenance = payload.get("provenance", {}) if isinstance(payload.get("provenance"), dict) else {}
     if best is None:
         return {
-            "trust_label": "unverified",
-            "generated_at": str(payload.get("generated_at", "")),
+            "trust_label": str(payload.get("trust_label", "unverified") or "unverified"),
+            "generated_at": str(payload_provenance.get("generated_at", payload.get("generated_at", ""))),
             "bundle": "",
             "report_path": "",
             "leaderboard_path": "",
             "source_path": "",
         }
-    summary = best.get("summary", {}) if isinstance(best.get("summary"), dict) else {}
-    quality = _parse_float(summary.get("avg_quality_score"))
-    fill = _parse_float(summary.get("avg_fill_rate"))
-    if quality >= 0.25 and fill > 0.0:
-        trust_label = "reference"
-    elif fill > 0.0:
-        trust_label = "diagnostic_only"
-    else:
+    bundle_provenance = best.get("provenance", {}) if isinstance(best.get("provenance"), dict) else {}
+    trust_label = str(best.get("trust_label", payload.get("trust_label", "unverified")) or "unverified")
+    if trust_label not in {"reference", "diagnostic_only", "unverified"}:
         trust_label = "unverified"
     return {
         "trust_label": trust_label,
-        "generated_at": str(payload.get("generated_at", "")),
+        "generated_at": str(
+            bundle_provenance.get(
+                "generated_at",
+                payload_provenance.get("generated_at", payload.get("generated_at", "")),
+            )
+        ),
         "bundle": str(best.get("bundle", "")),
         "report_path": str(best.get("report_path", "")),
         "leaderboard_path": str(best.get("leaderboard_path", "")),

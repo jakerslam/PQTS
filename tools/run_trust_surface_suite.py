@@ -40,6 +40,15 @@ CHECKS: tuple[tuple[str, list[str]], ...] = (
         ],
     ),
     (
+        "reference_performance_contract",
+        [
+            "python3",
+            "tools/check_reference_performance_contract.py",
+            "--reference-performance",
+            "results/reference_performance_latest.json",
+        ],
+    ),
+    (
         "external_validation_evidence",
         [
             "python3",

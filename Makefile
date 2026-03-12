@@ -82,6 +82,7 @@ governance-check:
 	$(PY_RUN) tools/check_certified_paper_integrations.py --index config/integrations/official_integrations.json --cert-report data/reports/certifications/latest.json
 	$(PY_RUN) tools/check_native_latency_regression.py --results-dir results/native_benchmarks --policy config/native/latency_policy.json
 	$(PY_RUN) tools/check_benchmark_program.py --reference-performance results/reference_performance_latest.json --results-root . --policy config/benchmarks/program_policy.json
+	$(PY_RUN) tools/check_reference_performance_contract.py --reference-performance results/reference_performance_latest.json
 	$(PY_RUN) tools/check_external_validation_evidence.py --user-research docs/USER_RESEARCH_2026_03.md --readme README.md
 	$(PY_RUN) tools/check_external_beta_framework.py --registry data/validation/external_beta/cohort_registry.json --user-research docs/USER_RESEARCH_2026_03.md
 	$(PY_RUN) tools/check_tier_safety_policy.py

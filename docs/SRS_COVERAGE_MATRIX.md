@@ -4,8 +4,8 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **680**
-- implemented: **680**
+- Total requirements: **683**
+- implemented: **683**
 - partial: **0**
 - planned: **0**
 - traced: **0**
@@ -26,6 +26,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | BF | 6 | 0 | 0 | 0 | 0 | 6 |
 | BTR | 5 | 0 | 0 | 0 | 0 | 5 |
 | CGPT | 8 | 0 | 0 | 0 | 0 | 8 |
+| CGPTR | 3 | 0 | 0 | 0 | 0 | 3 |
 | COH | 8 | 0 | 0 | 0 | 0 | 8 |
 | COMP | 18 | 0 | 0 | 0 | 0 | 18 |
 | CT | 8 | 0 | 0 | 0 | 0 | 8 |
@@ -781,3 +782,6 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | DLM-3 | Monte-Carlo Dropout Uncertainty Contract | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | DLM-4 | Throughput-Aware Multi-Market Classifier Operations | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
 | DLM-5 | Source Reliability and Claim Handling | implemented | done | config/strategy/assimilation_full_closure_defaults.json, docs/SRS_FULL_CLOSURE_EXECUTION_MAP.md, docs/TODO.md |
+| CGPTR-1 | Embedded Reference Artifact Trust/Provenance Contract | implemented | done | docs/TODO.md |
+| CGPTR-2 | Package-First Quickstart Contract Enforcement | implemented | done | docs/TODO.md |
+| CGPTR-3 | Backlog Truth Partition Contract | implemented | done | docs/TODO.md |

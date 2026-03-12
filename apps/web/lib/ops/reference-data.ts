@@ -32,8 +32,17 @@ export interface ReferenceProvenance {
 }
 
 interface ReferencePerformancePayload {
+  schema_version?: string;
   generated_at: string;
   bundle_count: number;
+  trust_label?: "reference" | "diagnostic_only" | "unverified";
+  provenance?: {
+    generated_at?: string;
+    generator?: string;
+    source_policy?: string;
+    artifact_path?: string;
+    bundle_count?: number;
+  };
   bundles: ReferenceBundleSummary[];
 }
 
@@ -84,6 +93,10 @@ function inferTrustLabel(bundle: ReferenceBundleSummary | null): "reference" | "
   if (!bundle) {
     return "unverified";
   }
+  const explicit = String((bundle as Record<string, unknown>).trust_label ?? "").trim();
+  if (explicit === "reference" || explicit === "diagnostic_only" || explicit === "unverified") {
+    return explicit;
+  }
   if (bundle.summary.avg_quality_score >= 0.25 && bundle.summary.avg_fill_rate > 0.0) {
     return "reference";
   }
@@ -96,9 +109,14 @@ function inferTrustLabel(bundle: ReferenceBundleSummary | null): "reference" | "
 export function loadReferenceProvenance(): ReferenceProvenance {
   const payload = loadReferencePerformance();
   const best = loadBestReferenceBundle();
+  const explicitPayloadTrust = String(payload.trust_label ?? "").trim();
+  const payloadTrust =
+    explicitPayloadTrust === "reference" || explicitPayloadTrust === "diagnostic_only" || explicitPayloadTrust === "unverified"
+      ? explicitPayloadTrust
+      : undefined;
   return {
-    trust_label: inferTrustLabel(best),
-    generated_at: String(payload.generated_at ?? ""),
+    trust_label: inferTrustLabel(best) ?? payloadTrust ?? "unverified",
+    generated_at: String(payload.provenance?.generated_at ?? payload.generated_at ?? ""),
     bundle: String(best?.bundle ?? ""),
     report_path: String(best?.report_path ?? ""),
     leaderboard_path: String(best?.leaderboard_path ?? ""),
