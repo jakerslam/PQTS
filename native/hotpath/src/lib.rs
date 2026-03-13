@@ -214,6 +214,56 @@ fn paper_fill_metrics(
     )
 }
 
+fn depth_and_best(levels: &[(f64, f64)], max_levels: usize) -> (f64, f64, f64) {
+    let mut total = 0.0;
+    let mut best_price = 0.0;
+    let mut best_size = 0.0;
+    let mut count = 0usize;
+    for (price, size) in levels.iter() {
+        if count >= max_levels {
+            break;
+        }
+        let p = if price.is_finite() && *price > 0.0 { *price } else { 0.0 };
+        let q = if size.is_finite() && *size > 0.0 { *size } else { 0.0 };
+        if count == 0 {
+            best_price = p;
+            best_size = q;
+        }
+        total += p * q;
+        count += 1;
+    }
+    (total, best_price, best_size)
+}
+
+#[pyfunction]
+fn book_metrics(
+    bids: Vec<(f64, f64)>,
+    asks: Vec<(f64, f64)>,
+    max_levels: usize,
+) -> (f64, f64, f64, f64, f64, f64) {
+    let depth_limit = if max_levels == 0 { 1 } else { max_levels };
+    let (bid_depth, best_bid, bid_size) = depth_and_best(&bids, depth_limit);
+    let (ask_depth, best_ask, ask_size) = depth_and_best(&asks, depth_limit);
+    let mut mid = 0.0;
+    if best_bid > 0.0 && best_ask > 0.0 {
+        mid = (best_bid + best_ask) / 2.0;
+    }
+    let mid_price = if mid > 0.0 { mid } else { 1e-9 };
+    let spread_bps = if best_bid > 0.0 && best_ask > 0.0 {
+        ((best_ask - best_bid) / mid_price) * 10000.0
+    } else {
+        0.0
+    };
+    (
+        mid_price,
+        spread_bps,
+        bid_depth,
+        ask_depth,
+        bid_size,
+        ask_size,
+    )
+}
+
 #[pyfunction]
 fn smart_router_score(
     spread: f64,
@@ -275,6 +325,7 @@ fn pqts_hotpath(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(sum_notional, m)?)?;
     m.add_function(wrap_pyfunction!(fill_metrics, m)?)?;
+    m.add_function(wrap_pyfunction!(book_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(sequence_transition, m)?)?;
     m.add_function(wrap_pyfunction!(uniform_from_seed, m)?)?;
     m.add_function(wrap_pyfunction!(event_id_hash, m)?)?;

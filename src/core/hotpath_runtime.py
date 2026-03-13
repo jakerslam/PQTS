@@ -40,6 +40,7 @@ def _load_native_module() -> Any | None:
         return None
     required_symbols = (
         "sum_notional",
+        "book_metrics",
         "fill_metrics",
         "sequence_transition",
         "uniform_from_seed",
@@ -70,6 +71,44 @@ def sum_notional(levels: Iterable[Any], *, max_levels: int = 5) -> float:
     for price, size in normalized:
         total += price * size
     return float(total)
+
+
+def book_metrics(
+    bids: Iterable[Any],
+    asks: Iterable[Any],
+    *,
+    max_levels: int = 5,
+) -> tuple[float, float, float, float, float, float]:
+    normalized_bids = _normalize_levels(bids, max_levels=max_levels)
+    normalized_asks = _normalize_levels(asks, max_levels=max_levels)
+    module = _load_native_module()
+    if module is not None and hasattr(module, "book_metrics"):
+        try:
+            mid, spread_bps, bid_depth, ask_depth, top_bid_qty, top_ask_qty = module.book_metrics(
+                normalized_bids,
+                normalized_asks,
+                int(max(int(max_levels), 1)),
+            )
+            return (
+                float(mid),
+                float(spread_bps),
+                float(bid_depth),
+                float(ask_depth),
+                float(top_bid_qty),
+                float(top_ask_qty),
+            )
+        except Exception:
+            pass
+
+    best_bid = normalized_bids[0][0] if normalized_bids else 0.0
+    best_ask = normalized_asks[0][0] if normalized_asks else 0.0
+    top_bid_qty = normalized_bids[0][1] if normalized_bids else 0.0
+    top_ask_qty = normalized_asks[0][1] if normalized_asks else 0.0
+    mid = max((best_bid + best_ask) / 2.0, 1e-9) if best_bid > 0.0 and best_ask > 0.0 else 1e-9
+    spread_bps = ((best_ask - best_bid) / mid) * 10000.0 if best_bid > 0.0 and best_ask > 0.0 else 0.0
+    bid_depth = sum(price * size for price, size in normalized_bids)
+    ask_depth = sum(price * size for price, size in normalized_asks)
+    return float(mid), float(spread_bps), float(bid_depth), float(ask_depth), float(top_bid_qty), float(top_ask_qty)
 
 
 def fill_metrics(

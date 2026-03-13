@@ -2,20 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
-from core.hotpath_runtime import sum_notional
-
-
-def _safe_level(level: Any) -> Tuple[float, float]:
-    if not isinstance(level, (list, tuple)) or len(level) < 2:
-        return 0.0, 0.0
-    try:
-        price = float(level[0])
-        size = float(level[1])
-    except (TypeError, ValueError):
-        return 0.0, 0.0
-    return max(price, 0.0), max(size, 0.0)
+from core.hotpath_runtime import book_metrics
 
 
 def extract_microstructure_features(
@@ -33,19 +22,11 @@ def extract_microstructure_features(
     book = order_book if isinstance(order_book, dict) else {}
     bids = list(book.get("bids", []) or [])
     asks = list(book.get("asks", []) or [])
-    best_bid, bid_size = _safe_level(bids[0] if bids else None)
-    best_ask, ask_size = _safe_level(asks[0] if asks else None)
-    mid = float(reference_price)
-    if mid <= 0.0 and best_bid > 0.0 and best_ask > 0.0:
-        mid = (best_bid + best_ask) / 2.0
-    mid = max(mid, 1e-9)
-
-    spread_bps = 0.0
-    if best_bid > 0.0 and best_ask > 0.0:
-        spread_bps = ((best_ask - best_bid) / mid) * 10000.0
-
-    bid_depth_usd = sum_notional(bids, max_levels=max_levels)
-    ask_depth_usd = sum_notional(asks, max_levels=max_levels)
+    mid, spread_bps, bid_depth_usd, ask_depth_usd, bid_size, ask_size = book_metrics(
+        bids, asks, max_levels=max_levels
+    )
+    if reference_price > 0.0:
+        mid = float(reference_price)
     total_depth = max(bid_depth_usd + ask_depth_usd, 1e-9)
     imbalance = (bid_depth_usd - ask_depth_usd) / total_depth
 
