@@ -1,15 +1,15 @@
 {
   "artifacts": {
-    "leaderboard_csv": "simulation_leaderboard_20260313T020344743712Z.csv",
-    "leaderboard_sha256": "d1f963057a07702fcb388a2ccdb2168adc59e31b9a30d3b0acc2524d9fc917d9",
-    "report_json": "simulation_suite_20260313T020344743712Z.json",
-    "report_sha256": "7cb8e23d359aa71d6b39f9ddf55ae5c5c9ce1c861f2c5a7a6e6e7f484d3d5c73"
+    "leaderboard_csv": "simulation_leaderboard_20260313T023448292806Z.csv",
+    "leaderboard_sha256": "f3a4ce0a835f4f0f55fd8438369df20f50c4bdfd665ca339f9f3ed3260ac2afa",
+    "report_json": "simulation_suite_20260313T023448292806Z.json",
+    "report_sha256": "abf09cb5e286d07644d1f898832226a4666aad75953e71cb76e420b33f29a628"
   },
   "commands": [
     ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto --strategies trend_following --cycles-per-scenario 36 --symbols-per-market 1 --readiness-every 12 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-13_reference_crypto_trend_following --telemetry-log results/2026-03-13_reference_crypto_trend_following/simulation_events.jsonl --tca-dir results/2026-03-13_reference_crypto_trend_following/tca"
   ],
   "dataset_version": "dataset-20260313-reference-v2",
-  "generated_at": "2026-03-13T02:03:44.796129+00:00",
+  "generated_at": "2026-03-13T02:34:48.340269+00:00",
   "notes": "Reference bundle with non-zero fills and reproducible command surface.",
   "schema_version": "1",
   "sources": [

@@ -1,15 +1,15 @@
 {
   "artifacts": {
-    "leaderboard_csv": "simulation_leaderboard_20260313T020346400212Z.csv",
-    "leaderboard_sha256": "75691cf21bb4a610fab837485015f5e90e740ce24deba667aa36eecb594aea9b",
-    "report_json": "simulation_suite_20260313T020346400212Z.json",
-    "report_sha256": "eaecde934b55e011bf84b70f7b813736c56caceef699938333dfb106a9b64667"
+    "leaderboard_csv": "simulation_leaderboard_20260313T023450012456Z.csv",
+    "leaderboard_sha256": "b5eb4737307b27f874eb6e1f1b31becde13a4df4f83ec3107325f887517b05d2",
+    "report_json": "simulation_suite_20260313T023450012456Z.json",
+    "report_sha256": "a31600de373f2bbdc2fa646416781fedad09219413d52ee0b25ed8e4c911fec7"
   },
   "commands": [
     ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto,equities,forex --strategies market_making --cycles-per-scenario 30 --symbols-per-market 1 --readiness-every 10 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-13_reference_multi_market_making --telemetry-log results/2026-03-13_reference_multi_market_making/simulation_events.jsonl --tca-dir results/2026-03-13_reference_multi_market_making/tca"
   ],
   "dataset_version": "dataset-20260313-reference-v2",
-  "generated_at": "2026-03-13T02:03:46.450944+00:00",
+  "generated_at": "2026-03-13T02:34:50.061213+00:00",
   "notes": "Reference bundle with non-zero fills and reproducible command surface.",
   "schema_version": "1",
   "sources": [

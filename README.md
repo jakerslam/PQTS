@@ -544,19 +544,19 @@ Fallback access at `http://localhost:8501`
 
 Reference callout from latest `reference` bundle (auto-generated from `results/reference_performance_latest.json`):
 <!-- REFERENCE_PERFORMANCE:START -->
-_Last generated (UTC): 2026-03-13 02:03:43_
+_Last generated (UTC): 2026-03-13 02:34:47_
 
-- `2026-03-13_reference_crypto_funding_arbitrage` ([bundle](results/2026-03-13_reference_crypto_funding_arbitrage/README.md), [csv](results/2026-03-13_reference_crypto_funding_arbitrage/simulation_leaderboard_20260313T020345468787Z.csv), [report](results/2026-03-13_reference_crypto_funding_arbitrage/simulation_suite_20260313T020345468787Z.json))
-  - `avg_quality_score=0.8574`
+- `2026-03-13_reference_crypto_trend_following` ([bundle](results/2026-03-13_reference_crypto_trend_following/README.md), [csv](results/2026-03-13_reference_crypto_trend_following/simulation_leaderboard_20260313T023448292806Z.csv), [report](results/2026-03-13_reference_crypto_trend_following/simulation_suite_20260313T023448292806Z.json))
+  - `avg_quality_score=0.8535`
   - `avg_fill_rate=1.0000`
   - `avg_reject_rate=0.0000`
   - `total_filled=36` / `total_submitted=36`
 
 | Bundle | Markets | Strategy | Quality | Fill | Reject |
 |---|---|---|---:|---:|---:|
-| `2026-03-13_reference_crypto_funding_arbitrage` | `crypto` | `funding_arbitrage` | `0.8574` | `1.0000` | `0.0000` |
-| `2026-03-13_reference_crypto_trend_following` | `crypto` | `trend_following` | `0.8303` | `1.0000` | `0.0000` |
-| `2026-03-13_reference_multi_market_making` | `crypto,equities,forex` | `market_making` | `0.8405` | `1.0000` | `0.0000` |
+| `2026-03-13_reference_crypto_funding_arbitrage` | `crypto` | `funding_arbitrage` | `0.8199` | `1.0000` | `0.0000` |
+| `2026-03-13_reference_crypto_trend_following` | `crypto` | `trend_following` | `0.8535` | `1.0000` | `0.0000` |
+| `2026-03-13_reference_multi_market_making` | `crypto,equities,forex` | `market_making` | `0.8246` | `1.0000` | `0.0000` |
 <!-- REFERENCE_PERFORMANCE:END -->
 
 | Strategy | Timeframe | Edge |

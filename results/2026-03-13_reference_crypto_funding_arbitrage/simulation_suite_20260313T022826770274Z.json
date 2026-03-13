@@ -1,0 +1,70 @@
+{
+  "config_path": "config/paper.yaml",
+  "created_at": "2026-03-13T02:28:26.770720+00:00",
+  "leaderboard": [
+    {
+      "avg_fill_rate": 1.0,
+      "avg_quality_score": 0.8367277588777796,
+      "avg_reject_rate": 0.0,
+      "avg_slippage_mape_pct": 9.771751823324974,
+      "canary_ready_rate": 0.0,
+      "market": "crypto",
+      "optimization_priority": 0.26098975935547014,
+      "promote_rate": 0.0,
+      "runs": 5,
+      "strategy": "funding_arbitrage"
+    }
+  ],
+  "leaderboard_path": "results/2026-03-13_reference_crypto_funding_arbitrage/simulation_leaderboard_20260313T022826770274Z.csv",
+  "mechanism_switches": {
+    "allocation_controls": false,
+    "capacity_curves": false,
+    "confidence_allocator": false,
+    "maker_urgency_ladder": true,
+    "market_data_resilience": true,
+    "profitability_gate": true,
+    "regime_overlay": true,
+    "routing_failover": true,
+    "shorting_controls": false,
+    "slippage_stress_model": true,
+    "tca_calibration_feedback": true
+  },
+  "results": [
+    {
+      "filled": 36,
+      "ops_critical": 0,
+      "promotion_decision": "remain_in_paper",
+      "quality_score": 0.8183467198939354,
+      "ready_for_canary": false,
+      "reject_rate": 0.0,
+      "rejected": 0,
+      "risk_profile": {
+        "canary_allocation_scale": 1.0,
+        "description": "Default profile with baseline hard limits.",
+        "name": "balanced",
+        "risk_limit_scale": 1.0
+      },
+      "run_id": "sim_crypto_funding_arbitrage_0ff1e36716",
+      "scenario": {
+        "cycles": 36,
+        "market": "crypto",
+        "notional_usd": 150.0,
+        "strategy": "funding_arbitrage",
+        "symbols": [
+          "ADAUSDT"
+        ]
+      },
+      "submitted": 36,
+      "tca_path": "results/2026-03-13_reference_crypto_funding_arbitrage/tca/sim_crypto_funding_arbitrage_0ff1e36716.csv",
+      "tca_records": 36
+    }
+  ],
+  "risk_profile": {
+    "canary_allocation_scale": 1.0,
+    "description": "Default profile with baseline hard limits.",
+    "name": "balanced",
+    "risk_limit_scale": 1.0
+  },
+  "scenario_count": 1,
+  "telemetry_log_path": "results/2026-03-13_reference_crypto_funding_arbitrage/simulation_events.jsonl"
+}

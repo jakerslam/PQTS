@@ -1,15 +1,15 @@
 {
   "artifacts": {
-    "leaderboard_csv": "simulation_leaderboard_20260313T020345468787Z.csv",
-    "leaderboard_sha256": "1d37cd081506895d76bdffa4c66fa22417a58bed9f3dd64168c44143c7cec32c",
-    "report_json": "simulation_suite_20260313T020345468787Z.json",
-    "report_sha256": "0e804efc63ef1b6a766e56654fa14413db4272309cfb6aa8411701ab3627112d"
+    "leaderboard_csv": "simulation_leaderboard_20260313T023449137908Z.csv",
+    "leaderboard_sha256": "f4f0295b27a078e9a7c07621027af32f8c2071259e1eb0a1f5b928c60291f2d9",
+    "report_json": "simulation_suite_20260313T023449137908Z.json",
+    "report_sha256": "be662ed89d427c2194ae28736f6c0cb5153c4107379521b83924a7c33285250d"
   },
   "commands": [
     ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto --strategies funding_arbitrage --cycles-per-scenario 36 --symbols-per-market 1 --readiness-every 12 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-13_reference_crypto_funding_arbitrage --telemetry-log results/2026-03-13_reference_crypto_funding_arbitrage/simulation_events.jsonl --tca-dir results/2026-03-13_reference_crypto_funding_arbitrage/tca"
   ],
   "dataset_version": "dataset-20260313-reference-v2",
-  "generated_at": "2026-03-13T02:03:45.519657+00:00",
+  "generated_at": "2026-03-13T02:34:49.182643+00:00",
   "notes": "Reference bundle with non-zero fills and reproducible command surface.",
   "schema_version": "1",
   "sources": [

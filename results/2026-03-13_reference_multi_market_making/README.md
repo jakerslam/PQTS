@@ -2,7 +2,7 @@
 
 ## Run Metadata
 
-- Date (UTC): 2026-03-13T02:03:46.451341+00:00
+- Date (UTC): 2026-03-13T02:34:50.061770+00:00
 - Risk profile: balanced
 - Scenario count: 3
 - Config snapshot: `config_paper_snapshot.yaml`
@@ -15,8 +15,8 @@
 
 ## Included Artifacts
 
-- `simulation_suite_20260313T020346400212Z.json`
-- `simulation_leaderboard_20260313T020346400212Z.csv`
+- `simulation_suite_20260313T023450012456Z.json`
+- `simulation_leaderboard_20260313T023450012456Z.csv`
 - `metrics_chart.svg`
 - `config_paper_snapshot.yaml`
 - `dataset_manifest.json`
@@ -26,18 +26,18 @@
 - total_submitted=90
 - total_filled=90
 - total_rejected=0
-- avg_quality_score=0.8405
+- avg_quality_score=0.8246
 - avg_fill_rate=1.0000
 - avg_reject_rate=0.0000
 
-- `crypto/market_making`: quality=0.87, fill=1.00, reject=0.00, submitted=30
-- `equities/market_making`: quality=0.83, fill=1.00, reject=0.00, submitted=30
+- `crypto/market_making`: quality=0.82, fill=1.00, reject=0.00, submitted=30
+- `equities/market_making`: quality=0.84, fill=1.00, reject=0.00, submitted=30
 - `forex/market_making`: quality=0.82, fill=1.00, reject=0.00, submitted=30
 
 ## Claim Classification
 
 - Claim class: `reference`
-- Evidence source: `simulation_suite_20260313T020346400212Z.json` + `simulation_leaderboard_20260313T020346400212Z.csv`
+- Evidence source: `simulation_suite_20260313T023450012456Z.json` + `simulation_leaderboard_20260313T023450012456Z.csv`
 - Non-zero fill gate: `passed`
 
 ## Notes

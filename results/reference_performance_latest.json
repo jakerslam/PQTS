@@ -4,21 +4,21 @@
     {
       "bundle": "2026-03-13_reference_crypto_trend_following",
       "command": ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto --strategies trend_following --cycles-per-scenario 36 --symbols-per-market 1 --readiness-every 12 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-13_reference_crypto_trend_following --telemetry-log results/2026-03-13_reference_crypto_trend_following/simulation_events.jsonl --tca-dir results/2026-03-13_reference_crypto_trend_following/tca",
-      "leaderboard_path": "results/2026-03-13_reference_crypto_trend_following/simulation_leaderboard_20260313T020344743712Z.csv",
+      "leaderboard_path": "results/2026-03-13_reference_crypto_trend_following/simulation_leaderboard_20260313T023448292806Z.csv",
       "markets": "crypto",
       "path": "results/2026-03-13_reference_crypto_trend_following",
       "provenance": {
         "config_snapshot_path": "results/2026-03-13_reference_crypto_trend_following/config_paper_snapshot.yaml",
         "dataset_manifest_path": "results/2026-03-13_reference_crypto_trend_following/dataset_manifest.json",
-        "generated_at": "2026-03-13T02:03:43.937783+00:00",
+        "generated_at": "2026-03-13T02:34:47.458853+00:00",
         "generator": "scripts/publish_reference_bundles.py",
         "metrics_chart_path": "results/2026-03-13_reference_crypto_trend_following/metrics_chart.svg"
       },
-      "report_path": "results/2026-03-13_reference_crypto_trend_following/simulation_suite_20260313T020344743712Z.json",
+      "report_path": "results/2026-03-13_reference_crypto_trend_following/simulation_suite_20260313T023448292806Z.json",
       "strategies": "trend_following",
       "summary": {
         "avg_fill_rate": 1.0,
-        "avg_quality_score": 0.8302885501741156,
+        "avg_quality_score": 0.853462538680855,
         "avg_reject_rate": 0.0,
         "total_filled": 36.0,
         "total_rejected": 0.0,
@@ -29,21 +29,21 @@
     {
       "bundle": "2026-03-13_reference_crypto_funding_arbitrage",
       "command": ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto --strategies funding_arbitrage --cycles-per-scenario 36 --symbols-per-market 1 --readiness-every 12 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-13_reference_crypto_funding_arbitrage --telemetry-log results/2026-03-13_reference_crypto_funding_arbitrage/simulation_events.jsonl --tca-dir results/2026-03-13_reference_crypto_funding_arbitrage/tca",
-      "leaderboard_path": "results/2026-03-13_reference_crypto_funding_arbitrage/simulation_leaderboard_20260313T020345468787Z.csv",
+      "leaderboard_path": "results/2026-03-13_reference_crypto_funding_arbitrage/simulation_leaderboard_20260313T023449137908Z.csv",
       "markets": "crypto",
       "path": "results/2026-03-13_reference_crypto_funding_arbitrage",
       "provenance": {
         "config_snapshot_path": "results/2026-03-13_reference_crypto_funding_arbitrage/config_paper_snapshot.yaml",
         "dataset_manifest_path": "results/2026-03-13_reference_crypto_funding_arbitrage/dataset_manifest.json",
-        "generated_at": "2026-03-13T02:03:43.937783+00:00",
+        "generated_at": "2026-03-13T02:34:47.458853+00:00",
         "generator": "scripts/publish_reference_bundles.py",
         "metrics_chart_path": "results/2026-03-13_reference_crypto_funding_arbitrage/metrics_chart.svg"
       },
-      "report_path": "results/2026-03-13_reference_crypto_funding_arbitrage/simulation_suite_20260313T020345468787Z.json",
+      "report_path": "results/2026-03-13_reference_crypto_funding_arbitrage/simulation_suite_20260313T023449137908Z.json",
       "strategies": "funding_arbitrage",
       "summary": {
         "avg_fill_rate": 1.0,
-        "avg_quality_score": 0.8574226338511053,
+        "avg_quality_score": 0.8199166379272558,
         "avg_reject_rate": 0.0,
         "total_filled": 36.0,
         "total_rejected": 0.0,
@@ -54,21 +54,21 @@
     {
       "bundle": "2026-03-13_reference_multi_market_making",
       "command": ".venv/bin/python scripts/run_simulation_suite.py --config config/paper.yaml --markets crypto,equities,forex --strategies market_making --cycles-per-scenario 30 --symbols-per-market 1 --readiness-every 10 --risk-profile balanced --sleep-seconds 0.0 --out-dir results/2026-03-13_reference_multi_market_making --telemetry-log results/2026-03-13_reference_multi_market_making/simulation_events.jsonl --tca-dir results/2026-03-13_reference_multi_market_making/tca",
-      "leaderboard_path": "results/2026-03-13_reference_multi_market_making/simulation_leaderboard_20260313T020346400212Z.csv",
+      "leaderboard_path": "results/2026-03-13_reference_multi_market_making/simulation_leaderboard_20260313T023450012456Z.csv",
       "markets": "crypto,equities,forex",
       "path": "results/2026-03-13_reference_multi_market_making",
       "provenance": {
         "config_snapshot_path": "results/2026-03-13_reference_multi_market_making/config_paper_snapshot.yaml",
         "dataset_manifest_path": "results/2026-03-13_reference_multi_market_making/dataset_manifest.json",
-        "generated_at": "2026-03-13T02:03:43.937783+00:00",
+        "generated_at": "2026-03-13T02:34:47.458853+00:00",
         "generator": "scripts/publish_reference_bundles.py",
         "metrics_chart_path": "results/2026-03-13_reference_multi_market_making/metrics_chart.svg"
       },
-      "report_path": "results/2026-03-13_reference_multi_market_making/simulation_suite_20260313T020346400212Z.json",
+      "report_path": "results/2026-03-13_reference_multi_market_making/simulation_suite_20260313T023450012456Z.json",
       "strategies": "market_making",
       "summary": {
         "avg_fill_rate": 1.0,
-        "avg_quality_score": 0.8404844030153321,
+        "avg_quality_score": 0.8246052518941435,
         "avg_reject_rate": 0.0,
         "total_filled": 90.0,
         "total_rejected": 0.0,
@@ -77,11 +77,11 @@
       "trust_label": "reference"
     }
   ],
-  "generated_at": "2026-03-13T02:03:43.937783+00:00",
+  "generated_at": "2026-03-13T02:34:47.458853+00:00",
   "provenance": {
     "artifact_path": "results/reference_performance_latest.json",
     "bundle_count": 3,
-    "generated_at": "2026-03-13T02:03:43.937783+00:00",
+    "generated_at": "2026-03-13T02:34:47.458853+00:00",
     "generator": "scripts/publish_reference_bundles.py",
     "source_policy": "docs/BENCHMARKS.md"
   },

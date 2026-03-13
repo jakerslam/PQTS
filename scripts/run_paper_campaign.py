@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path[:] = [str(REPO_ROOT), *sys.path]
+SRC_ROOT = REPO_ROOT / "src"
+sys.path[:] = [str(REPO_ROOT), str(SRC_ROOT), *sys.path]
 
 import numpy as np
 import yaml
@@ -24,6 +25,7 @@ ROOT = REPO_ROOT
 def _ensure_runtime() -> None:
     ensure_min_python()
     ensure_repo_python_path()
+
 
 from analytics.ops_health import OpsThresholds, evaluate_operational_health  # noqa: E402
 from analytics.promotion_gates import (  # noqa: E402
