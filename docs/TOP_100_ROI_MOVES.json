@@ -93,19 +93,6 @@
   {
     "rank": 8,
     "score": 384.0,
-    "title": "Build unified connector ecosystem registry and capability matrix for venues, brokers, feeds, filings, and alt-data providers, then expose it through API and Studio/docs surfaces",
-    "roi": "high",
-    "impact": 8,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "DOM-4",
-    "depends": "",
-    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
-    "line_no": 374
-  },
-  {
-    "rank": 9,
-    "score": 384.0,
     "title": "Ship a versioned searchable docs and troubleshooting surface with hard drift checks across README, PyPI, release notes, and docs metadata",
     "roi": "high",
     "impact": 8,
@@ -117,7 +104,7 @@
     "line_no": 377
   },
   {
-    "rank": 10,
+    "rank": 9,
     "score": 384.0,
     "title": "Publish at least 12 verified example packs with known-good outputs, provenance, and one-click import or command equivalents",
     "roi": "high",
@@ -130,7 +117,7 @@
     "line_no": 378
   },
   {
-    "rank": 11,
+    "rank": 10,
     "score": 384.0,
     "title": "Own canonical docs-surface migration and update package/release/docs links after cutover",
     "roi": "high",
@@ -143,20 +130,7 @@
     "line_no": 390
   },
   {
-    "rank": 12,
-    "score": 382.0,
-    "title": "Enforce quantitative external UX release gates for beginner and professional cohorts using machine-readable release-readiness thresholds",
-    "roi": "high",
-    "impact": 9,
-    "track": "moat",
-    "item_type": "engineering",
-    "refs": "DOM-6",
-    "depends": "",
-    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
-    "line_no": 376
-  },
-  {
-    "rank": 13,
+    "rank": 11,
     "score": 382.0,
     "title": "Add funnel analytics and conversion reporting for hosted/local, Guided/Pro, and beginner/pro cohorts, then publish release conversion deltas",
     "roi": "high",
@@ -169,7 +143,7 @@
     "line_no": 379
   },
   {
-    "rank": 14,
+    "rank": 12,
     "score": 382.0,
     "title": "Publish a public trust-operations dashboard for release readiness, benchmark freshness, venue certification, docs freshness, and package/docs availability",
     "roi": "high",
@@ -182,7 +156,7 @@
     "line_no": 380
   },
   {
-    "rank": 15,
+    "rank": 13,
     "score": 382.0,
     "title": "Run monthly user interviews for casual and professional cohorts and feed roadmap deltas",
     "roi": "high",
@@ -195,7 +169,7 @@
     "line_no": 387
   },
   {
-    "rank": 16,
+    "rank": 14,
     "score": 268.0,
     "title": "Perform third-party bot/operator security due-diligence checklist before adding external signal adapters to production allowlist",
     "roi": "medium",
