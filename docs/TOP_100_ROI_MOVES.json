@@ -27,6 +27,19 @@
   },
   {
     "rank": 3,
+    "score": 500.0,
+    "title": "Build one canonical casual-first journey that hides operator complexity by default while preserving parity on the same strategy/evidence objects",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "DOM-18",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 384
+  },
+  {
+    "rank": 4,
     "score": 490.0,
     "title": "Run at least one external beginner cohort and one external pro cohort for each release window and archive completed evidence in monthly user research artifacts",
     "roi": "very_high",
@@ -39,7 +52,7 @@
     "line_no": 127
   },
   {
-    "rank": 4,
+    "rank": 5,
     "score": 490.0,
     "title": "Build machine-readable competitive scorecard and release review artifacts covering onboarding speed, certified venues, proof density, docs freshness, and latency posture",
     "roi": "very_high",
@@ -52,7 +65,7 @@
     "line_no": 371
   },
   {
-    "rank": 5,
+    "rank": 6,
     "score": 490.0,
     "title": "Certify two tier-1 crypto venues through paper, canary, and live readiness with rolling 30d/90d quality evidence and public stage gating",
     "roi": "very_high",
@@ -65,7 +78,7 @@
     "line_no": 373
   },
   {
-    "rank": 6,
+    "rank": 7,
     "score": 490.0,
     "title": "Extend the public proof program to a rolling 180-day matrix across 3 strategies, 2 certified venues, and 2 regimes with monthly comparative bundles",
     "roi": "very_high",
@@ -78,7 +91,85 @@
     "line_no": 375
   },
   {
-    "rank": 7,
+    "rank": 8,
+    "score": 490.0,
+    "title": "Auto-generate public truth surfaces (README snapshot, PyPI long description, docs landing, release notes, certification links, external-beta summary) directly from canonical artifacts with hard 404/consistency gates in CI/release",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-11",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 377
+  },
+  {
+    "rank": 9,
+    "score": 490.0,
+    "title": "Publish connector certification scorecard in Studio/docs and push Binance + Coinbase from `beta` to `active/certified` with public stage history and incident/reliability budgets",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-12",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 378
+  },
+  {
+    "rank": 10,
+    "score": 490.0,
+    "title": "Build capital-governor layer: strategy cards with trust label, promotion stage, venue compatibility, drawdown envelope, reject/fill/slippage score, correlation-aware capital budgets, and approval workflow",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-14",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 380
+  },
+  {
+    "rank": 11,
+    "score": 490.0,
+    "title": "Add machine-readable release-maturity graduation gates and auto-drive package/docs/release posture from `alpha` -> `beta` -> `stable`",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-17",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 383
+  },
+  {
+    "rank": 12,
+    "score": 490.0,
+    "title": "Drive crypto-first dominance with live/canary/paper certification depth and explicit anti-scope-creep enforcement on non-certified markets",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-20",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 386
+  },
+  {
+    "rank": 13,
+    "score": 490.0,
+    "title": "Add hard release/docs gates for public evidence-link availability and canonical metric parity across README, docs, release notes, and PyPI surfaces",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-21",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 387
+  },
+  {
+    "rank": 14,
     "score": 384.0,
     "title": "Perform legal/compliance review for copy-trade workflows in target jurisdictions before enabling live copy-follow mode",
     "roi": "high",
@@ -91,7 +182,33 @@
     "line_no": 228
   },
   {
-    "rank": 8,
+    "rank": 15,
+    "score": 384.0,
+    "title": "Ship mobile-friendly approval inbox for promotion/incident/rollback actions with RBAC + audit, and keep assistant actions constrained to policy-gated suggestions",
+    "roi": "high",
+    "impact": 8,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "DOM-15",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 381
+  },
+  {
+    "rank": 16,
+    "score": 384.0,
+    "title": "Productize a casual convenience moat with governed mobile-friendly notification, approval, and incident-review flows comparable to Telegram/dashboard-first competitors",
+    "roi": "high",
+    "impact": 8,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "DOM-22",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 388
+  },
+  {
+    "rank": 17,
     "score": 384.0,
     "title": "Ship a versioned searchable docs and troubleshooting surface with hard drift checks across README, PyPI, release notes, and docs metadata",
     "roi": "high",
@@ -101,10 +218,10 @@
     "refs": "DOM-7",
     "depends": "",
     "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
-    "line_no": 377
+    "line_no": 389
   },
   {
-    "rank": 9,
+    "rank": 18,
     "score": 384.0,
     "title": "Publish at least 12 verified example packs with known-good outputs, provenance, and one-click import or command equivalents",
     "roi": "high",
@@ -114,10 +231,10 @@
     "refs": "DOM-8",
     "depends": "",
     "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
-    "line_no": 378
+    "line_no": 390
   },
   {
-    "rank": 10,
+    "rank": 19,
     "score": 384.0,
     "title": "Own canonical docs-surface migration and update package/release/docs links after cutover",
     "roi": "high",
@@ -127,10 +244,49 @@
     "refs": "COMP-1, CGPT-4, COMP-15",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 390
+    "line_no": 402
   },
   {
-    "rank": 11,
+    "rank": 20,
+    "score": 382.0,
+    "title": "Convert ops/guardrail scripts (nightly review, six-month harness, secret validation, governance gates, benchmark publishing) into first-class ops jobs with status, artifacts, retries, alerts, and approvals",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-13",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 379
+  },
+  {
+    "rank": 21,
+    "score": 382.0,
+    "title": "Expand deployment scenario packs for crypto (maker/taker slippage regimes, reconnect/outage bursts, funding spikes, cross-venue skew) and wire them into benchmark, replay, certification, and promotion gates",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-16",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 382
+  },
+  {
+    "rank": 22,
+    "score": 382.0,
+    "title": "Upgrade assistant into a constrained operator layer that drafts memos/rollback plans/blocker summaries using canonical evidence while hard-blocking privileged execution without approval",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "DOM-19",
+    "depends": "",
+    "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
+    "line_no": 385
+  },
+  {
+    "rank": 23,
     "score": 382.0,
     "title": "Add funnel analytics and conversion reporting for hosted/local, Guided/Pro, and beginner/pro cohorts, then publish release conversion deltas",
     "roi": "high",
@@ -140,10 +296,10 @@
     "refs": "DOM-9",
     "depends": "",
     "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
-    "line_no": 379
+    "line_no": 391
   },
   {
-    "rank": 12,
+    "rank": 24,
     "score": 382.0,
     "title": "Publish a public trust-operations dashboard for release readiness, benchmark freshness, venue certification, docs freshness, and package/docs availability",
     "roi": "high",
@@ -153,10 +309,10 @@
     "refs": "DOM-10",
     "depends": "",
     "section": "02x. Competitive Leadership Closure Program (Open, Highest Remaining ROI)",
-    "line_no": 380
+    "line_no": 392
   },
   {
-    "rank": 13,
+    "rank": 25,
     "score": 382.0,
     "title": "Run monthly user interviews for casual and professional cohorts and feed roadmap deltas",
     "roi": "high",
@@ -166,10 +322,10 @@
     "refs": "COMP-7, COMP-8, MOAT-8",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 387
+    "line_no": 399
   },
   {
-    "rank": 14,
+    "rank": 26,
     "score": 268.0,
     "title": "Perform third-party bot/operator security due-diligence checklist before adding external signal adapters to production allowlist",
     "roi": "medium",

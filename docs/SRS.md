@@ -5368,6 +5368,162 @@ These requirements capture net-new, applicable deltas from the referenced post c
 - The system SHALL publish per-decision explainability cards containing `p_market`, `p_model`, posterior delta, expected value, size recommendation, and gate outcome.
 - Explainability cards SHALL be queryable through API and linked from execution/order-truth surfaces.
 
+## 93A. Additional Delta Requirements from External Post Chain (RetroValix near-even passive prediction-market workflow, March 14, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post chain describing passive, high-cadence trading in near-even prediction markets (for example liquid sports markets around the `47c-52c` zone). They intentionally avoid duplicating existing Kelly, Monte Carlo, copy-trade, and generic latency-control requirements already present elsewhere in this SRS.
+
+### RVX-1 Near-Even Market Selection Contract
+
+- The system SHALL support scanners for near-even contracts using configurable price-band filters (source-context example: contracts trading in the `47c-52c` range).
+- Candidate markets SHALL be ranked by fee-adjusted spread capture, available resting depth, event start horizon, and recent quote-staleness metrics.
+- Markets failing minimum liquidity, spread, or quote-refresh thresholds SHALL be marked ineligible for this strategy family.
+
+### RVX-2 Passive-Only Quote Discipline Contract
+
+- This strategy family SHALL support a passive-only execution mode in which entries and exits are placed as resting limit orders by default.
+- Any transition from passive-only behavior to aggressive crossing SHALL require explicit policy override and audit trace.
+- Order-truth artifacts SHALL record whether each fill complied with passive-only policy and, if not, the reason code for the exception.
+
+### RVX-3 Micro-Lot Ladder and Inventory Balance Contract
+
+- The system SHALL support micro-lot quote ladders across bounded price bands with per-order notional caps and aggregate side-specific inventory caps.
+- Inventory controls SHALL prevent repeated fills from silently converting a near-even range strategy into an unbounded directional bet.
+- Ladder state SHALL preserve outstanding level, filled quantity, canceled quantity, and rebalance actions for replay and attribution.
+
+### RVX-4 Micro-Edge Exit and Timeout Contract
+
+- The system SHALL support bounded exit rules for near-even scalps, including tick-target exits, mean-reversion exits, and max-hold timeout exits.
+- Timeout and unwind policies SHALL tighten automatically as event start or settlement cutoff approaches.
+- If expected edge decays below configured thresholds while inventory remains open, the system SHALL emit explicit `reduce` or `flatten` actions rather than silently holding residual exposure.
+
+### RVX-5 Copyability and Latency-Sensitivity Label Contract
+
+- Strategy metadata SHALL classify whether a strategy family is `copy_safe`, `delayed_signal_only`, or `non_copyable` based on latency dependence, queue-position sensitivity, and fill-decay characteristics.
+- Studio, API, and docs surfaces SHALL display this suitability label anywhere a strategy is promoted, shared, or exposed to assistant/copilot workflows.
+- Strategies labeled `non_copyable` SHALL be blocked from delayed copy-follow or social mirroring flows.
+
+### RVX-6 Event-Time Blackout and Flattening Contract
+
+- Prediction-market strategies in this family SHALL enforce configurable pre-start, in-play, and settlement blackout windows by venue and market class.
+- Open inventory SHALL be flattened or explicitly re-approved before blackout windows begin unless a separate hedging policy is active.
+- Blackout and flatten decisions SHALL be attached to the promotion and replay evidence for this strategy family.
+
+## 93B. Additional Delta Requirements from External Post Chain (DankoWeb3 strategy-discipline workflow, March 14, 2026)
+
+These requirements capture the net-new delta from the referenced post chain emphasizing long-run process discipline, fixed risk/reward behavior, and adherence to a declared trading system. They intentionally avoid duplicating existing stop-loss, override-audit, and mistake-taxonomy controls already present elsewhere in this SRS.
+
+### DNK-1 Strategy Adherence Score Contract
+
+- The system SHALL compute a per-strategy adherence score measuring how closely live, paper, and replayed decisions match the strategy's declared entry, exit, and sizing rules.
+- Adherence scoring SHALL distinguish between policy-approved overrides and unapproved discretionary drift.
+- Strategy cards, promotion reviews, and post-run reports SHALL surface adherence score alongside PnL and risk metrics.
+
+### DNK-2 Override Budget and Drift Gate Contract
+
+- Each strategy SHALL define an override budget covering maximum tolerated frequency and severity of manual or discretionary deviations from declared rules.
+- Exceeding the configured override budget SHALL trigger `hold`, `demote`, or `kill-review` outcomes depending on stage and severity.
+- Promotion gates SHALL block when recent runs exceed drift thresholds even if headline PnL remains positive.
+
+### DNK-3 Fixed Risk/Reward Policy Receipt Contract
+
+- Strategies using fixed risk/reward policies SHALL persist the declared stop, target, and invalidate conditions as first-class receipt fields on every order intent.
+- Execution and replay surfaces SHALL show whether exits matched declared risk/reward policy or were closed through approved exception pathways.
+- Any policy mismatch SHALL produce explicit reason codes to support process-quality reviews.
+
+## 93C. Additional Delta Requirements from External Post Chain (antpalkin exchange-discrepancy threshold workflow, March 14, 2026)
+
+These requirements capture the net-new delta from the referenced post chain describing event/prediction-market trading driven by discrepancies between underlying exchange prices and binary-market odds. They intentionally avoid duplicating existing cross-venue confirmation, fair-value model registry, and generic high-probability band controls already present elsewhere in this SRS.
+
+### ANTP-1 Underlying-to-Threshold Probability Translation Contract
+
+- The system SHALL support explicit models that translate underlying exchange price state into probability estimates for binary threshold contracts over defined horizons.
+- Translation receipts SHALL preserve the underlying snapshot, threshold definition, horizon, volatility/input assumptions, and resulting probability estimate used for each decision.
+- Strategy configs SHALL reference registered translation-model IDs rather than ad-hoc inline formulas.
+
+### ANTP-2 Cross-Market Discrepancy Attribution Contract
+
+- For every trade candidate driven by exchange-versus-contract discrepancy, the system SHALL persist the binary-market implied probability, the translated underlying-derived probability, and the resulting discrepancy after fees/slippage adjustments.
+- Execution and replay surfaces SHALL expose whether the realized trade outcome was driven primarily by underlying-price convergence, contract repricing, or both.
+- Discrepancy-derived signals SHALL fail closed when underlying snapshots are stale, internally inconsistent, or missing required calibration inputs.
+
+### ANTP-3 Majority-Side Bias Falsification Contract
+
+- Strategies that systematically favor contracts priced above `50c` SHALL be required to demonstrate incremental edge beyond a naive majority-side baseline.
+- Backtests, paper reports, and promotion reviews SHALL include attribution versus a simple `buy_if_above_50c` benchmark where applicable.
+- Promotion gates SHALL block when the purported edge is not statistically distinguishable from the naive majority-side heuristic after costs.
+
+## 93D. Additional Delta Requirements from External Post Chain (Kropanchik capital-efficiency critique, March 14, 2026)
+
+These requirements capture the net-new delta from the referenced post chain criticizing high-trade-count, low-efficiency market-neutral/arbitrage behavior. They intentionally avoid duplicating existing two-sided quoting, reward decomposition, and duplicate-exposure controls already present elsewhere in this SRS.
+
+### KROP-1 Capital Efficiency Score Contract
+
+- The system SHALL compute capital-efficiency metrics for every strategy and run, including net PnL per unit of locked capital, net PnL per order, and net PnL per unit of turnover after fees and slippage.
+- Strategy evaluation, leaderboards, and promotion reviews SHALL surface capital-efficiency metrics alongside gross PnL and trade count.
+- Strategies with high trade count but sub-threshold capital efficiency SHALL be explicitly flagged as `throughput_without_edge`.
+
+### KROP-2 Same-Market Self-Offset Detection Contract
+
+- The system SHALL detect repeated acquisition of opposite-side inventory in the same market when the resulting exposure pattern does not match a declared two-sided liquidity or hedging strategy.
+- Self-offset detections SHALL record the market, time window, side sequence, resulting net exposure, and expected versus realized spread capture or reward income.
+- Unexplained self-offset patterns SHALL trigger review alerts and SHALL degrade promotion eligibility for the affected strategy.
+
+### KROP-3 Trade-Count Vanity Falsification Contract
+
+- Promotion and leaderboard logic SHALL not treat raw order count, fill count, or turnover as evidence of edge without supporting capital-efficiency and risk-adjusted outcome metrics.
+- Benchmark reports SHALL compare high-frequency/high-count strategies against lower-turnover baselines to quantify whether additional activity adds real net value.
+- Strategies whose edge disappears after normalizing by locked capital, turnover, or market count SHALL be blocked from being labeled top-performing.
+
+## 93E. Additional Delta Requirements from External Post Chain (0xwhrrari positive-skew low-price workflow, March 14, 2026)
+
+These requirements capture the net-new delta from the referenced post chain describing a positive-skew strategy that repeatedly buys low-priced binary contracts and tolerates many small losses for occasional large wins. They intentionally avoid duplicating existing basket-entry, minimum-edge, and generic high-frequency governance requirements already present elsewhere in this SRS.
+
+### WHR-1 Positive-Skew Basket Expectancy Contract
+
+- The system SHALL evaluate low-priced basket strategies using payoff-distribution metrics that explicitly account for many-small-loss / few-large-win dynamics.
+- Strategy reports SHALL include expectancy, payoff ratio, hit rate, median loss size, tail-win contribution, and concentration of total PnL in the top winning trades.
+- Promotion gates SHALL block when positive expectancy depends on unrealistic tail wins, stale pricing, or unsupported fill assumptions.
+
+### WHR-2 Loss-Cluster Tolerance Contract
+
+- Strategies targeting low-priced contracts SHALL define maximum tolerated consecutive-loss streaks and capital drawdown envelopes consistent with their skew profile.
+- Runtime risk controls SHALL reduce or halt the strategy when observed loss clustering exceeds modeled tolerance, even if long-run expectancy remains positive on paper.
+- Loss-cluster telemetry SHALL be attached to paper/canary evidence bundles and surfaced in post-run diagnostics.
+
+### WHR-3 Hit-Rate Illusion Falsification Contract
+
+- Review surfaces SHALL not treat low hit rate alone as strategy failure or high hit rate alone as strategy success for skewed-payout strategies.
+- Benchmark and promotion reviews SHALL compare observed results against the declared skew model, including expected hit-rate band and expected payoff-ratio band.
+- Strategies whose realized outcomes materially diverge from declared skew assumptions SHALL be downgraded or blocked pending replay and attribution review.
+
+## 93F. Additional Delta Requirements from External Repo (MiroFish scenario-lab workflow, March 14, 2026)
+
+These requirements capture the net-new, applicable deltas from the referenced repo's document-seeded simulation workflow, graph-backed memory model, and report-oriented product surface. They intentionally avoid importing MiroFish architecture or code and instead adapt the useful ideas to PQTS's governed trading/research stack.
+
+### MRF-1 Seed-Material Scenario Ingestion Contract
+
+- The system SHALL support ingestion of seed materials for scenario work, including research notes, news summaries, policy drafts, filings, and operator-authored hypothesis briefs.
+- Seed-material ingestion SHALL preserve source, timestamp, trust label, and parser/extractor version for every derived scenario artifact.
+- Scenario generation SHALL fail closed when seed materials are stale, unverifiable, or missing required provenance fields.
+
+### MRF-2 Entity and Catalyst Graph Contract
+
+- The system SHALL construct a machine-readable entity/catalyst graph linking assets, venues, narratives, counterparties, macro drivers, and event catalysts extracted from seed materials and runtime evidence.
+- Graph nodes and edges SHALL carry source evidence, confidence, update timestamp, and conflict metadata.
+- Scenario, replay, benchmark, and promotion surfaces SHALL be able to reference graph entities and relationships as supporting context.
+
+### MRF-3 Counterfactual Simulation Lab Contract
+
+- The system SHALL provide a scenario-lab workflow that runs counterfactual simulations against seeded catalyst graphs and market state snapshots before promotion or risk-policy changes.
+- Scenario-lab simulations SHALL be challenger-only by default and SHALL not bypass canonical execution, router, or hard-risk paths.
+- Counterfactual outputs SHALL include changed assumptions, affected entities, expected market impact, and confidence/uncertainty notes suitable for audit and replay.
+
+### MRF-4 Report-Agent Evidence Memo Contract
+
+- The system SHALL generate human-readable evidence memos from scenario-lab, replay, benchmark, and certification artifacts for use in promotion reviews, incident postmortems, and operator briefings.
+- Evidence memos SHALL link directly to the canonical underlying artifacts and SHALL not introduce unsourced conclusions.
+- Memo generation SHALL distinguish observed facts, inferred scenarios, and speculative counterfactuals with explicit labels.
+
 ## 94. Competitive Leadership Closure Requirements (March 12, 2026)
 
 These requirements target the remaining deltas versus QuantConnect, NautilusTrader, Freqtrade, Hummingbot, and QuantRocket: hosted first success, certified venue depth, ecosystem breadth, sustained public proof, and quantitative usability/release gates.
@@ -5462,3 +5618,64 @@ These requirements target the remaining deltas versus QuantConnect, NautilusTrad
 
 - Crypto-first scenario packs (maker/taker slippage regimes, outage/reconnect bursts, funding spikes, cross-venue skew anomalies) SHALL feed benchmark, replay, certification, and promotion gates.
 - Scenario-pack artifacts SHALL be reproducible and versioned alongside benchmark bundles.
+
+### DOM-17 Release Maturity Graduation Contract
+
+- The system SHALL define machine-readable graduation gates from `alpha` to `beta` to `stable` using certified venue depth, external-cohort outcomes, docs truth-surface integrity, benchmark freshness, and release-readiness evidence.
+- Package classifiers, docs posture, and release notes SHALL be derived from the current graduation state and SHALL fail closed on mismatch.
+
+### DOM-18 Casual-First Product Simplicity Contract
+
+- The system SHALL expose one canonical beginner path that reaches demo, backtest, and bounded paper trading without requiring the broader operator CLI surface.
+- Beginner-facing surfaces SHALL progressively disclose advanced controls rather than presenting full operator complexity by default.
+- The product SHALL preserve parity between beginner and pro workflows on the same underlying strategy, evidence, and promotion objects.
+
+### DOM-19 Constrained Operator Intelligence Contract
+
+- The assistant layer SHALL explain rejects, draft promotion memos, generate rollback plans, summarize blockers, and propose risk changes using the same evidence and provenance objects available to operators.
+- Assistant actions SHALL be read, explain, draft, or recommend by default; any capital-affecting or privileged operation SHALL require policy gates, role checks, and explicit approval.
+
+### DOM-20 Certified Crypto Deployment Dominance Contract
+
+- The system SHALL establish `crypto_first` dominance before broadening scope by certifying live/canary/paper operational maturity on at least two tier-1 crypto venues with rolling quality, reliability, and incident evidence.
+- Marketing and onboarding surfaces SHALL not imply broader production readiness than the certified crypto wedge currently supports.
+
+### DOM-21 Product Truth Availability Contract
+
+- Every public evidence link referenced by README, docs landing, PyPI description, release notes, trust dashboard, and release-readiness artifacts SHALL resolve successfully at release time.
+- Release and docs publication SHALL fail when any public artifact is missing, stale beyond policy, or inconsistent with canonical machine-readable evidence.
+
+### DOM-22 Casual Convenience Moat Contract
+
+- The system SHALL provide mobile-friendly notifications and approval flows for promotions, incidents, holds, and rollbacks without weakening auditability or RBAC.
+- Everyday operator actions that competitors simplify through Telegram, dashboards, or mobile surfaces SHALL be available in PQTS through governed equivalents tied to canonical control-plane contracts.
+
+### DOM-23 Public Proof Federation Contract
+
+- The system SHALL auto-publish a rolling public proof bundle for the active release window, including benchmark summary, promotion-stage summary, external cohort summary, and venue certification summary from canonical artifacts.
+- Public proof bundles SHALL be versioned, timestamped, and linked from the docs landing page, trust dashboard, and release notes.
+- Any release lacking a fresh public proof bundle inside policy-defined recency windows SHALL fail readiness checks for quality or usability claims.
+
+### DOM-24 Docs Property and Content Federation Contract
+
+- The system SHALL generate README snippets, PyPI long description fragments, docs landing content, and in-product help from one canonical release-content bundle.
+- Release and docs pipelines SHALL run broken-link validation, cross-surface command parity checks, and content-drift checks before publication.
+- Docs-surface health SHALL be continuously monitored, and any public docs property outage or 404 SHALL surface as a failing trust status rather than an implicit success state.
+
+### DOM-25 Tier-1 Venue Drill and Certification Contract
+
+- The system SHALL run recurring certification drills for tier-1 crypto venues covering paper, canary, and live-readiness paths, including reconnect, stale-feed, reject-spike, and manual rollback scenarios.
+- Drill artifacts SHALL include latency, reject/fill, slippage, incident response timing, and replay fidelity receipts.
+- Connectors SHALL not advance to `active` or `certified` without passing the current drill policy for their declared stage.
+
+### DOM-26 Guided Studio First-Success Contract
+
+- The web product SHALL expose a guided default path for `demo`, `backtest`, and bounded `paper start` in no more than three primary screens and with no required CLI knowledge.
+- Advanced operator surfaces SHALL remain available but SHALL be progressively disclosed behind explicit mode or density controls.
+- Beginner flows SHALL emit human-readable explanations, next actions, and code/CLI equivalents without exposing irrelevant operational complexity by default.
+
+### DOM-27 Public Release Evidence Pack Contract
+
+- Every tagged release SHALL ship a machine-readable and human-readable evidence pack containing benchmark status, docs/link health, certification status, external cohort status, trust limitations, and active maturity state.
+- Release notes, trust dashboard, and in-product About/Status views SHALL link to the same evidence pack.
+- Public claims about readiness, performance, or usability SHALL be prohibited unless supported by the active evidence pack.

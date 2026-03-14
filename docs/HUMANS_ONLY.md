@@ -76,3 +76,20 @@ This file tracks tasks that cannot be reliably automated and require direct huma
 - Execute distribution/outreach campaigns (Show HN, X thread launches, community posts, partner outreach) and track outcomes.
 - Set explicit monthly traction KPI targets (stars/forks/issues/downloads) and publish a recurring growth review note.
 - Own canonical docs-surface migration and keep docs URLs synchronized across README, package metadata, and release notes after cutover.
+
+## P0 10-10 Closure
+
+- Decide and publicly announce objective graduation criteria for `alpha`, `beta`, and `stable`, then sign off each transition only when external proof, certification, and docs truth gates are satisfied.
+- Enable and maintain the public docs property, release landing pages, and PyPI narrative so no public evidence surface 404s or lags the active release.
+- Run recurring external beginner and professional cohorts large enough to claim category-leading usability, then publish the results with dated evidence.
+- Own the crypto-first wedge narrative and refuse broader production claims until at least two tier-1 crypto venues are clearly active/certified.
+- Execute the convenience/adoption layer: mobile demos, operator walkthroughs, community response discipline, and distribution campaigns that turn engineering quality into visible traction.
+
+## P0 Remaining Gap Closure
+
+- Publish a recurring public proof cadence (monthly benchmark bundle, cohort summary, venue-certification summary, and release evidence page) and keep the narrative synchronized across README, docs, PyPI, and release notes.
+- Own the live docs property end-to-end: DNS/hosting/settings, broken-link triage, content review before each release, and immediate remediation when any public docs surface drifts or 404s.
+- Operate the tier-1 crypto certification program in practice: maintain exchange accounts/credentials, run scheduled drill campaigns, review incident receipts, and sign off connector promotion from `beta` to `active/certified`.
+- Conduct true beginner usability reviews focused on first-success simplicity, then approve or reject UX claims based on observed time-to-result and confusion points rather than internal intuition.
+- Maintain the external trust posture: publish known limitations, respond visibly to proof gaps or incidents, and refuse marketing claims that outpace current evidence.
+- Maintain a public interactive demo/sandbox and scripted walkthrough that show the guided web flow, scenario lab, and trust/provenance surfaces using current release artifacts.
