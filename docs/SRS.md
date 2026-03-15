@@ -5524,6 +5524,28 @@ These requirements capture the net-new, applicable deltas from the referenced re
 - Evidence memos SHALL link directly to the canonical underlying artifacts and SHALL not introduce unsourced conclusions.
 - Memo generation SHALL distinguish observed facts, inferred scenarios, and speculative counterfactuals with explicit labels.
 
+## 93G. Additional Delta Requirements from External Post (Alex Jost pricing-portfolio fit workflow, Feb 27, 2026)
+
+These requirements capture the net-new, applicable deltas from the referenced post on portfolio pricing coherence and customer-fit quality. They intentionally avoid duplicating existing plan-catalog, billing, and signup controls already present in `MON-*`.
+
+### AJO-1 Bestseller Price-Floor Coherence Contract
+
+- The system SHALL enforce a configurable floor on the ratio between the most-purchased offer and the portfolio median paid offer (for example `bestseller_price / median_paid_price >= min_bestseller_ratio`).
+- Plan-catalog and checkout configuration updates that violate the ratio policy SHALL fail closed with a machine-readable rejection reason.
+- Exception overrides SHALL require explicit operator justification and SHALL emit an audit artifact linked to workspace, operator, and timestamp.
+
+### AJO-2 Customer-Fit Cohort Quality Contract
+
+- The system SHALL compute customer-fit telemetry by entry cohort, including 30/60/90-day retention, upgrade conversion, support-burden rate, and live-eligibility attainment.
+- Commercial and growth reports SHALL surface whether the dominant acquisition cohort aligns with the intended target operator profile for each plan tier.
+- Promotion or pricing recommendations SHALL include a warning flag when low-price cohorts dominate acquisition but underperform on retention, upgrades, or safe live progression.
+
+### AJO-3 Discount and Entry-Offer Guardrail Contract
+
+- The system SHALL enforce guardrails on entry-offer discounts and promotional pricing so campaigns cannot silently train persistent price-anchor behavior.
+- Any campaign with entry pricing below policy thresholds SHALL require explicit success criteria and auto-expiry, then auto-disable when post-campaign cohort quality fails policy minimums.
+- Campaign telemetry SHALL be linked to canonical monetization and ops artifacts so pricing experiments remain traceable to retention, support load, and promotion outcomes.
+
 ## 94. Competitive Leadership Closure Requirements (March 12, 2026)
 
 These requirements target the remaining deltas versus QuantConnect, NautilusTrader, Freqtrade, Hummingbot, and QuantRocket: hosted first success, certified venue depth, ecosystem breadth, sustained public proof, and quantitative usability/release gates.
