@@ -19,6 +19,8 @@ markets:
         api_secret: ${BINANCE_TESTNET_API_SECRET}
         testnet: true
         symbols:
+          # Symbol format: BASEQUOTE (e.g., BTCUSDT = BTC quoted in USDT)
+          # These symbols must match the exchange's exact naming convention
           - BTCUSDT
           - ETHUSDT
           - SOLUSDT
