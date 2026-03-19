@@ -75,10 +75,13 @@ Semantic Versioning.
 - Release automation workflow with GitHub Release + PyPI publish support.
 - Coverage workflow and CI summary artifact.
 - MkDocs site configuration and benchmark/results documentation templates.
+- **Operational documentation**: Incident response runbook, deployment procedures.
+- **Utility scripts**: Log rotation, service health checks for operational hygiene.
 
 ### Changed
 - CI workflows aligned with `src/` package layout.
 - README upgraded with professional badges and comparison guidance.
+- Configuration comments clarifying symbol format conventions in paper trading config.
 
 ## [0.1.0] - 2026-03-09
 
