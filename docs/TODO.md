@@ -525,3 +525,14 @@ Dependency order: edge decomposition and priors -> sizing and behavioral gates -
 - [x] Promote required venue adapters to beta maturity after certified-paper evidence and update integration status governance docs (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: RLG-3, PMKT-16`, `Impact: 8`, `Evidence: config/integrations/official_integrations.json; docs/OFFICIAL_INTEGRATIONS.md; data/reports/certifications/latest.json`)
 - [x] Replace execute-mode ops helper responses with typed async job lifecycle contracts (queued/running/succeeded/failed) and list/detail polling APIs (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: OPSJ-1, OPSJ-2, OPSJ-3, OPSJ-4`, `Impact: 8`, `Evidence: services/api/routes/core.py; services/api/state.py; tests/test_services_api_rest_endpoints.py`)
 - [x] Refresh benchmark and research/backlog truth surfaces to align with latest reference artifact dates and archive markers (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: RLG-4, RLG-5, COMP-17`, `Impact: 8`, `Evidence: docs/BENCHMARKS.md; docs/USER_RESEARCH_2026_03.md; docs/ISSUE_BACKLOG.md`)
+
+## 02ad. Packaging and Easy-Use Productization (Open, High ROI)
+
+- [ ] Implement one-command localhost launcher with ordered startup, typed failure diagnostics, and URL/health summary output (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: PKG-1, PKG-3`, `Impact: 10`, `Evidence: pending`)
+- [ ] Implement first-run setup wizard and persisted safe-default config generation (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PKG-2`, `Impact: 9`, `Evidence: pending`)
+- [ ] Add machine-readable local readiness/shutdown status artifact surface for launcher and shells (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PKG-3`, `Impact: 8`, `Evidence: pending`)
+- [ ] Implement packaged no-toolchain runtime distribution pipeline with bundle metadata/signature manifest (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: PKG-4, PKG-6`, `Impact: 9`, `Evidence: pending`)
+- [ ] Add desktop shell integration that supervises canonical localhost stack and exposes startup/health/shutdown UX (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PKG-5`, `Impact: 8`, `Evidence: pending`)
+- [ ] Implement installer + upgrade/downgrade continuity policy and publish install provenance in release surfaces (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: PKG-6`, `Impact: 9`, `Evidence: pending`)
+- [ ] Implement channelized auto-update flow (`stable/beta/canary`) with rollback-safe config/artifact preservation (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: PKG-7`, `Impact: 8`, `Evidence: pending`)
+- [ ] Implement crash-recovery UX and one-action support bundle export with default secret redaction (`ROI: high`, `Type: engineering`, `Track: parity`, `Ref: PKG-8`, `Impact: 8`, `Evidence: pending`)

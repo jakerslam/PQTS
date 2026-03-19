@@ -6099,3 +6099,55 @@ These requirements target the remaining deltas versus QuantConnect, NautilusTrad
 - Every tagged release SHALL ship a machine-readable and human-readable evidence pack containing benchmark status, docs/link health, certification status, external cohort status, trust limitations, and active maturity state.
 - Release notes, trust dashboard, and in-product About/Status views SHALL link to the same evidence pack.
 - Public claims about readiness, performance, or usability SHALL be prohibited unless supported by the active evidence pack.
+
+## 95. Packaging and Easy-Use Productization Requirements (March 18, 2026)
+
+These requirements define the minimum packaging and usability contracts needed to ship PQTS as an easy local product surface for non-operator users, while preserving existing governance and risk controls.
+
+### PKG-1 One-Command Localhost Launch Contract
+
+- The system SHALL provide one canonical command that starts all required local services for first-success operation (control plane API, primary web surface, and required state dependencies) without requiring users to manually orchestrate process order.
+- The launch command SHALL fail closed with typed diagnostics when dependencies are missing, ports are occupied, or required runtime health checks do not pass.
+- The launch flow SHALL expose the resulting local URLs and health state in a human-readable summary.
+
+### PKG-2 First-Run Setup Wizard Contract
+
+- On first run, the product SHALL provide a guided setup flow that captures minimum required choices (mode, risk profile, workspace path, and optional credentials) with safe paper defaults.
+- Setup artifacts SHALL persist deterministic config files and include an explicit preview of the resulting runtime policy before execution starts.
+- If setup cannot validate required inputs, the flow SHALL block execution and return actionable fix instructions instead of silently degrading to unsafe or ambiguous defaults.
+
+### PKG-3 Local Service Health Orchestration Contract
+
+- Local product launch SHALL gate readiness on explicit API/web/dependency health checks and SHALL not report success while required components remain degraded.
+- Readiness and shutdown transitions SHALL emit machine-readable status artifacts suitable for desktop shells, web launchers, and support tooling.
+- Recovery guidance for common startup failures (port collision, DB/Redis unavailable, missing env values) SHALL be published in the same launch output surface.
+
+### PKG-4 No-Toolchain Runtime Bundle Contract
+
+- The system SHALL support distribution bundles that do not require end users to install development toolchains (for example Python/Node build stacks) before first launch.
+- Bundle metadata SHALL declare supported OS/architecture, included runtime components, version, and verification hash.
+- Bundle startup behavior SHALL preserve the same governed control-plane contracts as source-mode execution.
+
+### PKG-5 Desktop Shell Localhost Integration Contract
+
+- The system SHALL support a desktop shell mode that launches and supervises the same canonical localhost web control plane, rather than introducing a separate execution path.
+- Desktop mode SHALL surface startup status, runtime health, and controlled shutdown, and SHALL open the same guided first-success flow as browser-only mode.
+- Desktop shell actions that can affect capital or stage progression SHALL remain subject to existing policy, role, and approval gates.
+
+### PKG-6 Installer, Signing, and Trust Distribution Contract
+
+- Installable artifacts for supported desktop targets SHALL be produced through a reproducible build pipeline with signing/notarization posture appropriate to target OS requirements.
+- Installer flows SHALL include explicit upgrade/downgrade behavior and data-directory continuity policy.
+- Public release surfaces SHALL publish installer provenance, signature status, and known limitations.
+
+### PKG-7 Auto-Update Channel Safety Contract
+
+- Packaged local and desktop distributions SHALL support policy-controlled update channels (`stable`, `beta`, optional `canary`) with explicit user visibility.
+- Update workflows SHALL include rollback-safe behavior and SHALL preserve user configs and audit artifacts across version transitions.
+- Any update that changes governance, risk, or execution policy defaults SHALL require explicit post-update acknowledgement before live-affecting actions continue.
+
+### PKG-8 Crash Recovery and Support Bundle Contract
+
+- Localhost and desktop surfaces SHALL capture structured crash diagnostics and allow one-action export of a support bundle containing logs, health status, version/build metadata, and non-secret configuration context.
+- Support bundle generation SHALL redact or omit secrets and private credentials by default.
+- Recovery surfaces SHALL provide deterministic restart actions and preserve prior failure context for operator review.

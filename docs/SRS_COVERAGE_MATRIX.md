@@ -4,10 +4,10 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **855**
+- Total requirements: **863**
 - implemented: **855**
 - partial: **0**
-- planned: **0**
+- planned: **8**
 - traced: **0**
 - unmapped: **0**
 
@@ -88,6 +88,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | PG | 7 | 0 | 0 | 0 | 0 | 7 |
 | PH | 10 | 0 | 0 | 0 | 0 | 10 |
 | PHL | 4 | 0 | 0 | 0 | 0 | 4 |
+| PKG | 0 | 0 | 8 | 0 | 0 | 8 |
 | PL | 7 | 0 | 0 | 0 | 0 | 7 |
 | PMDESK | 12 | 0 | 0 | 0 | 0 | 12 |
 | PMKT | 16 | 0 | 0 | 0 | 0 | 16 |
@@ -963,30 +964,38 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | TAGR-2 | Committee Decision Lineage Contract | implemented | done | docs/TODO.md |
 | TTV-1 | Profile-Handle to Execution-Identity Resolution Contract | implemented | done | docs/TODO.md |
 | TTV-2 | Restart-Safe Copy-Event Watermark Contract | implemented | done | docs/TODO.md |
-| DOM-1 | Competitive Scorecard Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
-| DOM-2 | Hosted Sandbox First-Success Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
-| DOM-3 | Tier-1 Forecast-Trading Venue Certification Depth Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
+| DOM-1 | Competitive Scorecard Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
+| DOM-2 | Hosted Sandbox First-Success Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
+| DOM-3 | Tier-1 Forecast-Trading Venue Certification Depth Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
 | DOM-4 | Unified Connector Ecosystem Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
-| DOM-5 | Rolling Proof Density Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
+| DOM-5 | Rolling Proof Density Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
 | DOM-6 | Quantitative External UX Gate Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
-| DOM-7 | Docs and Troubleshooting Product Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
-| DOM-8 | Verified Example-Pack Density Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
-| DOM-9 | Product Analytics and Conversion Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
-| DOM-10 | Public Trust Operations Dashboard Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md, docs/TOP_100_ROI_MOVES.json |
-| DOM-11 | Canonical Truth-Surface Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-12 | Connector Certification Depth Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-13 | Ops Job Orchestration Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-14 | Capital Governor Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-15 | Mobile + Assistant Safety Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-16 | Deployment Scenario Packs Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-17 | Release Maturity Graduation Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-18 | Casual-First Product Simplicity Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-19 | Constrained Operator Intelligence Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-20 | Certified Prediction-Market Deployment Dominance Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-21 | Product Truth Availability Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| DOM-22 | Casual Convenience Moat Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| DOM-7 | Docs and Troubleshooting Product Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
+| DOM-8 | Verified Example-Pack Density Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
+| DOM-9 | Product Analytics and Conversion Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
+| DOM-10 | Public Trust Operations Dashboard Contract | implemented | done | config/srs/assimilation_registry.json, docs/TODO.md |
+| DOM-11 | Canonical Truth-Surface Contract | implemented | done | docs/TODO.md |
+| DOM-12 | Connector Certification Depth Contract | implemented | done | docs/TODO.md |
+| DOM-13 | Ops Job Orchestration Contract | implemented | done | docs/TODO.md |
+| DOM-14 | Capital Governor Contract | implemented | done | docs/TODO.md |
+| DOM-15 | Mobile + Assistant Safety Contract | implemented | done | docs/TODO.md |
+| DOM-16 | Deployment Scenario Packs Contract | implemented | done | docs/TODO.md |
+| DOM-17 | Release Maturity Graduation Contract | implemented | done | docs/TODO.md |
+| DOM-18 | Casual-First Product Simplicity Contract | implemented | done | docs/TODO.md |
+| DOM-19 | Constrained Operator Intelligence Contract | implemented | done | docs/TODO.md |
+| DOM-20 | Certified Prediction-Market Deployment Dominance Contract | implemented | done | docs/TODO.md |
+| DOM-21 | Product Truth Availability Contract | implemented | done | docs/TODO.md |
+| DOM-22 | Casual Convenience Moat Contract | implemented | done | docs/TODO.md |
 | DOM-23 | Public Proof Federation Contract | implemented | done | docs/TODO.md |
 | DOM-24 | Docs Property and Content Federation Contract | implemented | done | docs/TODO.md |
 | DOM-25 | Tier-1 Forecast-Trading Venue Drill and Certification Contract | implemented | done | docs/TODO.md |
 | DOM-26 | Guided Studio First-Success Contract | implemented | done | docs/TODO.md |
 | DOM-27 | Public Release Evidence Pack Contract | implemented | done | docs/TODO.md |
+| PKG-1 | One-Command Localhost Launch Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-2 | First-Run Setup Wizard Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-3 | Local Service Health Orchestration Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-4 | No-Toolchain Runtime Bundle Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-5 | Desktop Shell Localhost Integration Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-6 | Installer, Signing, and Trust Distribution Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-7 | Auto-Update Channel Safety Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-8 | Crash Recovery and Support Bundle Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
