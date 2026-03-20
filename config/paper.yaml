@@ -2,6 +2,10 @@
 # This configuration runs the trading system in paper trading mode
 # No real money is used - all trades are simulated
 
+# Mode configuration: Controls the trading environment
+# - paper_trading: Simulated trades with no real capital at risk
+# - live_trading: Real money trades (requires additional safety checks)
+# - backtest: Historical simulation for strategy validation
 mode: paper_trading
 
 # ============================================
