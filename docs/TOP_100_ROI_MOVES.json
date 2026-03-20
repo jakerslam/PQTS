@@ -15,6 +15,19 @@
   {
     "rank": 2,
     "score": 500.0,
+    "title": "Define and maintain on-call escalation matrix and incident/rollback runbook ownership with severity-based response targets",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "human_only",
+    "refs": "PRDY-8, PMKT-15",
+    "depends": "",
+    "section": "02ae. Production Readiness Hardening Sprint (2026-03-19)",
+    "line_no": 100
+  },
+  {
+    "rank": 3,
+    "score": 500.0,
     "title": "Trigger first public release + GitHub Pages leaderboard export workflows, then publish links/status in README/docs",
     "roi": "very_high",
     "impact": 10,
@@ -23,20 +36,7 @@
     "refs": "COMP-2, COMP-5, MOAT-12",
     "depends": "",
     "section": "02c. Visibility Polish (Open, High ROI)",
-    "line_no": 309
-  },
-  {
-    "rank": 3,
-    "score": 500.0,
-    "title": "Implement one-command localhost launcher with ordered startup, typed failure diagnostics, and URL/health summary output",
-    "roi": "very_high",
-    "impact": 10,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "PKG-1, PKG-3",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 531
+    "line_no": 363
   },
   {
     "rank": 4,
@@ -49,23 +49,10 @@
     "refs": "COMP-19",
     "depends": "",
     "section": "02x. Competitive Gap Closure Sprint (2026-03-12)",
-    "line_no": 185
+    "line_no": 239
   },
   {
     "rank": 5,
-    "score": 392.0,
-    "title": "Implement first-run setup wizard and persisted safe-default config generation",
-    "roi": "high",
-    "impact": 9,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "PKG-2",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 532
-  },
-  {
-    "rank": 6,
     "score": 384.0,
     "title": "Perform legal/compliance review for copy-trade workflows in target jurisdictions before enabling live copy-follow mode",
     "roi": "high",
@@ -75,10 +62,10 @@
     "refs": "LUNR-6",
     "depends": "",
     "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
-    "line_no": 286
+    "line_no": 340
   },
   {
-    "rank": 7,
+    "rank": 6,
     "score": 384.0,
     "title": "Own canonical docs-surface migration and update package/release/docs links after cutover",
     "roi": "high",
@@ -88,49 +75,10 @@
     "refs": "COMP-1, CGPT-4, COMP-15",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 460
+    "line_no": 514
   },
   {
-    "rank": 8,
-    "score": 384.0,
-    "title": "Add machine-readable local readiness/shutdown status artifact surface for launcher and shells",
-    "roi": "high",
-    "impact": 8,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "PKG-3",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 533
-  },
-  {
-    "rank": 9,
-    "score": 384.0,
-    "title": "Add desktop shell integration that supervises canonical localhost stack and exposes startup/health/shutdown UX",
-    "roi": "high",
-    "impact": 8,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "PKG-5",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 535
-  },
-  {
-    "rank": 10,
-    "score": 384.0,
-    "title": "Implement crash-recovery UX and one-action support bundle export with default secret redaction",
-    "roi": "high",
-    "impact": 8,
-    "track": "parity",
-    "item_type": "engineering",
-    "refs": "PKG-8",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 538
-  },
-  {
-    "rank": 11,
+    "rank": 7,
     "score": 382.0,
     "title": "Run monthly user interviews for casual and professional cohorts and feed roadmap deltas",
     "roi": "high",
@@ -140,49 +88,10 @@
     "refs": "COMP-7, COMP-8, MOAT-8",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 457
+    "line_no": 511
   },
   {
-    "rank": 12,
-    "score": 382.0,
-    "title": "Implement packaged no-toolchain runtime distribution pipeline with bundle metadata/signature manifest",
-    "roi": "high",
-    "impact": 9,
-    "track": "moat",
-    "item_type": "engineering",
-    "refs": "PKG-4, PKG-6",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 534
-  },
-  {
-    "rank": 13,
-    "score": 382.0,
-    "title": "Implement installer + upgrade/downgrade continuity policy and publish install provenance in release surfaces",
-    "roi": "high",
-    "impact": 9,
-    "track": "moat",
-    "item_type": "engineering",
-    "refs": "PKG-6",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 536
-  },
-  {
-    "rank": 14,
-    "score": 374.0,
-    "title": "Implement channelized auto-update flow (`stable/beta/canary`) with rollback-safe config/artifact preservation",
-    "roi": "high",
-    "impact": 8,
-    "track": "moat",
-    "item_type": "engineering",
-    "refs": "PKG-7",
-    "depends": "",
-    "section": "02ad. Packaging and Easy-Use Productization (Open, High ROI)",
-    "line_no": 537
-  },
-  {
-    "rank": 15,
+    "rank": 8,
     "score": 268.0,
     "title": "Perform third-party bot/operator security due-diligence checklist before adding external signal adapters to production allowlist",
     "roi": "medium",
@@ -192,6 +101,6 @@
     "refs": "LUNR-6",
     "depends": "",
     "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
-    "line_no": 287
+    "line_no": 341
   }
 ]

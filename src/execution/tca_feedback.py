@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
+import csv
+import importlib.util
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 import numpy as np
-import pandas as pd
 
-try:
-    import pyarrow  # noqa: F401
+from core.hotpath_runtime import append_lines as native_append_lines
+from core.hotpath_runtime import encode_csv_line as native_encode_csv_line
 
-    HAS_PYARROW = True
-except ImportError:  # pragma: no cover - environment dependent
-    HAS_PYARROW = False
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    import pandas as pd
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,46 @@ logger = logging.getLogger(__name__)
 SLIPPAGE_MAPE_DENOM_FLOOR_BPS = 1.0
 MIN_CALIBRATED_ETA = 0.005
 MAX_CALIBRATED_ETA = 3.0
+
+TCA_CSV_COLUMNS = (
+    "trade_id",
+    "timestamp",
+    "symbol",
+    "exchange",
+    "side",
+    "quantity",
+    "price",
+    "notional",
+    "predicted_slippage_bps",
+    "predicted_commission_bps",
+    "predicted_total_bps",
+    "realized_slippage_bps",
+    "realized_commission_bps",
+    "realized_total_bps",
+    "spread_bps",
+    "vol_24h",
+    "depth_1pct_usd",
+    "strategy_id",
+    "expected_alpha_bps",
+    "prediction_profile",
+    "expected_gross_alpha_usd",
+    "realized_commission_cost_usd",
+    "realized_slippage_cost_usd",
+    "realized_net_alpha_usd",
+    "spread_capture_proxy_usd",
+    "adverse_selection_proxy_usd",
+    "inventory_carry_proxy_usd",
+)
+
+
+def _pd():
+    import pandas as pd
+
+    return pd
+
+
+def _has_pyarrow() -> bool:
+    return importlib.util.find_spec("pyarrow") is not None
 
 
 def slippage_mape_pct(
@@ -105,7 +145,26 @@ class TCATradeRecord:
 def _ensure_datetime(value: Any) -> datetime:
     if isinstance(value, datetime):
         return value
-    return pd.to_datetime(value).to_pydatetime()
+    if isinstance(value, (int, float)):
+        token = float(value)
+        if token > 10_000_000_000:
+            token /= 1000.0
+        return datetime.fromtimestamp(token, tz=timezone.utc)
+    token = str(value).strip()
+    if not token:
+        return datetime.now(timezone.utc)
+    if token.endswith("Z"):
+        token = f"{token[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(token)
+    except ValueError:
+        try:
+            parsed = datetime.fromtimestamp(float(token), tz=timezone.utc)
+        except (TypeError, ValueError):
+            return datetime.now(timezone.utc)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 class TCADatabase:
@@ -115,26 +174,87 @@ class TCADatabase:
         self.db_path = Path(db_path)
         self.storage_path = self._resolve_storage_path()
         self.records: List[TCATradeRecord] = []
+        self._saved_record_count = 0
         self._load_existing()
 
     def _resolve_storage_path(self) -> Path:
-        suffix = self.db_path.suffix.lower()
-
-        if suffix in {".csv", ".parquet"}:
-            if suffix == ".parquet" and not HAS_PYARROW:
-                return self.db_path.with_suffix(".csv")
+        if self.db_path.suffix.lower() == ".csv":
             return self.db_path
-
-        preferred_suffix = ".parquet" if HAS_PYARROW else ".csv"
-        return self.db_path.with_suffix(preferred_suffix)
+        return self.db_path.with_suffix(".csv")
 
     def _candidate_paths(self) -> List[Path]:
         candidates = [self.storage_path]
-        if self.storage_path.suffix == ".parquet":
-            candidates.append(self.storage_path.with_suffix(".csv"))
-        elif self.storage_path.suffix == ".csv":
-            candidates.append(self.storage_path.with_suffix(".parquet"))
+        candidates.append(self.storage_path.with_suffix(".parquet"))
         return candidates
+
+    @staticmethod
+    def _float_or_default(value: Any, default: float = 0.0) -> float:
+        if value is None:
+            return float(default)
+        try:
+            if isinstance(value, float) and np.isnan(value):
+                return float(default)
+        except TypeError:
+            pass
+        token = str(value).strip()
+        if token == "" or token.lower() == "nan":
+            return float(default)
+        try:
+            return float(token)
+        except ValueError:
+            return float(default)
+
+    @staticmethod
+    def _string_or_default(value: Any, default: str) -> str:
+        token = str(value).strip() if value is not None else ""
+        return token or str(default)
+
+    def _record_from_mapping(self, payload: Dict[str, Any]) -> TCATradeRecord:
+        return TCATradeRecord(
+            trade_id=self._string_or_default(payload.get("trade_id"), "unknown_trade"),
+            timestamp=_ensure_datetime(payload.get("timestamp")),
+            symbol=self._string_or_default(payload.get("symbol"), "unknown_symbol"),
+            exchange=self._string_or_default(payload.get("exchange"), "unknown_exchange"),
+            side=self._string_or_default(payload.get("side"), "buy"),
+            quantity=self._float_or_default(payload.get("quantity"), 0.0),
+            price=self._float_or_default(payload.get("price"), 0.0),
+            notional=self._float_or_default(payload.get("notional"), 0.0),
+            predicted_slippage_bps=self._float_or_default(payload.get("predicted_slippage_bps"), 0.0),
+            predicted_commission_bps=self._float_or_default(payload.get("predicted_commission_bps"), 0.0),
+            predicted_total_bps=self._float_or_default(payload.get("predicted_total_bps"), 0.0),
+            realized_slippage_bps=self._float_or_default(payload.get("realized_slippage_bps"), 0.0),
+            realized_commission_bps=self._float_or_default(payload.get("realized_commission_bps"), 0.0),
+            realized_total_bps=self._float_or_default(payload.get("realized_total_bps"), 0.0),
+            spread_bps=self._float_or_default(payload.get("spread_bps"), 0.0),
+            vol_24h=self._float_or_default(payload.get("vol_24h"), 0.0),
+            depth_1pct_usd=self._float_or_default(payload.get("depth_1pct_usd"), 0.0),
+            strategy_id=self._string_or_default(payload.get("strategy_id"), "unknown"),
+            expected_alpha_bps=self._float_or_default(payload.get("expected_alpha_bps"), 0.0),
+            prediction_profile=self._string_or_default(payload.get("prediction_profile"), "unknown"),
+            expected_gross_alpha_usd=self._float_or_default(payload.get("expected_gross_alpha_usd"), 0.0),
+            realized_commission_cost_usd=self._float_or_default(
+                payload.get("realized_commission_cost_usd"), 0.0
+            ),
+            realized_slippage_cost_usd=self._float_or_default(
+                payload.get("realized_slippage_cost_usd"), 0.0
+            ),
+            realized_net_alpha_usd=self._float_or_default(payload.get("realized_net_alpha_usd"), 0.0),
+            spread_capture_proxy_usd=self._float_or_default(payload.get("spread_capture_proxy_usd"), 0.0),
+            adverse_selection_proxy_usd=self._float_or_default(
+                payload.get("adverse_selection_proxy_usd"), 0.0
+            ),
+            inventory_carry_proxy_usd=self._float_or_default(
+                payload.get("inventory_carry_proxy_usd"), 0.0
+            ),
+        )
+
+    def _load_csv_records(self, path: Path) -> List[TCATradeRecord]:
+        rows: List[TCATradeRecord] = []
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                rows.append(self._record_from_mapping(dict(row)))
+        return rows
 
     def _load_existing(self) -> None:
         for path in self._candidate_paths():
@@ -143,53 +263,32 @@ class TCADatabase:
 
             try:
                 if path.suffix == ".parquet":
-                    if not HAS_PYARROW:
+                    if not _has_pyarrow():
                         continue
+                    pd = _pd()
                     frame = pd.read_parquet(path)
+                    loaded = self._df_to_records(frame)
                 else:
-                    frame = pd.read_csv(path, parse_dates=["timestamp"])
+                    loaded = self._load_csv_records(path)
             except Exception as exc:  # pragma: no cover - IO safety
                 logger.warning("Could not load TCA data from %s: %s", path, exc)
                 continue
 
-            self.storage_path = path
-            self.records = self._df_to_records(frame)
+            self.storage_path = self.storage_path.with_suffix(".csv")
+            self.records = loaded
+            self._saved_record_count = len(self.records)
             logger.info("Loaded %s TCA records from %s", len(self.records), path)
             return
 
     def _df_to_records(self, frame: pd.DataFrame) -> List[TCATradeRecord]:
         records: List[TCATradeRecord] = []
         for _, row in frame.iterrows():
-            payload = row.to_dict()
-            payload["timestamp"] = _ensure_datetime(payload["timestamp"])
-            strategy_id = payload.get("strategy_id", "unknown")
-            if pd.isna(strategy_id) or str(strategy_id).strip() == "":
-                strategy_id = "unknown"
-            expected_alpha_bps = payload.get("expected_alpha_bps", 0.0)
-            if pd.isna(expected_alpha_bps):
-                expected_alpha_bps = 0.0
-            prediction_profile = payload.get("prediction_profile", "unknown")
-            if pd.isna(prediction_profile) or str(prediction_profile).strip() == "":
-                prediction_profile = "unknown"
-            for key in (
-                "expected_gross_alpha_usd",
-                "realized_commission_cost_usd",
-                "realized_slippage_cost_usd",
-                "realized_net_alpha_usd",
-                "spread_capture_proxy_usd",
-                "adverse_selection_proxy_usd",
-                "inventory_carry_proxy_usd",
-            ):
-                value = payload.get(key, 0.0)
-                payload[key] = 0.0 if pd.isna(value) else float(value)
-            payload["strategy_id"] = str(strategy_id)
-            payload["expected_alpha_bps"] = float(expected_alpha_bps)
-            payload["prediction_profile"] = str(prediction_profile)
-            records.append(TCATradeRecord(**payload))
+            records.append(self._record_from_mapping(row.to_dict()))
         return records
 
     def _records_to_df(self) -> pd.DataFrame:
-        rows = []
+        pd = _pd()
+        rows: List[Dict[str, Any]] = []
         for record in self.records:
             rows.append(
                 {
@@ -198,44 +297,81 @@ class TCADatabase:
                     "symbol": record.symbol,
                     "exchange": record.exchange,
                     "side": record.side,
-                    "quantity": record.quantity,
-                    "price": record.price,
-                    "notional": record.notional,
-                    "predicted_slippage_bps": record.predicted_slippage_bps,
-                    "predicted_commission_bps": record.predicted_commission_bps,
-                    "predicted_total_bps": record.predicted_total_bps,
-                    "realized_slippage_bps": record.realized_slippage_bps,
-                    "realized_commission_bps": record.realized_commission_bps,
-                    "realized_total_bps": record.realized_total_bps,
-                    "spread_bps": record.spread_bps,
-                    "vol_24h": record.vol_24h,
-                    "depth_1pct_usd": record.depth_1pct_usd,
+                    "quantity": float(record.quantity),
+                    "price": float(record.price),
+                    "notional": float(record.notional),
+                    "predicted_slippage_bps": float(record.predicted_slippage_bps),
+                    "predicted_commission_bps": float(record.predicted_commission_bps),
+                    "predicted_total_bps": float(record.predicted_total_bps),
+                    "realized_slippage_bps": float(record.realized_slippage_bps),
+                    "realized_commission_bps": float(record.realized_commission_bps),
+                    "realized_total_bps": float(record.realized_total_bps),
+                    "spread_bps": float(record.spread_bps),
+                    "vol_24h": float(record.vol_24h),
+                    "depth_1pct_usd": float(record.depth_1pct_usd),
                     "strategy_id": record.strategy_id,
-                    "expected_alpha_bps": record.expected_alpha_bps,
+                    "expected_alpha_bps": float(record.expected_alpha_bps),
                     "prediction_profile": record.prediction_profile,
-                    "expected_gross_alpha_usd": record.expected_gross_alpha_usd,
-                    "realized_commission_cost_usd": record.realized_commission_cost_usd,
-                    "realized_slippage_cost_usd": record.realized_slippage_cost_usd,
-                    "realized_net_alpha_usd": record.realized_net_alpha_usd,
-                    "spread_capture_proxy_usd": record.spread_capture_proxy_usd,
-                    "adverse_selection_proxy_usd": record.adverse_selection_proxy_usd,
-                    "inventory_carry_proxy_usd": record.inventory_carry_proxy_usd,
+                    "expected_gross_alpha_usd": float(record.expected_gross_alpha_usd),
+                    "realized_commission_cost_usd": float(record.realized_commission_cost_usd),
+                    "realized_slippage_cost_usd": float(record.realized_slippage_cost_usd),
+                    "realized_net_alpha_usd": float(record.realized_net_alpha_usd),
+                    "spread_capture_proxy_usd": float(record.spread_capture_proxy_usd),
+                    "adverse_selection_proxy_usd": float(record.adverse_selection_proxy_usd),
+                    "inventory_carry_proxy_usd": float(record.inventory_carry_proxy_usd),
                 }
             )
-        return pd.DataFrame(rows)
+        return pd.DataFrame(rows, columns=list(TCA_CSV_COLUMNS))
+
+    @staticmethod
+    def _record_to_csv_fields(record: TCATradeRecord) -> List[str]:
+        return [
+            str(record.trade_id),
+            _ensure_datetime(record.timestamp).isoformat(),
+            str(record.symbol),
+            str(record.exchange),
+            str(record.side),
+            str(float(record.quantity)),
+            str(float(record.price)),
+            str(float(record.notional)),
+            str(float(record.predicted_slippage_bps)),
+            str(float(record.predicted_commission_bps)),
+            str(float(record.predicted_total_bps)),
+            str(float(record.realized_slippage_bps)),
+            str(float(record.realized_commission_bps)),
+            str(float(record.realized_total_bps)),
+            str(float(record.spread_bps)),
+            str(float(record.vol_24h)),
+            str(float(record.depth_1pct_usd)),
+            str(record.strategy_id),
+            str(float(record.expected_alpha_bps)),
+            str(record.prediction_profile),
+            str(float(record.expected_gross_alpha_usd)),
+            str(float(record.realized_commission_cost_usd)),
+            str(float(record.realized_slippage_cost_usd)),
+            str(float(record.realized_net_alpha_usd)),
+            str(float(record.spread_capture_proxy_usd)),
+            str(float(record.adverse_selection_proxy_usd)),
+            str(float(record.inventory_carry_proxy_usd)),
+        ]
 
     def add_record(self, record: TCATradeRecord) -> None:
         self.records.append(record)
 
     def save(self) -> Path:
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        frame = self._records_to_df()
+        pending = self.records[self._saved_record_count :]
+        if not pending:
+            return self.storage_path
 
-        if self.storage_path.suffix == ".parquet" and HAS_PYARROW:
-            frame.to_parquet(self.storage_path, index=False)
-        else:
-            self.storage_path = self.storage_path.with_suffix(".csv")
-            frame.to_csv(self.storage_path, index=False)
+        lines: List[str] = []
+        if not self.storage_path.exists() or self.storage_path.stat().st_size == 0:
+            lines.append(native_encode_csv_line(TCA_CSV_COLUMNS))
+        for record in pending:
+            lines.append(native_encode_csv_line(self._record_to_csv_fields(record)))
+
+        native_append_lines(str(self.storage_path), lines)
+        self._saved_record_count = len(self.records)
 
         logger.info("Saved %s TCA records to %s", len(self.records), self.storage_path)
         return self.storage_path
@@ -251,6 +387,7 @@ class TCADatabase:
         frame = self._records_to_df()
         if frame.empty:
             return frame
+        pd = _pd()
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         timestamps = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
         return frame[(frame["symbol"] == symbol) & (timestamps >= cutoff)]
@@ -259,6 +396,7 @@ class TCADatabase:
         frame = self._records_to_df()
         if frame.empty:
             return frame
+        pd = _pd()
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         timestamps = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
         return frame[(frame["exchange"] == exchange) & (timestamps >= cutoff)]
@@ -267,6 +405,7 @@ class TCADatabase:
         frame = self._records_to_df()
         if frame.empty:
             return frame
+        pd = _pd()
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         timestamps = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
         return frame[
@@ -307,6 +446,7 @@ class TCACalibrator:
     def _apply_lookback(frame: pd.DataFrame, *, days: int) -> pd.DataFrame:
         if frame.empty:
             return frame
+        pd = _pd()
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         timestamps = pd.to_datetime(frame["timestamp"], utc=True, errors="coerce")
         return frame[timestamps >= cutoff]
@@ -336,6 +476,7 @@ class TCACalibrator:
         return symbol_frame, "insufficient_data"
 
     def analyze_symbol_venue(self, symbol: str, exchange: str, days: int = 30) -> Dict[str, Any]:
+        pd = _pd()
         frame = self.tca_db.get_by_symbol_venue(symbol, exchange, days=days)
         if len(frame) < self.min_samples:
             return {
@@ -379,6 +520,7 @@ class TCACalibrator:
     def calibrate_eta(
         self, symbol: str, exchange: str, current_eta: float, days: int = 30
     ) -> Tuple[float, Dict[str, Any]]:
+        pd = _pd()
         frame, calibration_scope = self._calibration_frame(
             symbol=symbol,
             exchange=exchange,

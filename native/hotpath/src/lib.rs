@@ -1,5 +1,8 @@
 use pyo3::prelude::*;
 use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 fn clamp_lower(value: f64, floor: f64) -> f64 {
     if value.is_finite() {
@@ -18,6 +21,74 @@ fn sha256_hex(seed: &str) -> String {
         out.push_str(&format!("{:02x}", byte));
     }
     out
+}
+
+fn finite_values(values: &[f64]) -> Vec<f64> {
+    values.iter().copied().filter(|v| v.is_finite()).collect()
+}
+
+fn mean_of(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    values.iter().sum::<f64>() / values.len() as f64
+}
+
+fn percentile_of(values: &[f64], percentile: f64) -> f64 {
+    if values.is_empty() {
+        return 0.0;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+    let q = percentile.clamp(0.0, 100.0) / 100.0;
+    let idx = q * (sorted.len().saturating_sub(1) as f64);
+    let low = idx.floor() as usize;
+    let high = idx.ceil() as usize;
+    if low == high {
+        return sorted[low];
+    }
+    let frac = idx - (low as f64);
+    sorted[low] + (sorted[high] - sorted[low]) * frac
+}
+
+fn csv_escape(field: &str) -> String {
+    let needs_quotes = field.contains(',') || field.contains('"') || field.contains('\n') || field.contains('\r');
+    if !needs_quotes {
+        return field.to_string();
+    }
+    let escaped = field.replace('"', "\"\"");
+    format!("\"{}\"", escaped)
+}
+
+fn pearson_abs_corr(x: &[f64], y: &[f64]) -> Option<f64> {
+    let n = x.len().min(y.len());
+    if n < 2 {
+        return None;
+    }
+    let x_tail = &x[x.len() - n..];
+    let y_tail = &y[y.len() - n..];
+    let x_vals = finite_values(x_tail);
+    let y_vals = finite_values(y_tail);
+    if x_vals.len() != n || y_vals.len() != n {
+        return None;
+    }
+    let x_mean = mean_of(&x_vals);
+    let y_mean = mean_of(&y_vals);
+    let mut cov = 0.0;
+    let mut vx = 0.0;
+    let mut vy = 0.0;
+    for i in 0..n {
+        let dx = x_vals[i] - x_mean;
+        let dy = y_vals[i] - y_mean;
+        cov += dx * dy;
+        vx += dx * dx;
+        vy += dy * dy;
+    }
+    if vx <= 1e-12 || vy <= 1e-12 {
+        return None;
+    }
+    let corr = cov / (vx.sqrt() * vy.sqrt());
+    Some(corr.abs().clamp(0.0, 1.0))
 }
 
 #[pyfunction]
@@ -320,6 +391,83 @@ fn profitability_net_alpha_bps(
     (total_router_bps, net_alpha_bps, required_alpha_bps)
 }
 
+#[pyfunction]
+fn append_lines(path: &str, lines: Vec<String>) -> PyResult<usize> {
+    if lines.is_empty() {
+        return Ok(0);
+    }
+    let mut handle = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|err| pyo3::exceptions::PyRuntimeError::new_err(err.to_string()))?;
+    for line in &lines {
+        handle
+            .write_all(line.as_bytes())
+            .map_err(|err| pyo3::exceptions::PyRuntimeError::new_err(err.to_string()))?;
+        handle
+            .write_all(b"\n")
+            .map_err(|err| pyo3::exceptions::PyRuntimeError::new_err(err.to_string()))?;
+    }
+    Ok(lines.len())
+}
+
+#[pyfunction]
+fn encode_csv_line(fields: Vec<String>) -> String {
+    let encoded: Vec<String> = fields.iter().map(|field| csv_escape(field)).collect();
+    encoded.join(",")
+}
+
+#[pyfunction]
+fn vector_mean(values: Vec<f64>) -> f64 {
+    let filtered = finite_values(&values);
+    mean_of(&filtered)
+}
+
+#[pyfunction]
+fn vector_percentile(values: Vec<f64>, percentile: f64) -> f64 {
+    let filtered = finite_values(&values);
+    percentile_of(&filtered, percentile)
+}
+
+#[pyfunction]
+fn reliability_metrics(
+    latencies_ms: Vec<f64>,
+    rejected_flags: Vec<f64>,
+    failure_flags: Vec<f64>,
+) -> (f64, f64, f64, f64) {
+    let lat = finite_values(&latencies_ms);
+    let rej = finite_values(&rejected_flags);
+    let fail = finite_values(&failure_flags);
+    let samples = lat.len() as f64;
+    let p95 = percentile_of(&lat, 95.0);
+    let rejection_rate = mean_of(&rej);
+    let failure_rate = mean_of(&fail);
+    (samples, p95, rejection_rate, failure_rate)
+}
+
+#[pyfunction]
+fn pairwise_abs_corr_mean(series: Vec<Vec<f64>>, min_len: usize) -> f64 {
+    if series.len() < 2 {
+        return 0.0;
+    }
+    let mut corr_values: Vec<f64> = Vec::new();
+    for i in 0..series.len() {
+        for j in (i + 1)..series.len() {
+            let x = &series[i];
+            let y = &series[j];
+            let n = x.len().min(y.len());
+            if n < min_len.max(2) {
+                continue;
+            }
+            if let Some(corr) = pearson_abs_corr(&x[x.len() - n..], &y[y.len() - n..]) {
+                corr_values.push(corr);
+            }
+        }
+    }
+    mean_of(&corr_values)
+}
+
 #[pymodule]
 fn pqts_hotpath(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
@@ -333,5 +481,11 @@ fn pqts_hotpath(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(smart_router_score, m)?)?;
     m.add_function(wrap_pyfunction!(quote_state, m)?)?;
     m.add_function(wrap_pyfunction!(profitability_net_alpha_bps, m)?)?;
+    m.add_function(wrap_pyfunction!(append_lines, m)?)?;
+    m.add_function(wrap_pyfunction!(encode_csv_line, m)?)?;
+    m.add_function(wrap_pyfunction!(vector_mean, m)?)?;
+    m.add_function(wrap_pyfunction!(vector_percentile, m)?)?;
+    m.add_function(wrap_pyfunction!(reliability_metrics, m)?)?;
+    m.add_function(wrap_pyfunction!(pairwise_abs_corr_mean, m)?)?;
     Ok(())
 }

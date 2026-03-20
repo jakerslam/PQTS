@@ -425,3 +425,131 @@ def profitability_net_alpha_bps(
         float(predicted_net_alpha_bps),
         float(required_alpha_bps),
     )
+
+
+def append_lines(path: str, lines: Iterable[str]) -> int:
+    path_token = str(path).strip()
+    encoded_lines = [str(line) for line in lines]
+    if not path_token or not encoded_lines:
+        return 0
+    module = _load_native_module()
+    if module is not None and hasattr(module, "append_lines"):
+        try:
+            return int(module.append_lines(path_token, encoded_lines))
+        except Exception:
+            pass
+    with open(path_token, "a", encoding="utf-8") as handle:
+        for line in encoded_lines:
+            handle.write(f"{line}\n")
+    return len(encoded_lines)
+
+
+def encode_csv_line(fields: Iterable[Any]) -> str:
+    values = ["" if item is None else str(item) for item in fields]
+    module = _load_native_module()
+    if module is not None and hasattr(module, "encode_csv_line"):
+        try:
+            return str(module.encode_csv_line(values))
+        except Exception:
+            pass
+
+    out: list[str] = []
+    for value in values:
+        token = str(value)
+        if any(ch in token for ch in [",", '"', "\n", "\r"]):
+            token = token.replace('"', '""')
+            token = f'"{token}"'
+        out.append(token)
+    return ",".join(out)
+
+
+def vector_mean(values: Iterable[float]) -> float:
+    payload = [float(v) for v in values]
+    module = _load_native_module()
+    if module is not None and hasattr(module, "vector_mean"):
+        try:
+            return float(module.vector_mean(payload))
+        except Exception:
+            pass
+    if not payload:
+        return 0.0
+    return float(sum(payload) / len(payload))
+
+
+def vector_percentile(values: Iterable[float], percentile: float) -> float:
+    payload = [float(v) for v in values]
+    q = float(percentile)
+    module = _load_native_module()
+    if module is not None and hasattr(module, "vector_percentile"):
+        try:
+            return float(module.vector_percentile(payload, q))
+        except Exception:
+            pass
+    if not payload:
+        return 0.0
+    payload = sorted(payload)
+    q = max(0.0, min(q, 100.0)) / 100.0
+    idx = q * (len(payload) - 1)
+    low = int(idx)
+    high = min(low + 1, len(payload) - 1)
+    if low == high:
+        return float(payload[low])
+    frac = idx - low
+    return float(payload[low] + (payload[high] - payload[low]) * frac)
+
+
+def reliability_metrics(
+    *,
+    latencies_ms: Iterable[float],
+    rejected_flags: Iterable[float],
+    failure_flags: Iterable[float],
+) -> tuple[float, float, float, float]:
+    lat = [float(v) for v in latencies_ms]
+    rej = [float(v) for v in rejected_flags]
+    fail = [float(v) for v in failure_flags]
+    module = _load_native_module()
+    if module is not None and hasattr(module, "reliability_metrics"):
+        try:
+            samples, p95, rej_rate, fail_rate = module.reliability_metrics(lat, rej, fail)
+            return float(samples), float(p95), float(rej_rate), float(fail_rate)
+        except Exception:
+            pass
+    return (
+        float(len(lat)),
+        float(vector_percentile(lat, 95.0)),
+        float(vector_mean(rej)),
+        float(vector_mean(fail)),
+    )
+
+
+def pairwise_abs_corr_mean(
+    *,
+    series: Iterable[Iterable[float]],
+    min_len: int = 20,
+) -> float:
+    payload: list[list[float]] = [[float(v) for v in row] for row in series]
+    module = _load_native_module()
+    if module is not None and hasattr(module, "pairwise_abs_corr_mean"):
+        try:
+            return float(module.pairwise_abs_corr_mean(payload, int(max(min_len, 2))))
+        except Exception:
+            pass
+    if len(payload) < 2:
+        return 0.0
+    corr_values: list[float] = []
+    for idx, lhs in enumerate(payload):
+        for rhs in payload[idx + 1 :]:
+            size = min(len(lhs), len(rhs))
+            if size < max(int(min_len), 2):
+                continue
+            x = lhs[-size:]
+            y = rhs[-size:]
+            x_mean = sum(x) / size
+            y_mean = sum(y) / size
+            cov = sum((a - x_mean) * (b - y_mean) for a, b in zip(x, y, strict=True))
+            x_var = sum((a - x_mean) ** 2 for a in x)
+            y_var = sum((b - y_mean) ** 2 for b in y)
+            if x_var <= 1e-12 or y_var <= 1e-12:
+                continue
+            corr_values.append(abs(cov / ((x_var ** 0.5) * (y_var ** 0.5))))
+    return float(sum(corr_values) / len(corr_values)) if corr_values else 0.0

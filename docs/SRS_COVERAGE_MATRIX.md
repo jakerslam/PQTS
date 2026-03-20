@@ -4,11 +4,11 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 
 ## Summary
 
-- Total requirements: **863**
-- implemented: **855**
+- Total requirements: **896**
+- implemented: **895**
 - partial: **0**
-- planned: **8**
-- traced: **0**
+- planned: **0**
+- traced: **1**
 - unmapped: **0**
 
 ## Prefix Summary
@@ -17,6 +17,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 |---|---:|---:|---:|---:|---:|---:|
 | AC | 3 | 0 | 0 | 0 | 0 | 3 |
 | AEG | 6 | 0 | 0 | 0 | 0 | 6 |
+| AET | 5 | 0 | 0 | 0 | 0 | 5 |
 | AGP | 9 | 0 | 0 | 0 | 0 | 9 |
 | AHF | 12 | 0 | 0 | 0 | 0 | 12 |
 | AJO | 3 | 0 | 0 | 0 | 0 | 3 |
@@ -76,6 +77,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | MON | 8 | 0 | 0 | 0 | 0 | 8 |
 | MORP | 4 | 0 | 0 | 0 | 0 | 4 |
 | MRF | 4 | 0 | 0 | 0 | 0 | 4 |
+| MRPH | 5 | 0 | 0 | 0 | 0 | 5 |
 | MTM | 12 | 0 | 0 | 0 | 0 | 12 |
 | MVZ | 3 | 0 | 0 | 0 | 0 | 3 |
 | NAUT | 8 | 0 | 0 | 0 | 0 | 8 |
@@ -88,10 +90,12 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | PG | 7 | 0 | 0 | 0 | 0 | 7 |
 | PH | 10 | 0 | 0 | 0 | 0 | 10 |
 | PHL | 4 | 0 | 0 | 0 | 0 | 4 |
-| PKG | 0 | 0 | 8 | 0 | 0 | 8 |
+| PKG | 8 | 0 | 0 | 0 | 0 | 8 |
 | PL | 7 | 0 | 0 | 0 | 0 | 7 |
 | PMDESK | 12 | 0 | 0 | 0 | 0 | 12 |
 | PMKT | 16 | 0 | 0 | 0 | 0 | 16 |
+| PNSH | 4 | 0 | 0 | 0 | 0 | 4 |
+| PRDY | 7 | 0 | 0 | 1 | 0 | 8 |
 | PS | 7 | 0 | 0 | 0 | 0 | 7 |
 | PWX | 2 | 0 | 0 | 0 | 0 | 2 |
 | QF | 9 | 0 | 0 | 0 | 0 | 9 |
@@ -109,7 +113,9 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | SECAPI | 10 | 0 | 0 | 0 | 0 | 10 |
 | SFD | 2 | 0 | 0 | 0 | 0 | 2 |
 | SH | 5 | 0 | 0 | 0 | 0 | 5 |
+| SLS | 3 | 0 | 0 | 0 | 0 | 3 |
 | SOLS | 2 | 0 | 0 | 0 | 0 | 2 |
+| SOPR | 3 | 0 | 0 | 0 | 0 | 3 |
 | SWI | 7 | 0 | 0 | 0 | 0 | 7 |
 | TAGR | 2 | 0 | 0 | 0 | 0 | 2 |
 | TD | 6 | 0 | 0 | 0 | 0 | 6 |
@@ -131,6 +137,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | ZNM | 2 | 0 | 0 | 0 | 0 | 2 |
 | ZOS | 3 | 0 | 0 | 0 | 0 | 3 |
 | ZQ | 8 | 0 | 0 | 0 | 0 | 8 |
+| ZSTF | 5 | 0 | 0 | 0 | 0 | 5 |
 
 ## Requirement Matrix
 
@@ -556,7 +563,7 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | COMP-7 | Studio (Casual) UX Contract | implemented | done | config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | COMP-8 | Core (Professional) UX Contract | implemented | done | config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | COMP-9 | Surface Parity and Traceability | implemented | done | config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
-| COMP-10 | Wedge-First Market Scope Governance | implemented | done | config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
+| COMP-10 | Wedge-First Market Scope Governance | implemented | done | build/lib/core/market_scope_governance.py, config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md |
 | COMP-11 | First-Success CLI Path | implemented | done | config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
 | COMP-12 | Template-First, Code-Optional, Code-Visible Operation | implemented | done | config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md, docs/TODO.md |
 | COMP-13 | Public Claim and Evidence Policy | implemented | done | config/srs/assimilation_registry.json, docs/COMP_ISSUES_DRAFT.md, docs/DOMINANCE_SRS_HUMAN_SPLIT.md |
@@ -991,11 +998,44 @@ This matrix is auto-generated from `docs/SRS.md`, `docs/TODO.md`, and repository
 | DOM-25 | Tier-1 Forecast-Trading Venue Drill and Certification Contract | implemented | done | docs/TODO.md |
 | DOM-26 | Guided Studio First-Success Contract | implemented | done | docs/TODO.md |
 | DOM-27 | Public Release Evidence Pack Contract | implemented | done | docs/TODO.md |
-| PKG-1 | One-Command Localhost Launch Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| PKG-2 | First-Run Setup Wizard Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| PKG-3 | Local Service Health Orchestration Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| PKG-4 | No-Toolchain Runtime Bundle Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| PKG-5 | Desktop Shell Localhost Integration Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| PKG-6 | Installer, Signing, and Trust Distribution Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| PKG-7 | Auto-Update Channel Safety Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
-| PKG-8 | Crash Recovery and Support Bundle Contract | planned | open | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-1 | One-Command Localhost Launch Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-2 | First-Run Setup Wizard Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-3 | Local Service Health Orchestration Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-4 | No-Toolchain Runtime Bundle Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-5 | Desktop Shell Localhost Integration Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-6 | Installer, Signing, and Trust Distribution Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-7 | Auto-Update Channel Safety Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PKG-8 | Crash Recovery and Support Bundle Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| SOPR-1 | Edge-Sign Hard Block Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| SOPR-2 | Narrative-Override Immunity Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| SOPR-3 | Skip-Discipline and Overtrading Guard Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| AET-1 | Guarded Fast-Action Terminal Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| AET-2 | Cross-Venue Synchronized Recorder Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| AET-3 | Near-Close Favorite Strategy Guard Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| AET-4 | Wallet-History Segmentation and Accumulation Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| AET-5 | External Indicator-Feed Governance Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PNSH-1 | Multi-Seed Swarm Stability Gate Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PNSH-2 | News-Shock Re-Simulation Reactivity Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PNSH-3 | Attention-Tier Market Regime Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PNSH-4 | Mismatch-Decay and Time-to-Execution Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| SLS-1 | Multi-Repo Stack Compatibility Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| SLS-2 | Source-to-Simulation Dataset Verification Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| SLS-3 | Underlying-to-Contract Bridge Integrity Contract | implemented | done | docs/TODO.md, docs/TOP_100_ROI_MOVES.json, docs/TOP_100_ROI_MOVES.md |
+| PRDY-1 | Disaster Recovery Objective Contract | implemented | done | docs/TODO.md |
+| PRDY-2 | Backup and Restore Drill Contract | implemented | done | docs/TODO.md |
+| PRDY-3 | Release Artifact Integrity and SBOM Contract | implemented | done | docs/TODO.md |
+| PRDY-4 | Schema Migration and Rollback Safety Contract | implemented | done | docs/TODO.md |
+| PRDY-5 | Platform Error-Budget and SLO Gating Contract | implemented | done | docs/TODO.md |
+| PRDY-6 | Dependency Failure and Chaos Validation Contract | implemented | done | docs/TODO.md |
+| PRDY-7 | Key and Secret Emergency Response Contract | implemented | done | docs/TODO.md |
+| PRDY-8 | Operational Readiness and Escalation Contract | traced | none | docs/TODO.md |
+| MRPH-1 | Iterative Correction-Cycle Model Contract | implemented | done | docs/TODO.md |
+| MRPH-2 | Early-Stop and Latency-Safe Fallback Contract | implemented | done | docs/TODO.md |
+| MRPH-3 | Cycle-Level Diagnostics and Promotion Evidence Contract | implemented | done | docs/TODO.md |
+| MRPH-4 | Win-Rate Claim Normalization for Iterative Models Contract | implemented | done | docs/TODO.md |
+| MRPH-5 | Drift and Recalibration Governance for Correction Loops Contract | implemented | done | docs/TODO.md |
+| ZSTF-1 | Avellaneda-Stoikov Quoting Policy Contract | implemented | done | docs/TODO.md |
+| ZSTF-2 | Hawkes Order-Flow Intensity Contract | implemented | done | docs/TODO.md |
+| ZSTF-3 | VPIN-Coupled Microstructure Circuit Breaker Contract | implemented | done | docs/TODO.md |
+| ZSTF-4 | Microstructure Simulation Evidence Contract | implemented | done | docs/TODO.md |
+| ZSTF-5 | Source Reliability and Claim Handling | implemented | done | docs/TODO.md |

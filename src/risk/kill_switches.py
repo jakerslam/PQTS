@@ -20,13 +20,14 @@ Acceptance Criteria:
 import logging
 import threading
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import pandas as pd
+
+from core.hotpath_runtime import pairwise_abs_corr_mean, vector_mean, vector_percentile
 
 logger = logging.getLogger(__name__)
 
@@ -247,11 +248,9 @@ class KillSwitchMonitor:
         if len(portfolio_pnl_changes) < 30:
             return False, ""
 
-        var_95 = np.percentile(portfolio_pnl_changes, 5)  # 5th percentile = 95% VaR
-        var_99 = np.percentile(portfolio_pnl_changes, 1)  # 1st percentile = 99% VaR
+        var_99 = vector_percentile(portfolio_pnl_changes, 1.0)  # 1st percentile = 99% VaR
 
         capital = self._get_capital()
-        var_95_pct = abs(var_95) / capital
         var_99_pct = abs(var_99) / capital
 
         if var_99_pct > self.limits.var_99_daily:
@@ -274,7 +273,7 @@ class KillSwitchMonitor:
             return False, ""
 
         recent_slippage = list(self.last_slippages)[-self.limits.slippage_lookback_trade :]
-        avg_slippage = np.mean(recent_slippage)
+        avg_slippage = vector_mean(recent_slippage)
 
         if avg_slippage > self.limits.max_slippage_bps / 10000:
             return (
@@ -305,22 +304,14 @@ class KillSwitchMonitor:
         if len(strategy_returns) < 2:
             return False, ""
 
-        # Calculate pairwise correlations
-        corrs = []
-        names = list(strategy_returns.keys())
-
         min_len = min(len(r) for r in strategy_returns.values())
         if min_len < 20:
             return False, ""
 
-        for i, s1 in enumerate(names):
-            for s2 in names[i + 1 :]:
-                corr = np.corrcoef(
-                    strategy_returns[s1][-min_len:], strategy_returns[s2][-min_len:]
-                )[0, 1]
-                corrs.append(abs(corr))
-
-        avg_corr = np.mean(corrs) if corrs else 0
+        avg_corr = pairwise_abs_corr_mean(
+            series=(np.asarray(row, dtype=float).tolist() for row in strategy_returns.values()),
+            min_len=min_len,
+        )
 
         if avg_corr > self.limits.correlation_threshold:
             return (

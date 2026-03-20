@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Deque, Dict, Iterable, Optional
 
-import numpy as np
+from core.hotpath_runtime import reliability_metrics
 
 
 @dataclass
@@ -32,14 +32,16 @@ class VenueReliabilityState:
                 "rejection_rate": 0.0,
                 "failure_rate": 0.0,
             }
-        lat = np.array(self.latencies_ms, dtype=float)
-        rej = np.array(self.rejected_flags, dtype=float)
-        fail = np.array(self.failure_flags, dtype=float)
+        samples, latency_p95_ms, rejection_rate, failure_rate = reliability_metrics(
+            latencies_ms=self.latencies_ms,
+            rejected_flags=self.rejected_flags,
+            failure_flags=self.failure_flags,
+        )
         return {
-            "samples": float(len(lat)),
-            "latency_p95_ms": float(np.percentile(lat, 95)),
-            "rejection_rate": float(rej.mean()),
-            "failure_rate": float(fail.mean()),
+            "samples": float(samples),
+            "latency_p95_ms": float(latency_p95_ms),
+            "rejection_rate": float(rejection_rate),
+            "failure_rate": float(failure_rate),
         }
 
 

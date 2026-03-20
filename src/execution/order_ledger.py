@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from core.hotpath_runtime import append_lines, event_id
 
 
 class OrderState:
@@ -91,8 +92,7 @@ class ImmutableOrderLedger:
             "metadata": dict(metadata or {}),
         }
         blob = json.dumps(payload, sort_keys=True)
-        token = hashlib.sha256(blob.encode("utf-8")).hexdigest()[:20]
-        return f"evt_{token}"
+        return event_id("evt", (blob,), hex_len=20)
 
     def _load_existing(self) -> None:
         if not self.path.exists():
@@ -118,8 +118,7 @@ class ImmutableOrderLedger:
                 self._state_by_order_id[order_id] = state
 
     def _append(self, event: OrderLedgerEvent) -> None:
-        with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event.to_dict(), sort_keys=True) + "\n")
+        append_lines(str(self.path), [json.dumps(event.to_dict(), sort_keys=True)])
 
     def _validate_transition(self, order_id: str, next_state: str) -> None:
         current_state = self._state_by_order_id.get(str(order_id))

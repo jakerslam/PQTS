@@ -43,6 +43,12 @@ from core.trace_context import ensure_trace_fields
 from execution.capacity_curves import StrategyCapacityCurveModel
 from execution.confidence_allocator import ConfidenceWeightedAllocator
 from execution.distributed_ops_state import DistributedOpsState, DistributedStateConfig
+from execution.edge_sign_discipline import (
+    EdgeSignInputs,
+    EdgeSignTelemetry,
+    evaluate_edge_sign_gate,
+    evaluate_skip_discipline_gate,
+)
 from execution.live_ops_controls import (
     OrderIdempotencyGuard,
     RateLimitConfig,
@@ -79,6 +85,8 @@ from risk.kill_switches import (
     RiskDecision,
     RiskLimits,
     RiskState,
+)
+from risk.kill_switches import (
     TradingEngine as RiskEngine,
 )
 from risk.regime_overlay import RegimeExposureOverlay
@@ -350,6 +358,18 @@ class RiskAwareRouter:
             lunar_edge_cfg.get("max_repricing_lag_ms", 20_000)
         )
         self.lunar_edge_gate_max_data_age_ms = int(lunar_edge_cfg.get("max_data_age_ms", 15_000))
+        edge_sign_cfg = broker_config.get("edge_sign_gate", {}) or {}
+        self.edge_sign_gate_enabled = bool(edge_sign_cfg.get("enabled", False))
+        self.edge_sign_allow_override_simulation = bool(
+            edge_sign_cfg.get("allow_override_simulation", True)
+        )
+        self.edge_sign_max_non_positive_attempt_rate = float(
+            edge_sign_cfg.get("max_non_positive_attempt_rate", 0.20)
+        )
+        self.edge_sign_min_conversion_ratio = float(
+            edge_sign_cfg.get("min_conversion_ratio", 0.05)
+        )
+        self.edge_sign_telemetry = EdgeSignTelemetry()
         self.require_live_client_order_id = bool(
             broker_config.get("require_live_client_order_id", True)
         )
@@ -1563,6 +1583,48 @@ class RiskAwareRouter:
             "required_alpha_bps": float(required_alpha_bps),
             "passed": True,
         }
+        decision_context = order.decision_context if isinstance(order.decision_context, dict) else {}
+        edge_sign_decision = evaluate_edge_sign_gate(
+            EdgeSignInputs(
+                model_probability=(
+                    float(decision_context["model_probability"])
+                    if decision_context.get("model_probability") is not None
+                    else None
+                ),
+                market_probability=(
+                    float(decision_context["market_probability"])
+                    if decision_context.get("market_probability") is not None
+                    else None
+                ),
+                expected_alpha_bps=float(expected_alpha_bps),
+                predicted_total_router_bps=float(predicted_total_router_bps),
+                attempted_override=bool(
+                    decision_context.get("manual_override")
+                    or decision_context.get("narrative_override")
+                    or decision_context.get("conviction_override")
+                ),
+                override_reason=str(decision_context.get("override_reason", "")),
+            ),
+            allow_override_simulation=bool(self.edge_sign_allow_override_simulation),
+        )
+        self.edge_sign_telemetry.record(edge_sign_decision)
+        audit_entry["edge_sign_gate"] = edge_sign_decision.to_dict()
+        if self.edge_sign_gate_enabled and not edge_sign_decision.allow_execute:
+            self.reject_count += 1
+            audit_entry["rejected"] = True
+            audit_entry["reject_reason"] = (
+                "NON_POSITIVE_EDGE: "
+                f"{edge_sign_decision.reason_code}:{edge_sign_decision.final_disposition}"
+            )
+            self.audit_log.append(audit_entry)
+            return _result(
+                success=False,
+                decision_value=RiskDecision.HALT,
+                risk_state_value=risk_state,
+                order_id_value=None,
+                exchange_value=route.exchange,
+                rejected_reason_value=str(audit_entry["reject_reason"]),
+            )
         if self.profitability_gate_enabled:
             if (
                 self.profitability_auto_block_campaign_zero_alpha
@@ -1622,31 +1684,32 @@ class RiskAwareRouter:
                 )
 
         if self.lunar_edge_gate_enabled:
-            context = order.decision_context if isinstance(order.decision_context, dict) else {}
             lunar_gate = evaluate_net_edge_gate(
                 NetEdgeGateInputs(
-                    model_probability=float(context.get("model_probability", -1.0)),
-                    market_probability=float(context.get("market_probability", -1.0)),
-                    fee_bps=float(context.get("fee_bps", 0.0)),
-                    spread_bps=float(context.get("spread_bps", 0.0)),
-                    slippage_bps=float(context.get("slippage_bps", predicted_total_router_bps)),
-                    latency_penalty_bps=float(context.get("latency_penalty_bps", 0.0)),
+                    model_probability=float(decision_context.get("model_probability", -1.0)),
+                    market_probability=float(decision_context.get("market_probability", -1.0)),
+                    fee_bps=float(decision_context.get("fee_bps", 0.0)),
+                    spread_bps=float(decision_context.get("spread_bps", 0.0)),
+                    slippage_bps=float(
+                        decision_context.get("slippage_bps", predicted_total_router_bps)
+                    ),
+                    latency_penalty_bps=float(decision_context.get("latency_penalty_bps", 0.0)),
                     min_net_edge_bps=float(
-                        context.get("min_net_edge_bps", self.lunar_edge_gate_min_net_edge_bps)
+                        decision_context.get("min_net_edge_bps", self.lunar_edge_gate_min_net_edge_bps)
                     ),
                     evidence_ts_ms=(
-                        int(context["evidence_ts_ms"])
-                        if context.get("evidence_ts_ms") is not None
+                        int(decision_context["evidence_ts_ms"])
+                        if decision_context.get("evidence_ts_ms") is not None
                         else None
                     ),
                     market_ts_ms=(
-                        int(context["market_ts_ms"])
-                        if context.get("market_ts_ms") is not None
+                        int(decision_context["market_ts_ms"])
+                        if decision_context.get("market_ts_ms") is not None
                         else None
                     ),
                     now_ts_ms=(
-                        int(context["now_ts_ms"])
-                        if context.get("now_ts_ms") is not None
+                        int(decision_context["now_ts_ms"])
+                        if decision_context.get("now_ts_ms") is not None
                         else int(time.time() * 1000)
                     ),
                     max_repricing_lag_ms=int(self.lunar_edge_gate_max_repricing_lag_ms),
@@ -2823,6 +2886,18 @@ class RiskAwareRouter:
                     self.profitability_auto_block_campaign_zero_alpha
                 ),
                 "campaign_strategy_ids": sorted(self.profitability_campaign_strategy_ids),
+            },
+            "edge_sign_gate": {
+                "enabled": bool(self.edge_sign_gate_enabled),
+                "allow_override_simulation": bool(self.edge_sign_allow_override_simulation),
+                "metrics": self.edge_sign_telemetry.metrics(),
+                "skip_discipline": evaluate_skip_discipline_gate(
+                    self.edge_sign_telemetry,
+                    max_non_positive_attempt_rate=float(
+                        self.edge_sign_max_non_positive_attempt_rate
+                    ),
+                    min_conversion_ratio=float(self.edge_sign_min_conversion_ratio),
+                ).__dict__,
             },
             "live_ops_controls": {
                 "idempotency_ttl_seconds": float(self.idempotency_guard.ttl_seconds),
