@@ -146,7 +146,7 @@ export function OnboardingWizard() {
         </label>
       </div>
 
-      <article className="card" style={{ background: "#f8fbff" }}>
+      <article className="card card-subtle">
         <p style={{ margin: 0 }}>
           Recommended risk profile: <strong>{plan.riskProfile}</strong>
         </p>
@@ -156,7 +156,7 @@ export function OnboardingWizard() {
         <code>{commandBlock}</code>
       </pre>
 
-      <article className="card" style={{ background: "#f8fbff", display: "grid", gap: 8 }}>
+      <article className="card card-subtle" style={{ display: "grid", gap: 8 }}>
         <h3 style={{ margin: 0 }}>Generated Config (UI → Code)</h3>
         <pre className="pqts-code-block" style={{ margin: 0 }}>
           <code>{JSON.stringify(plan.generatedConfig, null, 2)}</code>

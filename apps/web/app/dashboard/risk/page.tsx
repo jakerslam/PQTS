@@ -45,7 +45,7 @@ export default async function RiskPage() {
         </p>
         <div className="grid">
           {blockReasons.map((row) => (
-            <article key={row.code} className="card" style={{ background: "#f8fbff" }}>
+            <article key={row.code} className="card card-subtle">
               <p style={{ margin: "0 0 6px", fontWeight: 700 }}>{row.code}</p>
               <p style={{ margin: 0, color: "var(--muted)" }}>{row.explanation}</p>
             </article>

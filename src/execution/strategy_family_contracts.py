@@ -6,15 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-
-def _parse_iso(value: str) -> datetime:
-    token = str(value).strip()
-    if token.endswith("Z"):
-        token = token[:-1] + "+00:00"
-    dt = datetime.fromisoformat(token)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+from core.compaction_primitives import parse_utc_iso as _parse_iso
 
 
 @dataclass(frozen=True)

@@ -87,7 +87,7 @@ The current bundle-level metrics are shown in the [Strategy Performance](#-strat
 | --- | --- | --- |
 | ![Dashboard Pulse](docs/media/dashboard_pulse.gif) | ![Leaderboard Cycle](docs/media/leaderboard_cycle.gif) | ![Risk Alert Flash](docs/media/risk_alert_flash.gif) |
 
-Regenerate media assets with:
+Regenerate media assets from the primary web Studio with:
 
 ```bash
 python scripts/generate_readme_media.py

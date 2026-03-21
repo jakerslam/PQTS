@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from statistics import mean
 from typing import Any
 
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from core.compaction_primitives import utc_now_iso as _utc_now_iso
 
 
 @dataclass(frozen=True)

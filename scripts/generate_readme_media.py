@@ -25,7 +25,7 @@ from websocket import create_connection
 ROOT = Path(__file__).resolve().parent.parent
 MEDIA_DIR = ROOT / "docs" / "media"
 TARGET_SIZE = (1280, 720)
-DEFAULT_DASHBOARD_URL = "http://127.0.0.1:8501"
+DEFAULT_DASHBOARD_URL = "http://127.0.0.1:3000/dashboard"
 DEFAULT_CHROME_BINARY = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
@@ -88,6 +88,15 @@ def _start_dashboard_process(port: int) -> subprocess.Popen[bytes]:
         [sys.executable, "-c", runner],
         cwd=ROOT,
         env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _start_web_process(port: int) -> subprocess.Popen[bytes]:
+    return subprocess.Popen(
+        ["npm", "--prefix", "apps/web", "run", "dev", "--", "--port", str(port)],
+        cwd=ROOT,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -215,12 +224,12 @@ def _capture_stills(client: CdpClient) -> None:
 
     selector_map = {
         "risk_controls.png": ".summary-row",
-        "performance_snapshot.png": "#equity-chart",
-        "architecture_layers.png": "#price-chart",
-        "canary_progress.png": "#positions-table",
-        "execution_pipeline.png": "#trades-table",
-        "ops_health.png": "#strategy-table",
-        "simulation_leaderboard.png": "#simulation-leaderboard-table",
+        "performance_snapshot.png": ".column-left .chart-container:nth-of-type(1)",
+        "architecture_layers.png": ".main-content",
+        "canary_progress.png": ".column-right .table-container:nth-of-type(3)",
+        "execution_pipeline.png": ".column-right .table-container:nth-of-type(2)",
+        "ops_health.png": ".column-right .table-container:nth-of-type(5)",
+        "simulation_leaderboard.png": ".column-right .table-container:nth-of-type(4)",
     }
 
     for filename, selector in selector_map.items():
@@ -268,7 +277,7 @@ def _connect_cdp(debug_port: int, target_url: str) -> CdpClient:
     return CdpClient(ws_url)
 
 
-def _capture_media(base_url: str, chrome_binary: str, debug_port: int) -> None:
+def _capture_media(base_url: str, chrome_binary: str, debug_port: int, surface: str) -> None:
     chrome_proc = _start_chrome_process(chrome_binary=chrome_binary, debug_port=debug_port)
     client: CdpClient | None = None
     try:
@@ -286,9 +295,14 @@ def _capture_media(base_url: str, chrome_binary: str, debug_port: int) -> None:
             },
         )
         time.sleep(2.0)
-        _wait_for_selector(client, "#equity-chart", timeout_seconds=60.0)
-        _wait_for_selector(client, "#price-chart", timeout_seconds=60.0)
-        _wait_for_selector(client, "#simulation-leaderboard-table", timeout_seconds=60.0)
+        if surface == "dash":
+            _wait_for_selector(client, "#equity-chart", timeout_seconds=60.0)
+            _wait_for_selector(client, "#price-chart", timeout_seconds=60.0)
+            _wait_for_selector(client, "#simulation-leaderboard-table", timeout_seconds=60.0)
+        else:
+            _wait_for_selector(client, ".summary-row", timeout_seconds=60.0)
+            _wait_for_selector(client, ".main-content", timeout_seconds=60.0)
+            _wait_for_selector(client, ".table-container", timeout_seconds=60.0)
         time.sleep(1.5)
 
         print("Capturing screenshots...")
@@ -323,7 +337,13 @@ def _capture_media(base_url: str, chrome_binary: str, debug_port: int) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default=DEFAULT_DASHBOARD_URL, help="Dashboard URL to capture.")
-    parser.add_argument("--port", type=int, default=8501, help="Dashboard port when launching locally.")
+    parser.add_argument("--port", type=int, default=3000, help="Surface port when launching locally.")
+    parser.add_argument(
+        "--surface",
+        choices=["web", "dash"],
+        default="web",
+        help="Capture source surface.",
+    )
     parser.add_argument(
         "--chrome-binary",
         default=DEFAULT_CHROME_BINARY,
@@ -348,14 +368,23 @@ def main() -> int:
     dashboard_proc: subprocess.Popen[bytes] | None = None
     try:
         if not args.no_launch:
-            print("Starting dashboard process...")
-            dashboard_proc = _start_dashboard_process(args.port)
+            if args.surface == "dash":
+                print("Starting Dash process...")
+                dashboard_proc = _start_dashboard_process(args.port)
+            else:
+                print("Starting web process...")
+                dashboard_proc = _start_web_process(args.port)
 
         print(f"Waiting for dashboard at {args.url} ...")
         if not _wait_for_http(args.url):
             raise RuntimeError(f"Dashboard did not become ready at {args.url}")
 
-        _capture_media(base_url=args.url, chrome_binary=args.chrome_binary, debug_port=args.debug_port)
+        _capture_media(
+            base_url=args.url,
+            chrome_binary=args.chrome_binary,
+            debug_port=args.debug_port,
+            surface=args.surface,
+        )
         print(f"Generated real dashboard media in {MEDIA_DIR}")
         return 0
     finally:

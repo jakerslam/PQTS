@@ -6151,3 +6151,397 @@ These requirements define the minimum packaging and usability contracts needed t
 - Localhost and desktop surfaces SHALL capture structured crash diagnostics and allow one-action export of a support bundle containing logs, health status, version/build metadata, and non-secret configuration context.
 - Support bundle generation SHALL redact or omit secrets and private credentials by default.
 - Recovery surfaces SHALL provide deterministic restart actions and preserve prior failure context for operator review.
+
+## 96. Additional Delta Requirements from External Post (sopersone edge-sign discipline, March 18, 2026)
+
+These requirements capture the narrow net-new delta from the referenced post emphasizing strict probability-edge sign discipline (`edge = my_p - market_p`) and "no-trade" behavior when edge is non-positive, independent of narrative conviction.
+
+### SOPR-1 Edge-Sign Hard Block Contract
+
+- Trade candidacy SHALL compute and persist both raw probability edge (`p_model - p_market`) and cost-adjusted edge before order eligibility is evaluated.
+- If either raw or cost-adjusted edge is non-positive, the system SHALL block execution with a typed `non_positive_edge` reason code.
+- Block decisions SHALL be visible in order-truth artifacts and strategy diagnostics so "no-trade" outcomes are auditable rather than silent.
+
+### SOPR-2 Narrative-Override Immunity Contract
+
+- Narrative conviction, discretionary confidence, social consensus, or manual "feels right" flags SHALL NOT override a non-positive edge gate in capital-affecting paths.
+- Any attempted override against a non-positive edge decision SHALL be downgraded to `hold` or `shadow_only` unless a policy-defined privileged test mode explicitly permits non-execute simulation.
+- Override artifacts SHALL record the attempted rationale and final downgraded disposition.
+
+### SOPR-3 Skip-Discipline and Overtrading Guard Contract
+
+- Strategy telemetry SHALL track candidate-to-trade conversion, skip counts by gate reason, and edge-sign distribution for admitted vs rejected candidates.
+- Promotion and leaderboard surfaces SHALL include skip-discipline metrics and SHALL not reward high activity if it is driven by low or non-positive edge candidates.
+- If a strategy repeatedly attempts trades against non-positive edge gates beyond policy thresholds, the system SHALL trigger review actions (for example throttle, disable, or retraining requirement).
+
+## 97. Additional Delta Requirements from External Post (AlterEgo Polymarket script toolkit, March 19, 2026)
+
+These requirements capture the narrow net-new delta from the referenced post describing a public toolkit of script-level components (terminal, recorder, near-close bot, wallet analyzer, and indicator-driven model). They intentionally avoid duplicating existing router safety, EV gates, and generic copy-trade controls.
+
+Observed source links:
+- `https://x.com/AlterEgo_eth/status/2034597324815819003?s=46`
+- `https://github.com/txbabaxyz/polyterminal`
+- `https://github.com/txbabaxyz/polyrec`
+- `https://github.com/txbabaxyz/4coinsbot`
+- `https://github.com/txbabaxyz/collectmarkets2`
+- `https://github.com/txbabaxyz/mlmodelpoly`
+
+### AET-1 Guarded Fast-Action Terminal Contract
+
+- The system MAY support accelerated terminal actions (for example hotkey-triggered order intents), but every order action SHALL still traverse canonical risk and router gates.
+- Fast-action terminal flows SHALL emit intent receipts containing trigger source, pre-trade checks, and final disposition (`submitted`, `blocked`, `hold`).
+- Any configuration that would bypass required confirmations, approvals, or eligibility gates SHALL fail closed.
+
+### AET-2 Cross-Venue Synchronized Recorder Contract
+
+- Data recorder workflows SHALL support synchronized capture of target prediction-market data and selected reference-venue data in the same timeline (for example order book, trades, and indicators).
+- Recorder artifacts SHALL persist source identifiers, sequence/timestamp metadata, and clock-drift diagnostics sufficient for deterministic replay and cross-venue attribution.
+- If recorder synchronization quality drops below policy thresholds, downstream research and model-training workflows SHALL be flagged or blocked from promotion evidence use.
+
+### AET-3 Near-Close Favorite Strategy Guard Contract
+
+- Strategies that enter near market close (for example final-minute/final-segment entries) SHALL declare explicit time-to-close windows, spread/liquidity eligibility, and stop-loss/exit behavior.
+- Near-close entries SHALL be blocked when stale-price age, estimated impact, or settlement-window uncertainty exceeds policy limits.
+- Promotion evidence for near-close strategies SHALL include separate expectancy/slippage breakdown for the configured close-window bucket versus non-close baseline periods.
+
+### AET-4 Wallet-History Segmentation and Accumulation Contract
+
+- Wallet-analysis workflows SHALL normalize full wallet trade history into market-level and position-accumulation/deaccumulation segments with reproducible extraction metadata.
+- Wallet-derived analytics SHALL preserve data provenance and confidence flags for missing/partial on-chain or venue events.
+- Wallet-analysis outputs SHALL remain advisory unless corroborated by canonical internal ledgers before any capital-affecting automation.
+
+### AET-5 External Indicator-Feed Governance Contract
+
+- Strategies using large external indicator sets from third-party providers SHALL declare provider metadata (entitlement scope, latency posture, update cadence, failure modes, and cost model).
+- Indicator snapshots used in decision paths SHALL carry as-of timestamps and freshness checks; stale or degraded indicator feeds SHALL trigger fail-closed or shadow-only behavior.
+- Promotion artifacts SHALL include ablation-style evidence showing incremental value beyond naive baselines when external indicator feeds are enabled.
+
+## 98. Additional Delta Requirements from External Post (0x_Punisher AI-swarm mismatch workflow, March 19, 2026)
+
+These requirements capture the narrow net-new delta from the referenced post/article emphasizing multi-agent swarm-vs-market probability mismatch execution. They intentionally avoid duplicating existing EV gates, unverified-claim handling, and generic crowd-simulation controls already covered in `SOPR-*`, `ZOS-*`, and `LLR-*`.
+
+Observed source links:
+- `https://x.com/0x_punisher/status/2034569323411296491?s=46`
+- `https://x.com/i/article/2034567139516919808`
+
+### PNSH-1 Multi-Seed Swarm Stability Gate Contract
+
+- Swarm-derived probability estimates used for trading decisions SHALL be produced from multiple independent simulation seeds/runs, not a single run.
+- Decision artifacts SHALL persist run-count, seed identifiers (or deterministic hash), central estimate, dispersion/confidence interval, and stability verdict.
+- Trade candidacy SHALL fail closed when between-run dispersion or disagreement exceeds policy thresholds, regardless of nominal mean edge.
+
+### PNSH-2 News-Shock Re-Simulation Reactivity Contract
+
+- For event-driven strategies, the system SHALL support explicit news-shock re-simulation that updates swarm probability outputs after new information ingestion.
+- Re-simulation artifacts SHALL include shock timestamp, ingest timestamp, recompute completion timestamp, and resulting probability-shift delta.
+- If re-simulation latency or freshness exceeds policy limits for the target market horizon, execution eligibility SHALL downgrade to `hold`/`shadow_only`.
+
+### PNSH-3 Attention-Tier Market Regime Contract
+
+- Markets SHALL be classified into attention/competition tiers (for example `high_attention`, `medium_attention`, `low_attention`) using participant/volume/liquidity and update-rate telemetry.
+- Swarm mismatch thresholds, size caps, and confidence requirements SHALL be configurable by attention tier instead of assuming one global edge policy.
+- Promotion and strategy cards SHALL explicitly state when observed edge is concentrated in low-attention tiers and SHALL block unqualified extrapolation to high-attention tiers.
+
+### PNSH-4 Mismatch-Decay and Time-to-Execution Contract
+
+- The system SHALL track decay of swarm-vs-market mismatch over elapsed time from simulation output to order submission and report mismatch half-life metrics by market class.
+- Candidate decisions SHALL include expected net edge at projected execution delay, not only at simulation completion time.
+- Execution SHALL be blocked when projected delay-adjusted mismatch no longer satisfies configured post-cost edge thresholds.
+
+## 99. Additional Delta Requirements from External Post (slash1sol open-source simulation stack, March 19, 2026)
+
+These requirements capture the narrow net-new delta from the referenced post describing a composed open-source stack (`market-data MCP` + `research agent` + `swarm simulator`) for prediction-market workflows. They intentionally avoid duplicating existing unverified-claim labeling, copy-trade safeguards, and generic scenario-simulation requirements.
+
+Observed source links:
+- `https://x.com/slash1sol/status/2034437395156750681?s=46`
+- `https://github.com/financial-datasets/mcp-server`
+- `https://github.com/MiroMindAI/MiroThinker`
+- `https://github.com/666ghj/MiroFish`
+
+### SLS-1 Multi-Repo Stack Compatibility Contract
+
+- Any composed external stack used in PQTS workflows SHALL publish a machine-readable compatibility manifest across data provider, research agent, and simulation engine layers (versions, schema expectations, and interface contracts).
+- Stack startup and run orchestration SHALL fail closed when compatibility checks detect schema drift, connector mismatch, or missing mandatory capabilities.
+- Run artifacts SHALL include reproducible environment metadata (component versions, image/build identifiers, and model endpoint identifiers) for audit and replay.
+
+### SLS-2 Source-to-Simulation Dataset Verification Contract
+
+- Research-agent outputs promoted into simulation inputs SHALL preserve source citations, extraction provenance, and verification status at dataset-field granularity.
+- Unsourced, stale, or unverified derived fields SHALL be excluded or down-weighted by policy before simulation outputs can influence execution decisions.
+- Promotion evidence SHALL include dataset verification coverage metrics and field-level trust composition so model quality claims remain falsifiable.
+
+### SLS-3 Underlying-to-Contract Bridge Integrity Contract
+
+- Strategies that map underlying-market signals (for example equities or indices) into prediction-market contracts SHALL declare explicit symbol/event mapping logic, confidence score, and refresh cadence.
+- Decision artifacts SHALL include bridge-latency and translation-uncertainty adjustments so expected edge is evaluated after mapping risk, not only raw underlying signal strength.
+- Trade candidacy SHALL fail closed when bridge confidence or freshness falls below policy thresholds for the target market horizon.
+
+## 100. Production Readiness Delta Requirements (March 19, 2026)
+
+These requirements capture net-new production-hardening contracts needed to operate PQTS safely and repeatably beyond feature completeness.
+
+### PRDY-1 Disaster Recovery Objective Contract
+
+- Runtime and data-plane services SHALL declare explicit `RTO` and `RPO` objectives per environment (`paper`, `shadow`, `canary`, `live`).
+- Promotion/readiness artifacts SHALL include current measured recovery posture against declared objectives.
+- Any environment operating outside declared `RTO`/`RPO` policy SHALL be ineligible for canary/live promotion.
+
+### PRDY-2 Backup and Restore Drill Contract
+
+- System SHALL produce scheduled, verifiable backups for execution/audit-critical stores (ledger, reconciliation state, promotion artifacts, and policy/config snapshots).
+- Backup integrity checks SHALL include checksum/manifest validation and restore simulation against an isolated target environment.
+- Restore drills SHALL publish measured recovery time, data-loss window, and pass/fail outcome artifacts.
+
+### PRDY-3 Release Artifact Integrity and SBOM Contract
+
+- Build/release pipelines SHALL publish signed provenance for distributed artifacts (wheels/images/installers) and include a machine-readable SBOM.
+- Release readiness SHALL fail when signature/provenance verification or SBOM generation/validation fails.
+- Security scan findings tied to shipped artifact components SHALL be traceable to SBOM coordinates and release IDs.
+
+### PRDY-4 Schema Migration and Rollback Safety Contract
+
+- Persistent schema changes SHALL provide forward and rollback migration paths with explicit compatibility windows.
+- Migration plans SHALL include preflight checks, dry-run validation, and deterministic rollback procedures before production apply.
+- Promotion/release gates SHALL block rollout when migration verification or rollback rehearsal evidence is missing.
+
+### PRDY-5 Platform Error-Budget and SLO Gating Contract
+
+- Platform-level error budgets SHALL be defined for API availability, order-submit pipeline failures, stream-health degradation, and incident response latency.
+- Runtime SHALL automatically degrade to safe modes (throttle/hold/disable promotion advancement) when error budgets are exhausted.
+- Release and promotion decisions SHALL reference recent error-budget consumption windows rather than point-in-time snapshots only.
+
+### PRDY-6 Dependency Failure and Chaos Validation Contract
+
+- The system SHALL run recurring chaos/reliability drills for critical dependencies (venue endpoints, DB/cache, message/stream channels, and secret backends) under controlled scenarios.
+- Drill outputs SHALL include detection time, mitigation action, recovery time, and any invariant violations observed.
+- Canary/live eligibility SHALL require passing the active dependency-chaos policy window.
+
+### PRDY-7 Key and Secret Emergency Response Contract
+
+- Secret/key lifecycle SHALL include automated rotation cadence, expiry detection, and emergency revocation workflows with immutable audit receipts.
+- Runtime SHALL block live-affecting actions for expired, unrotated, or policy-invalid credentials.
+- Emergency key-revocation drills SHALL verify bounded-time containment and post-revocation recovery procedures.
+
+### PRDY-8 Operational Readiness and Escalation Contract
+
+- Production environments SHALL maintain explicit runbooks for incident triage, rollback, failover, and recovery validation with versioned ownership.
+- Escalation policies SHALL define severity classes, acknowledgment/response targets, and handoff requirements across human/operator workflows.
+- Post-incident artifacts SHALL link timeline, decision log, evidence, and preventive follow-up tasks to close the loop on recurring failures.
+
+## 101. Additional Delta Requirements from External Post (morpphhhaw XGBoost correction-cycle post, March 19, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post emphasizing high-cycle iterative correction (`XGBoost`-style updates) for prediction-market probability estimation.
+
+Observed source links:
+- `https://x.com/morpphhhaw/status/2034371024876449969?s=46`
+- Quoted article link from the post payload: `https://x.com/i/article/2034189225218752512`
+
+### MRPH-1 Iterative Correction-Cycle Model Contract
+
+- Strategy/model configs SHALL support bounded iterative correction cycles per prediction with explicit parameters for max rounds and learning-rate term (`eta` or equivalent).
+- Prediction artifacts SHALL persist cycle-depth metadata (`configured_max_rounds`, `executed_rounds`, objective/version identifiers) for every capital-affecting estimate.
+- Cycle-depth policy SHALL be stage-aware (`paper`, `shadow`, `canary`, `live`) and market-horizon-aware to prevent unconstrained compute in short-horizon paths.
+
+### MRPH-2 Early-Stop and Latency-Safe Fallback Contract
+
+- Live/canary inference SHALL enforce convergence and latency-stop criteria for iterative correction loops.
+- If convergence criteria are unmet or latency budget is breached, runtime SHALL fail closed to a policy-approved fallback (`hold`, `shadow_only`, or last validated snapshot) rather than executing stale/partial correction output.
+- Fallback actions SHALL emit typed reason codes and be visible in execution/promotion telemetry.
+
+### MRPH-3 Cycle-Level Diagnostics and Promotion Evidence Contract
+
+- Training and inference telemetry SHALL capture per-cycle loss deltas, residual/error deltas, and marginal post-cost edge contribution.
+- Promotion evidence SHALL demonstrate that additional correction depth improves calibrated, net-after-cost outcomes versus lower-depth baselines.
+- Depth increases that raise compute cost/latency without statistically meaningful net-edge improvement SHALL be rejected or rolled back.
+
+### MRPH-4 Win-Rate Claim Normalization for Iterative Models Contract
+
+- Any reported win-rate for iterative-correction strategies SHALL include sample count, class/base-rate context, horizon segmentation, fee/slippage assumptions, and confidence intervals.
+- High win-rate alone SHALL NOT satisfy promotion criteria without EV, calibration, and drawdown compliance.
+- Public claims from this source chain SHALL remain `unverified` unless reproducible from audited trade-level records and controlled re-runs.
+
+### MRPH-5 Drift and Recalibration Governance for Correction Loops Contract
+
+- Iterative-correction models SHALL run scheduled drift checks and trigger recalibration/retraining workflows when residual-error or calibration thresholds degrade.
+- Recalibration outputs SHALL be versioned, replayable, and rollback-capable before canary/live adoption.
+- If drift checks fail and no validated recalibration is available, execution eligibility SHALL downgrade per policy (`hold` or `shadow_only`).
+
+## 102. Long-History Multi-Asset Regime Signal Requirements (March 20, 2026)
+
+These requirements capture the user-requested capability for a machine-learning signal trained on long-history market data spanning forex, equities, and crypto, while preserving forecast-trading safety and anti-leakage controls.
+
+### ML50-1 Cross-Asset Long-History Dataset Contract
+
+- The system SHALL support a long-history training corpus that combines forex, equities, and crypto data under a unified schema with asset-class tags and timestamp-normalized fields.
+- Coverage manifests SHALL record actual available history by asset class and symbol (for example crypto with materially shorter history than forex/equities) rather than assuming uniform 50-year availability.
+- Training and promotion artifacts SHALL publish data coverage windows, missingness profile, and survivorship-handling policy.
+
+### ML50-2 Regime-Aware Training and Validation Contract
+
+- Model training SHALL use regime-aware, leakage-safe validation (for example walk-forward splits by era/regime and strict no-lookahead boundaries).
+- Feature generation SHALL enforce as-of-time correctness across all asset classes and data vendors.
+- Promotion evidence SHALL include out-of-sample performance segmented by regime class, not aggregate-only metrics.
+
+### ML50-3 Domain Model + Meta-Ensemble Contract
+
+- The system SHALL support per-domain models (`forex`, `equities`, `crypto`) and an optional meta-ensemble layer that combines domain outputs using explicit weighting policy.
+- Ensemble decisions SHALL persist component outputs, weights, confidence intervals, and final combined estimate for audit/replay.
+- Component model disablement or degradation SHALL trigger deterministic fallback behavior without bypassing existing risk and execution gates.
+
+### ML50-4 Prior-Only Signal Safety Contract
+
+- The long-history cross-asset model SHALL act as a regime/context prior and SHALL NOT directly bypass canonical EV, risk, router, and stage-gate controls.
+- Capital-affecting execution SHALL require agreement with existing market-specific edge and cost-adjusted EV policies before order submission.
+- Conflicts between prior signal and primary strategy evidence SHALL produce typed diagnostics and conservative action defaults (`hold`, `size_down`, or `shadow_only` per policy).
+
+### ML50-5 Recency Weighting and Drift Governance Contract
+
+- Training/inference policy SHALL support recency weighting or equivalent decay controls so stale regimes do not dominate current-state decisions.
+- Runtime SHALL track drift metrics for domain models and the meta-ensemble and auto-downweight/disable degraded components when thresholds are breached.
+- Drift-triggered recalibration/retraining outputs SHALL be versioned, replayable, and rollback-capable before canary/live rollout.
+
+### ML50-6 Throughput and Latency Budget Contract
+
+- Cross-asset inference workloads SHALL declare throughput and latency budgets by environment (`paper`, `shadow`, `canary`, `live`) and enforce safe degrade behavior on budget breach.
+- Telemetry SHALL publish per-cycle market count processed, inference latency distribution, skipped/dropped candidate counts, and budget-breach reasons.
+- Promotion to canary/live SHALL require evidence that the long-history signal path meets configured latency/error budgets under realistic load.
+
+## 103. Additional Delta Requirements from External Post (zostaff order-book quant stack, March 20, 2026)
+
+These requirements capture net-new, applicable deltas from the referenced post focused on combining Avellaneda-Stoikov market-making logic, Hawkes-process order-flow modeling, and VPIN-style safety breakers.
+
+Observed source links:
+- `https://x.com/zostaff/status/2034681860261851321?s=20`
+- Quoted article link from the post payload: `https://x.com/i/article/2033932705759481856`
+
+### ZSTF-1 Avellaneda-Stoikov Quoting Policy Contract
+
+- Market-making strategy workflows SHALL support an explicit quoting policy based on reservation price and optimal spread logic with configurable risk-aversion, inventory penalty, and horizon parameters.
+- Quoting decisions SHALL persist the full parameter snapshot and computed quote components (reservation adjustment, spread components, and final bid/ask) for audit/replay.
+- Inventory-sensitive skew and spread-widening behavior SHALL be stage-gated and bounded by existing risk and capital controls.
+
+### ZSTF-2 Hawkes Order-Flow Intensity Contract
+
+- The system SHALL support optional Hawkes-style self-exciting intensity modeling for order-flow arrival forecasting in microstructure-sensitive strategies.
+- Inference artifacts SHALL record baseline intensity, excitation/decay parameters, and current estimated intensity used for quote or entry decisions.
+- If model stability checks fail (for example non-stationary/invalid parameter region or degraded fit), execution eligibility SHALL downgrade to conservative fallback behavior.
+
+### ZSTF-3 VPIN-Coupled Microstructure Circuit Breaker Contract
+
+- VPIN-style toxicity state SHALL be coupled directly to quoting/entry aggressiveness for microstructure strategies, including deterministic throttle/pause/disable actions by severity band.
+- Circuit-breaker transitions SHALL emit typed reason codes and include linked microstructure diagnostics (toxicity estimate, recent fill/reject behavior, and latency context).
+- Recovery from VPIN-triggered pause SHALL require explicit health revalidation and cool-down policy satisfaction before re-enabling normal aggressiveness.
+
+### ZSTF-4 Microstructure Simulation Evidence Contract
+
+- Promotion evidence for order-book market-making strategies SHALL include microstructure simulation sweeps across inventory states, order-flow regimes, and latency/slippage stress conditions.
+- Evidence bundles SHALL report realized-vs-expected spread capture, inventory risk distribution, drawdown tails, and toxicity-trigger frequency.
+- Strategies SHALL not advance to canary/live unless simulation evidence shows robust net-after-cost behavior across the configured stress matrix.
+
+### ZSTF-5 Source Reliability and Claim Handling
+
+- Public claims from this source chain about win rates, rapid overnight build outcomes, or profitability SHALL remain `unverified` unless reproducible from audited trade-level records and controlled reruns.
+- Requirements adopted from this source SHALL remain constrained to observable mechanics and validated controls rather than promotional performance narratives.
+
+## 104. Web Studio v2 (Downloadable Quant Desk) Requirements (March 20, 2026)
+
+These requirements define a complete replacement target for the web surface: a professional quant-trading desk product that can be distributed as an installable client while remaining API-contract-compatible with the existing PQTS control plane.
+
+### WEB2-1 Canonical Quant Desk Information Architecture Contract
+
+- The primary web surface SHALL present a coherent desk IA with explicit sections for `terminal`, `execution`, `portfolio`, `risk`, `promotion`, and `benchmark evidence`.
+- Dash fallback display parity SHALL be represented in the primary terminal route by default (summary KPIs, equity view, price tape/candles, open positions, recent trades, strategy performance, simulation leaderboard).
+- Core trading views SHALL remain directly reachable within one navigation layer; hidden or undiscoverable critical views are prohibited.
+
+### WEB2-2 Display Parity and No-Demo-Illusion Contract
+
+- Any display claiming runtime state SHALL source from live API/contracts or explicit empty-state diagnostics; synthetic/demo filler data in primary operator views is prohibited.
+- Empty states SHALL be explicit and actionable (for example “no fills yet”, “publish reference bundle”, “API unavailable”) rather than visually implying healthy activity.
+- The web terminal SHALL preserve semantic parity with canonical artifact feeds and operator truth surfaces.
+
+### WEB2-3 Execution-Critical UX Contract
+
+- The terminal SHALL include an integrated trade ticket, open positions table, orders/fills tape, and direct jump paths to order-truth and replay drilldowns.
+- Capital-affecting actions SHALL clearly show auth/role requirements and fail-safe messaging when write permissions are absent.
+- Execution workflows SHALL remain constrained by existing router/risk gates and SHALL not introduce alternative order-entry bypass paths.
+
+### WEB2-4 Risk-First Surface Contract
+
+- Kill-switch state, stream health, freshness, trust label, and active risk posture SHALL remain continuously visible in the shell-level status rail.
+- Risk incidents SHALL be promoted to top-level operator context with deterministic severity encoding (normal/warn/degraded) and typed reason visibility.
+- The web surface SHALL fail loud on risk or data-path degradation and SHALL never render degraded states as silently healthy.
+
+### WEB2-5 Provenance and Trust Label Ubiquity Contract
+
+- Benchmark, execution-quality, and order-truth views SHALL expose trust labels and provenance metadata in-line with primary decision context.
+- Any metric or leaderboard shown without resolvable provenance SHALL be explicitly flagged and visually demoted.
+- Provenance exposure SHALL be standardized across pages to reduce interpretation drift between routes.
+
+### WEB2-6 Real-Time Ops Ergonomics Contract
+
+- Navigation, status rails, and command palette SHALL be keyboard-accessible and optimized for dense operator workflows.
+- Layout SHALL support desktop-first operator density while preserving functional mobile fallback for monitoring and low-risk actions.
+- Render paths SHALL remain responsive under realistic data table sizes and stream refresh cadence.
+
+### WEB2-7 Downloadable Distribution Contract
+
+- The web product SHALL define distribution-ready packaging targets (installable desktop shell and/or signed local runtime bundle) with one-command first launch.
+- Installed runtime SHALL include health checks for local dependencies and deterministic startup diagnostics.
+- Update paths SHALL be channel-aware (`stable`, `beta`, `canary`) with signed artifact integrity checks before activation.
+
+### WEB2-8 Workspace/Auth Onboarding Contract
+
+- First-run onboarding SHALL include workspace bootstrap, role-aware authentication, API connectivity checks, and explicit paper-first defaults.
+- Session/token handling SHALL support secure rotation and clear revocation semantics with visible current-role state.
+- Onboarding success criteria SHALL be tied to concrete capability checks (read telemetry, open terminal, submit paper order if role allows).
+
+### WEB2-9 Observability and Supportability Contract
+
+- The web surface SHALL include operator-visible diagnostics for API connectivity, stream channel state, data freshness, and request failure classes.
+- Support/export bundles SHALL include minimal reproducible context (trace/run IDs, route, timestamp, key endpoint failures) for incident triage.
+- UI release readiness SHALL require screenshot/video and smoke-test evidence for all critical desk routes.
+
+### WEB2-10 Public Product Readiness Contract
+
+- The web app SHALL satisfy basic public-product expectations: installability docs, hardened defaults, explicit incident/help paths, and versioned release notes.
+- User-facing copy SHALL describe actual supported capabilities and maturity states; aspirational claims without shipped behavior are prohibited.
+- Regressions in core terminal displays SHALL block release promotion until parity checks pass.
+
+## 105. Additional Delta Requirements from External Post (polydao micro-priced position-fanout pattern, March 20, 2026)
+
+These requirements capture applicable controls from the referenced discussion of high-fanout micro-priced position bots on prediction markets.
+
+Observed source links:
+- Primary target link from request: `https://x.com/polydao/status/2034610144835744124?s=20`
+- Accessible mirror snapshot used for extraction: `https://w.twstalker.com/polydao/status/2009625647874773354`
+- Scale context reference: `https://polymarketanalytics.com/activity`
+
+### POLY-1 Micro-Price Edge Integrity Contract
+
+- Strategies targeting micro-priced outcomes (for example near-$0.01 YES contracts) SHALL compute net EV after all modeled fees, slippage, settlement friction, and inventory carrying costs.
+- Entry SHALL be blocked when gross mispricing does not survive post-cost evaluation at the configured confidence threshold.
+- Decision artifacts SHALL persist micro-price assumptions and post-cost EV inputs for audit/replay.
+
+### POLY-2 Position-Fanout Capacity Governor Contract
+
+- Runtime SHALL enforce explicit limits for concurrent open positions, per-market leg count, and order fanout rate to prevent uncontrolled inventory explosion.
+- Fanout limits SHALL be account-size-aware and stage-aware (`paper`, `canary`, `live`) with deterministic throttle/deny behavior.
+- Fanout breaches SHALL emit typed reason codes and operator-facing diagnostics.
+
+### POLY-3 Crowding and Edge-Decay Monitoring Contract
+
+- The system SHALL monitor strategy crowding proxies (fill degradation, reject rise, edge compression, and latency drift) for high-replication playbooks.
+- When crowding signals indicate edge decay, policy SHALL support automatic size-down, stricter EV thresholds, or temporary strategy disable.
+- Crowding-triggered policy transitions SHALL be logged and exposed in promotion/risk surfaces.
+
+### POLY-4 Long-Tail Inventory and Settlement Risk Contract
+
+- Micro-priced accumulation strategies SHALL include controls for stale long-tail inventory, concentration by resolution window, and unresolved-event capital lockup.
+- Portfolio policy SHALL cap aggregate tail-risk notional and unresolved exposure age buckets.
+- Breach conditions SHALL trigger deterministic unwind/reduce or strategy pause actions.
+
+### POLY-5 Micro-Execution Efficiency Contract
+
+- For high-count, low-notional workflows, runtime SHALL track per-order overhead metrics (latency, reject causes, effective fee burden) and require minimum efficiency thresholds.
+- Workflows that are profitable in gross terms but negative in net operational efficiency SHALL be blocked from promotion.
+- Efficiency diagnostics SHALL be available in the web terminal execution/risk views for operator review.

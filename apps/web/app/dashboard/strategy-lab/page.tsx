@@ -46,7 +46,7 @@ export default function StrategyLabPage() {
 
       <div className="grid">
         {TEMPLATE_CARDS.map((card) => (
-          <article key={card.key} className="card" style={{ background: "#f8fbff" }}>
+          <article key={card.key} className="card card-subtle">
             <h3 style={{ marginTop: 0 }}>{card.title}</h3>
             <p style={{ margin: "0 0 8px" }}>
               <strong>Best for:</strong> {card.conditions}
@@ -101,4 +101,3 @@ export default function StrategyLabPage() {
     </section>
   );
 }
-

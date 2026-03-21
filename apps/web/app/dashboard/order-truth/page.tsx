@@ -4,13 +4,14 @@ import { ProvenanceDrawer } from "@/components/provenance/provenance-drawer";
 import { getOrderTruth, getReferencePerformance } from "@/lib/api/client";
 
 interface PageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     order_id?: string;
-  };
+  }>;
 }
 
 export default async function OrderTruthPage({ searchParams }: PageProps) {
-  const orderId = String(searchParams?.order_id ?? "").trim();
+  const resolved = await searchParams;
+  const orderId = String(resolved?.order_id ?? "").trim();
   const [payload, reference] = await Promise.all([
     getOrderTruth(orderId).catch(() => ({
       selected: null,

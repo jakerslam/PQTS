@@ -10,6 +10,7 @@ import type {
   Order,
   Connector,
   OrderTruthPayload,
+  PnLSnapshot,
   Position,
   ReplayPayload,
   ReferencePerformance,
@@ -17,6 +18,7 @@ import type {
   TerminalPayload,
   TerminalProfile,
 } from "@/lib/api/types";
+import type { PromotionRecord } from "@/lib/ops/promotion-store";
 
 async function apiGet<T>(path: string): Promise<T> {
   const response = await fetch(`${webEnv.NEXT_PUBLIC_API_BASE_URL}${path}`, {
@@ -70,6 +72,20 @@ interface FillEnvelope {
     quantity: number;
     price: number;
     executed_at: string;
+  }>;
+}
+
+interface PnLSnapshotEnvelope {
+  snapshots: Array<{
+    account_id: string;
+    period_start: string;
+    period_end: string;
+    realized_pnl: number;
+    unrealized_pnl: number;
+    gross_pnl: number;
+    net_pnl: number;
+    fees: number;
+    as_of: string;
   }>;
 }
 
@@ -136,6 +152,10 @@ interface DecisionCardsEnvelope {
   cards: DecisionExplainabilityCard[];
 }
 
+interface PromotionsEnvelope {
+  records: PromotionRecord[];
+}
+
 export async function getAccountSummary(): Promise<AccountSummary> {
   const payload = await apiGet<AccountEnvelope>(`/v1/accounts/${webEnv.NEXT_PUBLIC_ACCOUNT_ID}`);
   return payload.account;
@@ -179,6 +199,25 @@ export async function getFills(): Promise<Fill[]> {
     quantity: Number(row.quantity),
     price: Number(row.price),
     timestamp: row.executed_at,
+  }));
+}
+
+export async function getPnLSnapshots(limit = 400): Promise<PnLSnapshot[]> {
+  const payload = await apiGet<PnLSnapshotEnvelope>(
+    `/v1/pnl/snapshots?account_id=${encodeURIComponent(webEnv.NEXT_PUBLIC_ACCOUNT_ID)}`,
+  );
+  const rows = Array.isArray(payload.snapshots) ? payload.snapshots : [];
+  const bounded = Math.max(1, Math.floor(limit));
+  return rows.slice(-bounded).map((row) => ({
+    account_id: String(row.account_id),
+    period_start: String(row.period_start),
+    period_end: String(row.period_end),
+    realized_pnl: Number(row.realized_pnl),
+    unrealized_pnl: Number(row.unrealized_pnl),
+    gross_pnl: Number(row.gross_pnl),
+    net_pnl: Number(row.net_pnl),
+    fees: Number(row.fees),
+    as_of: String(row.as_of),
   }));
 }
 
@@ -245,6 +284,11 @@ export async function getDecisionCards(limit = 50): Promise<DecisionExplainabili
   const bounded = Math.min(Math.max(Math.floor(limit), 1), 500);
   const payload = await apiGet<DecisionCardsEnvelope>(`/v1/ops/decision-cards?limit=${bounded}`);
   return Array.isArray(payload.cards) ? payload.cards : [];
+}
+
+export async function getPromotions(): Promise<PromotionRecord[]> {
+  const payload = await apiGet<PromotionsEnvelope>("/v1/promotions");
+  return Array.isArray(payload.records) ? payload.records : [];
 }
 
 export async function getReplay(limit = 120): Promise<ReplayPayload> {

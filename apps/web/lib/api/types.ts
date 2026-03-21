@@ -31,6 +31,18 @@ export interface Fill {
   timestamp: string;
 }
 
+export interface PnLSnapshot {
+  account_id: string;
+  period_start: string;
+  period_end: string;
+  realized_pnl: number;
+  unrealized_pnl: number;
+  gross_pnl: number;
+  net_pnl: number;
+  fees: number;
+  as_of: string;
+}
+
 export interface RiskState {
   kill_switch_active: boolean;
   kill_switch_reason: string;

@@ -1,6 +1,7 @@
 import { ProvenanceDrawer } from "@/components/provenance/provenance-drawer";
 import { getFills, getOrderTruth, getOrders, getReferencePerformance } from "@/lib/api/client";
 import { LiveStreamStatus } from "@/components/stream/live-stream-status";
+import { TradeTicket } from "@/components/trading/trade-ticket";
 import Link from "next/link";
 
 export default async function ExecutionPage() {
@@ -34,6 +35,7 @@ export default async function ExecutionPage() {
           <Link href="/dashboard/replay">Deterministic Replay Timeline</Link>
         </div>
       </article>
+      <TradeTicket defaultSymbol={orders[0]?.symbol || "BTCUSDT"} />
       <article className="card">
         {references?.provenance ? (
           <ProvenanceDrawer provenance={references.provenance} title="Execution provenance" />

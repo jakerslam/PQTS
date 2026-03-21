@@ -18,14 +18,12 @@ function upstreamUrl(path: string): string {
 export async function proxyApi(path: string, options: ProxyOptions = {}): Promise<NextResponse> {
   const method = options.method ?? "GET";
   const jar = await cookies();
-  const sessionToken = jar.get(SESSION_COOKIE_NAME)?.value;
+  const sessionToken = jar.get(SESSION_COOKIE_NAME)?.value?.trim() || "";
+  const authToken = sessionToken || webEnv.NEXT_PUBLIC_API_TOKEN;
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${webEnv.NEXT_PUBLIC_API_TOKEN}`,
+    Authorization: `Bearer ${authToken}`,
     Accept: "application/json",
   };
-  if (sessionToken) {
-    headers["X-Session-Token"] = sessionToken;
-  }
   if (options.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }

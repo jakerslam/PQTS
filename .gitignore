@@ -83,11 +83,16 @@ native/hotpath/target/
 .DS_Store
 Thumbs.db
 
+# Local reusable prompt docs (kept for personal reference)
+.local-prompts/
+
 # Node / frontend
 node_modules/
 .next/
 apps/web/node_modules/
 apps/web/.next/
+apps/web/.next-dev/
+apps/web/.next-prod/
 *.tsbuildinfo
 
 # Secrets

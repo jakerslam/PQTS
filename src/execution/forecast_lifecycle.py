@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any
+
+from core.compaction_primitives import utc_now_iso as _utc_now_iso
 
 _REVISION_CLASSES = {"strengthen", "weaken", "invalidate", "supersede"}
 _POSITION_ACTIONS = {"hold", "reduce", "exit", "reprice", "no_trade"}
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass(frozen=True)
