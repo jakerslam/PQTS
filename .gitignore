@@ -86,6 +86,9 @@ Thumbs.db
 # Local reusable prompt docs (kept for personal reference)
 .local-prompts/
 
+# External repos cloned for read-only assimilation research
+external_repos/
+
 # Node / frontend
 node_modules/
 .next/

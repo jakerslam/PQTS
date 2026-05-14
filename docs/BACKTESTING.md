@@ -139,10 +139,92 @@ This writes rolling readiness snapshots:
 data/reports/paper_campaign_snapshot_<timestamp>.json
 ```
 
+## Live Market Data / Paper Execution
+
+For a clean live-data run without real order placement, use the Coinbase public
+market-data config:
+
+```bash
+python3 main.py config/live_data.yaml
+```
+
+This config enables only Coinbase crypto symbols with `public_market_data: true`.
+The router consumes live public quotes while `mode: paper_trading` keeps order
+execution simulated. Exchange credentials are still required before any
+authenticated or live-money order path can run.
+
+`config/live_data.yaml` fails closed when live quotes are unresolved or outside
+configured per-symbol price sanity bounds. The router may replay a recent good
+quote inside the resilience window, but it will not synthesize tradable BTC/ETH/SOL
+prices for this live-data paper path.
+
+Paper validation should use strategy/research-derived expected alpha:
+
+```bash
+python3 scripts/run_paper_campaign.py \
+  --config config/live_data.yaml \
+  --symbols BTC-USD,ETH-USD,SOL-USD \
+  --research-report data/research_reports/<run>/report.json \
+  --require-research-alpha
+```
+
+`--campaign-expected-alpha-bps` remains available only for simulation-only
+plumbing probes. Reports label that source as `cli_override` so it cannot be
+mistaken for strategy evidence.
+
 Each snapshot now includes:
 - `ops_health`: deterministic critical/warning incident checks
 - `promotion_gate`: explicit `promote_to_live_canary | remain_in_paper | reject_or_research`
 - `reliability`: per-venue degradation telemetry
+- `market_data_resilience`: replay/failover/sanity-reject/synthetic/unresolved quote counts
+
+Generate a compact soak report from a snapshot and TCA file:
+
+```bash
+python3 scripts/live_data_soak_report.py \
+  --reports-dir data/reports/live_data_soak_<run_id> \
+  --tca-path data/live_data_soak_<run_id>_tca.csv \
+  --out-dir data/reports/live_data_soak_<run_id>
+```
+
+Download backdated Coinbase candles for replay/research validation:
+
+```bash
+python3 scripts/download_historical_data.py \
+  --venue coinbase \
+  --coinbase-symbols BTC-USD,ETH-USD,SOL-USD \
+  --interval 1h \
+  --start 2024-01-01 \
+  --end 2026-05-01 \
+  --output-dir data/historical
+```
+
+Run the full real-data validation ladder before any live-money decision:
+
+```bash
+python3 scripts/run_real_money_validation.py \
+  --venue coinbase \
+  --symbols BTC-USD,ETH-USD,SOL-USD \
+  --interval 1h \
+  --start 2024-05-10 \
+  --end 2026-05-10 \
+  --run-paper-smoke
+```
+
+The ladder writes immutable evidence under `data/reports/real_money_validation_<run_id>/`.
+It first enforces historical data quality, then runs the research tournament,
+builds a research-validation payload, and only starts the live-data paper smoke
+when OOS/CV/deflated-Sharpe and expected-alpha gates are promotable. The default
+strategy universe includes aggregate legacy families plus symbol-aware
+`cross_sectional_momentum`, `adaptive_trend`, and `drawdown_reversion` families
+that can rotate among assets or sit in cash without bypassing promotion gates.
+It also includes the research-only `markov_regime` family, which implements the
+observable Markov-chain framework as rolling bull/bear/sideways state labels,
+walk-forward transition-matrix estimation, multi-step regime probability
+forecasts, and long-only allocation to assets with positive bull-minus-bear
+transition edge. It is not a live shortcut: candidates still need purged CV,
+deflated Sharpe, walk-forward validation, paper duration, slippage, and
+kill-switch gates before any staged promotion.
 
 ## Daily Ops Wrapper
 

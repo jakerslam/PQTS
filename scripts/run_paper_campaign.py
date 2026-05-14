@@ -450,6 +450,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional expected alpha override for campaign probe orders.",
     )
+    parser.add_argument(
+        "--require-research-alpha",
+        action="store_true",
+        help=(
+            "Require campaign expected alpha to come from --research-validation or "
+            "--research-report. Use explicit alpha overrides only for simulation-only probes."
+        ),
+    )
+    parser.add_argument("--max-replay-quotes", type=int, default=0)
+    parser.add_argument("--max-failover-quotes", type=int, default=0)
+    parser.add_argument("--max-sanity-reject-quotes", type=int, default=0)
+    parser.add_argument("--max-synthetic-quotes", type=int, default=0)
+    parser.add_argument("--max-unresolved-quotes", type=int, default=0)
     parser.add_argument("--promotion-min-purged-cv-sharpe", type=float, default=1.0)
     parser.add_argument("--promotion-min-walk-forward-sharpe", type=float, default=1.0)
     parser.add_argument("--promotion-min-deflated-sharpe", type=float, default=0.8)
@@ -530,9 +543,6 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
     capital = float(risk_cfg.get("initial_capital"))
     router.set_capital(capital, source="paper_campaign")
 
-    router.configure_market_adapters(config.get("markets", {}))
-    await router.start_market_data()
-
     symbol_list = (
         _parse_csv(args.symbols)
         if args.symbols
@@ -562,10 +572,20 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
             broker_config.get("expected_alpha_bps_by_strategy", {}).get("campaign", 0.0)
         ),
     )
+    if bool(args.require_research_alpha) and not str(campaign_expected_alpha_source).startswith(
+        "research_validation:"
+    ):
+        raise ValueError(
+            "--require-research-alpha requires --research-validation or --research-report "
+            "with an expected alpha field; explicit CLI/default alpha is simulation-only."
+        )
     portfolio_changes = list(np.linspace(-5.0, 5.0, 30))
 
     out_dir = Path(args.out_dir)
     last_snapshot: Dict[str, Any] = {}
+
+    router.configure_market_adapters(config.get("markets", {}))
+    await router.start_market_data()
 
     try:
         for cycle in range(args.cycles):
@@ -574,6 +594,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
             snapshot = await router.fetch_market_snapshot()
             selected = select_symbol_price(snapshot, symbol)
             if selected is None:
+                stats.skipped_no_price += 1
                 continue
 
             _venue, price = selected
@@ -584,6 +605,11 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                 cycle=cycle,
                 allow_short=bool(args.allow_short_probes),
             )
+            portfolio = build_portfolio_snapshot(
+                positions=positions,
+                prices=prices,
+                capital=capital,
+            )
             probe_notional = bounded_probe_notional(
                 side=side,
                 requested_notional_usd=float(args.notional_usd),
@@ -592,8 +618,11 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                 capital=capital,
                 max_single_position_pct=float(risk_limits.max_single_position_pct),
                 allow_short=bool(args.allow_short_probes),
+                current_gross_exposure=float(portfolio.get("gross_exposure", 0.0) or 0.0),
+                max_gross_leverage=float(risk_limits.max_gross_leverage),
             )
             if probe_notional <= 0.0:
+                stats.skipped_no_notional += 1
                 continue
             order = build_probe_order(
                 symbol=symbol,
@@ -603,12 +632,6 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                 order_type=OrderType.LIMIT,
                 strategy_id="campaign",
                 expected_alpha_bps=campaign_expected_alpha,
-            )
-
-            portfolio = build_portfolio_snapshot(
-                positions=positions,
-                prices=prices,
-                capital=capital,
             )
 
             result = await router.submit_order(
@@ -657,22 +680,32 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                 )
                 router_stats = router.get_stats()
                 reliability = router_stats.get("reliability", {})
+                market_data_resilience = router_stats.get("market_data_resilience", {})
                 ops_health = evaluate_operational_health(
                     campaign_stats={
                         "submitted": stats.submitted,
                         "filled": stats.filled,
                         "rejected": stats.rejected,
                         "reject_rate": stats.reject_rate,
+                        "skipped_no_price": stats.skipped_no_price,
+                        "skipped_no_notional": stats.skipped_no_notional,
+                        "skipped_inventory_guard": stats.skipped_inventory_guard,
                     },
                     readiness=readiness,
                     reliability=reliability,
                     calibration=calibration,
+                    market_data_resilience=market_data_resilience,
                     thresholds=OpsThresholds(
                         max_reject_rate=float(args.max_reject_rate),
                         max_p95_slippage_bps=float(args.max_p95_slippage_bps),
                         max_mape_pct=float(args.max_mape_pct),
                         max_degraded_venues=int(args.max_degraded_venues),
                         max_calibration_alerts=int(args.max_calibration_alerts),
+                        max_replay_quotes=int(args.max_replay_quotes),
+                        max_failover_quotes=int(args.max_failover_quotes),
+                        max_sanity_reject_quotes=int(args.max_sanity_reject_quotes),
+                        max_synthetic_quotes=int(args.max_synthetic_quotes),
+                        max_unresolved_quotes=int(args.max_unresolved_quotes),
                     ),
                 )
                 promotion_gate = evaluate_promotion_gate(
@@ -682,6 +715,9 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         "filled": stats.filled,
                         "rejected": stats.rejected,
                         "reject_rate": stats.reject_rate,
+                        "skipped_no_price": stats.skipped_no_price,
+                        "skipped_no_notional": stats.skipped_no_notional,
+                        "skipped_inventory_guard": stats.skipped_inventory_guard,
                     },
                     ops_summary=ops_health.get("summary", {}),
                     research_validation=research_validation,
@@ -731,6 +767,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
                         },
                     },
                     "reliability": reliability,
+                    "market_data_resilience": market_data_resilience,
                     "calibration": calibration,
                     "readiness": readiness,
                     "ops_health": ops_health,
@@ -758,6 +795,9 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
         "filled": stats.filled,
         "rejected": stats.rejected,
         "reject_rate": stats.reject_rate,
+        "skipped_no_price": stats.skipped_no_price,
+        "skipped_no_notional": stats.skipped_no_notional,
+        "skipped_inventory_guard": stats.skipped_inventory_guard,
         "symbols": symbol_list,
         "campaign_expected_alpha_bps": float(campaign_expected_alpha),
         "campaign_expected_alpha_source": campaign_expected_alpha_source,
@@ -765,6 +805,7 @@ async def _run(args: argparse.Namespace) -> Dict[str, Any]:
         "ops_health": last_snapshot.get("ops_health", {}),
         "promotion_gate": last_snapshot.get("promotion_gate", {}),
         "reliability": last_snapshot.get("reliability", {}),
+        "market_data_resilience": last_snapshot.get("market_data_resilience", {}),
         "readiness": last_snapshot.get("readiness", {}),
         "revenue": last_snapshot.get("revenue", {}),
     }

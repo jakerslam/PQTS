@@ -15,6 +15,11 @@ class OpsThresholds:
     max_mape_pct: float = 35.0
     max_degraded_venues: int = 0
     max_calibration_alerts: int = 0
+    max_replay_quotes: int = 0
+    max_failover_quotes: int = 0
+    max_sanity_reject_quotes: int = 0
+    max_synthetic_quotes: int = 0
+    max_unresolved_quotes: int = 0
 
 
 def _alert(
@@ -41,6 +46,7 @@ def build_ops_alerts(
     reliability: Dict[str, Dict[str, float]],
     calibration: List[Dict[str, Any]],
     thresholds: OpsThresholds,
+    market_data_resilience: Dict[str, Any] | None = None,
 ) -> List[Dict[str, Any]]:
     """Build deterministic alert list for operational gate decisions."""
     alerts: List[Dict[str, Any]] = []
@@ -121,6 +127,27 @@ def build_ops_alerts(
             )
         )
 
+    md_metrics = dict((market_data_resilience or {}).get("metrics", {}) or {})
+    md_checks = [
+        ("replay_quotes", "warning", int(thresholds.max_replay_quotes)),
+        ("failover_quotes", "warning", int(thresholds.max_failover_quotes)),
+        ("sanity_reject_quotes", "critical", int(thresholds.max_sanity_reject_quotes)),
+        ("synthetic_quotes", "critical", int(thresholds.max_synthetic_quotes)),
+        ("unresolved_quotes", "critical", int(thresholds.max_unresolved_quotes)),
+    ]
+    for key, severity, threshold in md_checks:
+        value = int(md_metrics.get(key, 0) or 0)
+        if value > threshold:
+            alerts.append(
+                _alert(
+                    key=f"market_data_{key}",
+                    severity=severity,
+                    message=f"Market-data resilience emitted {key}",
+                    value=value,
+                    threshold=threshold,
+                )
+            )
+
     return alerts
 
 
@@ -141,6 +168,7 @@ def evaluate_operational_health(
     readiness: Dict[str, Any],
     reliability: Dict[str, Dict[str, float]],
     calibration: List[Dict[str, Any]],
+    market_data_resilience: Dict[str, Any] | None = None,
     thresholds: OpsThresholds | None = None,
 ) -> Dict[str, Any]:
     """Single-call ops health evaluation payload for snapshots/reporting."""
@@ -150,6 +178,7 @@ def evaluate_operational_health(
         readiness=readiness,
         reliability=reliability,
         calibration=calibration,
+        market_data_resilience=market_data_resilience,
         thresholds=threshold_cfg,
     )
     return {

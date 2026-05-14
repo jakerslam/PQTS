@@ -62,6 +62,11 @@ def test_parser_accepts_alpha_override_and_research_report():
             "capacity_curves=off",
             "--disable-major-bootstrap",
             "--allow-short-probes",
+            "--require-research-alpha",
+            "--max-replay-quotes",
+            "1",
+            "--max-sanity-reject-quotes",
+            "2",
         ]
     )
 
@@ -74,6 +79,9 @@ def test_parser_accepts_alpha_override_and_research_report():
     assert args.switches == ["capacity_curves=off"]
     assert args.disable_major_bootstrap is True
     assert args.allow_short_probes is True
+    assert args.require_research_alpha is True
+    assert args.max_replay_quotes == 1
+    assert args.max_sanity_reject_quotes == 2
 
 
 def test_bootstrap_symbols_prefers_major_universe():

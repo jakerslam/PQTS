@@ -12,6 +12,126 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 
+class BinancePublicMarketDataAdapter:
+    """
+    Binance public market-data adapter.
+
+    This adapter intentionally exposes only unsigned market-data endpoints. It
+    lets paper/shadow runs consume live prices without exchange credentials and
+    without creating an order-capable venue client.
+    """
+
+    def __init__(
+        self,
+        router_token=None,
+        live: bool = True,
+        request_timeout_seconds: float = 10.0,
+    ):
+        self._require_router_token(router_token)
+        self._router_token = router_token
+        self.live = bool(live)
+        self.request_timeout_seconds = float(request_timeout_seconds)
+        self.request_timeout = aiohttp.ClientTimeout(total=self.request_timeout_seconds)
+
+        if self.live:
+            self.base_url = "https://api.binance.com"
+            self.ws_url = "wss://stream.binance.com:9443/ws"
+        else:
+            self.base_url = "https://testnet.binance.vision"
+            self.ws_url = "wss://testnet.binance.vision/ws"
+
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.market_data_only = True
+
+        logger.info("BinancePublicMarketDataAdapter initialized: live=%s", self.live)
+
+    @staticmethod
+    def _require_router_token(router_token) -> None:
+        from execution.risk_aware_router import _is_valid_router_token
+
+        if not _is_valid_router_token(router_token):
+            raise RuntimeError(
+                "BinancePublicMarketDataAdapter requires a valid _RouterToken "
+                "issued by RiskAwareRouter."
+            )
+
+    async def connect(self):
+        """Establish public market-data connection."""
+        self.session = aiohttp.ClientSession()
+        try:
+            await self._request("GET", "/api/v3/ping")
+            logger.info("Binance public market-data connection successful")
+        except Exception:
+            await self.disconnect()
+            raise
+
+    async def disconnect(self):
+        """Close connection."""
+        if self.session:
+            await self.session.close()
+            self.session = None
+
+    async def _request(
+        self, method: str, endpoint: str, params: dict = None, signed: bool = False
+    ) -> dict:
+        """Make unsigned public market-data API request."""
+        if signed:
+            raise RuntimeError("Binance public market-data adapter cannot make signed requests.")
+        if not self.session:
+            raise RuntimeError("Not connected")
+
+        url = f"{self.base_url}{endpoint}"
+        async with self.session.request(
+            method,
+            url,
+            params=params,
+            timeout=self.request_timeout,
+        ) as response:
+            data = await response.json()
+            if response.status != 200:
+                logger.error("Binance public API error: %s", data)
+                raise Exception(f"API error: {data}")
+            return data
+
+    async def get_ticker(self, symbol: str) -> dict:
+        """Get 24hr ticker data."""
+        return await self._request("GET", "/api/v3/ticker/24hr", {"symbol": symbol})
+
+    async def get_orderbook(self, symbol: str, limit: int = 100) -> dict:
+        """Get order book."""
+        return await self._request("GET", "/api/v3/depth", {"symbol": symbol, "limit": limit})
+
+    async def get_klines(self, symbol: str, interval: str = "1h", limit: int = 500) -> List[List]:
+        """Get candlestick data."""
+        params = {"symbol": symbol, "interval": interval, "limit": limit}
+        return await self._request("GET", "/api/v3/klines", params)
+
+    async def get_exchange_info(self) -> dict:
+        """Get exchange information."""
+        return await self._request("GET", "/api/v3/exchangeInfo")
+
+    async def place_order(self, *args, **kwargs) -> dict:
+        """Reject all order attempts; this adapter is market-data only."""
+        raise RuntimeError("Binance public adapter is market-data only; order placement disabled.")
+
+    async def cancel_order(self, *args, **kwargs) -> dict:
+        """Reject all cancel attempts; this adapter is market-data only."""
+        raise RuntimeError("Binance public adapter is market-data only; order cancel disabled.")
+
+    def stream_descriptors(self) -> Dict[str, Dict[str, Union[str, float]]]:
+        """Market stream descriptor only; no private order/fill stream."""
+        from execution.stream_contracts import StreamDescriptor
+
+        return {
+            "market": StreamDescriptor(
+                channel="market",
+                transport="websocket",
+                url=str(self.ws_url),
+                heartbeat_seconds=15.0,
+            ).to_dict()
+        }
+
+
 class BinanceAdapter:
     """
     Binance exchange adapter for crypto trading.

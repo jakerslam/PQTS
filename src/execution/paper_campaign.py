@@ -13,6 +13,9 @@ class CampaignStats:
     submitted: int = 0
     filled: int = 0
     rejected: int = 0
+    skipped_no_price: int = 0
+    skipped_no_notional: int = 0
+    skipped_inventory_guard: int = 0
 
     @property
     def reject_rate(self) -> float:
@@ -58,6 +61,8 @@ def select_symbol_price(snapshot: Dict[str, Any], symbol: str) -> Optional[Tuple
             continue
         quote = payload.get(symbol)
         if not isinstance(quote, dict):
+            continue
+        if str(quote.get("quality_mode", "")).lower() in {"synthetic", "unresolved"}:
             continue
         price = float(quote.get("price", 0.0) or 0.0)
         if price > 0:
@@ -112,6 +117,8 @@ def bounded_probe_notional(
     capital: float,
     max_single_position_pct: float,
     allow_short: bool = False,
+    current_gross_exposure: float = 0.0,
+    max_gross_leverage: float = 0.0,
 ) -> float:
     requested = float(max(requested_notional_usd, 0.0))
     if requested <= 0.0:
@@ -123,12 +130,24 @@ def bounded_probe_notional(
 
     side_token = str(side).lower()
     if side_token == "buy":
+        if qty < 0.0:
+            return float(min(requested, abs(qty) * px))
+        if float(max_gross_leverage) > 0.0:
+            max_gross = max(float(capital), 0.0) * float(max_gross_leverage)
+            gross_headroom = max(max_gross - max(float(current_gross_exposure), 0.0), 0.0)
+            requested = min(requested, gross_headroom)
         long_notional = max(qty, 0.0) * px
         headroom = max(cap_usd - long_notional, 0.0)
         return float(min(requested, headroom))
 
     if side_token == "sell":
         if bool(allow_short):
+            if qty > 0.0:
+                return float(min(requested, qty * px))
+            if float(max_gross_leverage) > 0.0:
+                max_gross = max(float(capital), 0.0) * float(max_gross_leverage)
+                gross_headroom = max(max_gross - max(float(current_gross_exposure), 0.0), 0.0)
+                requested = min(requested, gross_headroom)
             short_notional = max(-qty, 0.0) * px
             headroom = max(cap_usd - short_notional, 0.0)
             return float(min(requested, headroom))

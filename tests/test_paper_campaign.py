@@ -45,6 +45,21 @@ def test_select_symbol_price_skips_metadata_payloads():
     assert selected == ("binance", 51000.0)
 
 
+def test_select_symbol_price_skips_synthetic_quotes():
+    market_snapshot = {
+        "coinbase": {
+            "BTC-USD": {
+                "price": 128.0,
+                "spread": 0.001,
+                "volume_24h": 1000.0,
+                "quality_mode": "synthetic",
+            },
+        },
+    }
+
+    assert select_symbol_price(market_snapshot, "BTC-USD") is None
+
+
 def test_build_probe_order_uses_notional_and_order_type():
     order = build_probe_order(
         symbol="BTCUSDT",
@@ -96,3 +111,34 @@ def test_bounded_probe_notional_respects_long_only_inventory_and_cap():
         allow_short=False,
     )
     assert buy_notional == pytest.approx(250.0)
+
+
+def test_bounded_probe_notional_respects_gross_leverage_headroom():
+    buy_notional = bounded_probe_notional(
+        side="buy",
+        requested_notional_usd=500.0,
+        current_qty=0.0,
+        price=100.0,
+        capital=1000.0,
+        max_single_position_pct=1.0,
+        current_gross_exposure=950.0,
+        max_gross_leverage=1.0,
+    )
+
+    assert buy_notional == pytest.approx(50.0)
+
+
+def test_bounded_probe_notional_allows_flattening_without_gross_headroom():
+    sell_notional = bounded_probe_notional(
+        side="sell",
+        requested_notional_usd=500.0,
+        current_qty=5.0,
+        price=100.0,
+        capital=1000.0,
+        max_single_position_pct=1.0,
+        current_gross_exposure=1200.0,
+        max_gross_leverage=1.0,
+        allow_short=True,
+    )
+
+    assert sell_notional == pytest.approx(500.0)

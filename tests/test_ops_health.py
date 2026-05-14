@@ -53,3 +53,34 @@ def test_ops_health_reports_healthy_when_within_thresholds():
 
     assert payload["summary"]["critical"] == 0
     assert payload["summary"]["healthy"] is True
+
+
+def test_ops_health_alerts_on_market_data_quality_incidents():
+    payload = evaluate_operational_health(
+        campaign_stats={"submitted": 10, "filled": 10, "rejected": 0, "reject_rate": 0.0},
+        readiness={
+            "ready_for_canary": True,
+            "p95_realized_slippage_bps": 5.0,
+            "slippage_mape_pct": 5.0,
+        },
+        reliability={"coinbase": {"degraded": 0.0}},
+        calibration=[],
+        market_data_resilience={
+            "metrics": {
+                "replay_quotes": 1,
+                "failover_quotes": 1,
+                "sanity_reject_quotes": 1,
+                "synthetic_quotes": 1,
+                "unresolved_quotes": 1,
+            }
+        },
+        thresholds=OpsThresholds(),
+    )
+
+    keys = {row["key"] for row in payload["alerts"]}
+    assert "market_data_replay_quotes" in keys
+    assert "market_data_failover_quotes" in keys
+    assert "market_data_sanity_reject_quotes" in keys
+    assert "market_data_synthetic_quotes" in keys
+    assert "market_data_unresolved_quotes" in keys
+    assert payload["summary"]["critical"] >= 3

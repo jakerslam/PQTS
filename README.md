@@ -130,6 +130,14 @@ python src/dashboard/start.py
 
 # Run bounded paper forecast-trading loop
 python main.py config/paper.yaml
+# Run paper execution on live public Coinbase market data only
+python main.py config/live_data.yaml
+# For live-data paper validation, require research-derived expected alpha
+python scripts/run_paper_campaign.py \
+  --config config/live_data.yaml \
+  --symbols BTC-USD,ETH-USD,SOL-USD \
+  --research-report data/research_reports/<run>/report.json \
+  --require-research-alpha
 # or enforce a specific user risk tolerance profile:
 python main.py config/paper.yaml --risk-profile conservative
 # or run AI autopilot with human strategy overrides:
@@ -513,6 +521,18 @@ python scripts/run_strategy_tournament.py \
   --end 2026-02-01T00:00:00Z \
   --sources binance:BTCUSDT,binance:ETHUSDT \
   --strategy-types market_making,funding_arbitrage
+
+# 2b) real-data validation ladder with research-gated live-data paper smoke
+python scripts/run_real_money_validation.py \
+  --venue coinbase \
+  --symbols BTC-USD,ETH-USD,SOL-USD \
+  --interval 1h \
+  --start 2024-05-10 \
+  --end 2026-05-10 \
+  --run-paper-smoke
+
+# The default research universe includes symbol-aware Markov-regime candidates.
+# They are validated as research/backtest candidates only, under the same gates.
 
 # 3) policy-driven canary allocation step (advance/hold/rollback/halt)
 python scripts/run_canary_ramp.py

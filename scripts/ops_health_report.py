@@ -7,7 +7,15 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import sys
 from typing import Any, Dict
+
+ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path[:] = [str(SRC), *sys.path]
+if str(ROOT) not in sys.path:
+    sys.path[:] = [str(ROOT), *sys.path]
 
 from analytics.ops_health import OpsThresholds, evaluate_operational_health
 
@@ -41,6 +49,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-mape-pct", type=float, default=35.0)
     parser.add_argument("--max-degraded-venues", type=int, default=0)
     parser.add_argument("--max-calibration-alerts", type=int, default=0)
+    parser.add_argument("--max-replay-quotes", type=int, default=0)
+    parser.add_argument("--max-failover-quotes", type=int, default=0)
+    parser.add_argument("--max-sanity-reject-quotes", type=int, default=0)
+    parser.add_argument("--max-synthetic-quotes", type=int, default=0)
+    parser.add_argument("--max-unresolved-quotes", type=int, default=0)
     return parser
 
 
@@ -55,12 +68,18 @@ def main() -> int:
         readiness=snapshot.get("readiness", {}),
         reliability=snapshot.get("reliability", {}),
         calibration=snapshot.get("calibration", []),
+        market_data_resilience=snapshot.get("market_data_resilience", {}),
         thresholds=OpsThresholds(
             max_reject_rate=float(args.max_reject_rate),
             max_p95_slippage_bps=float(args.max_p95_slippage_bps),
             max_mape_pct=float(args.max_mape_pct),
             max_degraded_venues=int(args.max_degraded_venues),
             max_calibration_alerts=int(args.max_calibration_alerts),
+            max_replay_quotes=int(args.max_replay_quotes),
+            max_failover_quotes=int(args.max_failover_quotes),
+            max_sanity_reject_quotes=int(args.max_sanity_reject_quotes),
+            max_synthetic_quotes=int(args.max_synthetic_quotes),
+            max_unresolved_quotes=int(args.max_unresolved_quotes),
         ),
     )
 

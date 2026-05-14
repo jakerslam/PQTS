@@ -12,6 +12,135 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 
+class CoinbasePublicMarketDataAdapter:
+    """
+    Coinbase public market-data adapter.
+
+    This adapter intentionally exposes only unauthenticated market-data
+    endpoints. It lets paper/shadow runs consume live US-accessible crypto
+    prices while keeping order placement unavailable without credentials.
+    """
+
+    def __init__(
+        self,
+        router_token=None,
+        live: bool = True,
+        request_timeout_seconds: float = 10.0,
+    ):
+        self._require_router_token(router_token)
+        self._router_token = router_token
+        self.live = bool(live)
+        self.request_timeout_seconds = float(request_timeout_seconds)
+        self.request_timeout = aiohttp.ClientTimeout(total=self.request_timeout_seconds)
+
+        if self.live:
+            self.base_url = "https://api.exchange.coinbase.com"
+            self.ws_url = "wss://ws-feed.exchange.coinbase.com"
+        else:
+            self.base_url = "https://api-public.sandbox.exchange.coinbase.com"
+            self.ws_url = "wss://ws-feed-public.sandbox.exchange.coinbase.com"
+
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.market_data_only = True
+
+        logger.info("CoinbasePublicMarketDataAdapter initialized: live=%s", self.live)
+
+    @staticmethod
+    def _require_router_token(router_token) -> None:
+        from execution.risk_aware_router import _is_valid_router_token
+
+        if not _is_valid_router_token(router_token):
+            raise RuntimeError(
+                "CoinbasePublicMarketDataAdapter requires a valid _RouterToken "
+                "issued by RiskAwareRouter."
+            )
+
+    async def connect(self):
+        """Establish public market-data connection."""
+        self.session = aiohttp.ClientSession()
+        try:
+            await self._request("GET", "/time")
+            logger.info("Coinbase public market-data connection successful")
+        except Exception:
+            await self.disconnect()
+            raise
+
+    async def disconnect(self):
+        """Close connection."""
+        if self.session:
+            await self.session.close()
+            self.session = None
+
+    async def _request(self, method: str, path: str, params: dict = None) -> dict:
+        """Make unauthenticated public market-data request."""
+        if not self.session:
+            raise RuntimeError("Not connected")
+
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "PQTS-live-market-data/1.0",
+        }
+        url = f"{self.base_url}{path}"
+        async with self.session.request(
+            method,
+            url,
+            headers=headers,
+            params=params,
+            timeout=self.request_timeout,
+        ) as response:
+            data = await response.json()
+            if response.status not in [200, 201]:
+                logger.error("Coinbase public API error: %s", data)
+                raise Exception(f"API error: {data}")
+            return data
+
+    async def get_products(self) -> List[dict]:
+        """Get available trading pairs."""
+        return await self._request("GET", "/products")
+
+    async def get_product_ticker(self, product_id: str) -> dict:
+        """Get product ticker."""
+        return await self._request("GET", f"/products/{product_id}/ticker")
+
+    async def get_product_book(self, product_id: str, level: int = 2) -> dict:
+        """Get product order book."""
+        return await self._request("GET", f"/products/{product_id}/book", {"level": int(level)})
+
+    async def get_candles(
+        self, product_id: str, granularity: int = 3600, start: datetime = None, end: datetime = None
+    ) -> List[list]:
+        """Get historical candles."""
+        params = {"granularity": granularity}
+
+        if start:
+            params["start"] = start.isoformat()
+        if end:
+            params["end"] = end.isoformat()
+
+        return await self._request("GET", f"/products/{product_id}/candles", params=params)
+
+    async def place_order(self, *args, **kwargs) -> dict:
+        """Reject all order attempts; this adapter is market-data only."""
+        raise RuntimeError("Coinbase public adapter is market-data only; order placement disabled.")
+
+    async def cancel_order(self, *args, **kwargs) -> dict:
+        """Reject all cancel attempts; this adapter is market-data only."""
+        raise RuntimeError("Coinbase public adapter is market-data only; order cancel disabled.")
+
+    def stream_descriptors(self) -> Dict[str, Dict[str, Union[str, float]]]:
+        """Market stream descriptor only; no private order/fill stream."""
+        from execution.stream_contracts import StreamDescriptor
+
+        return {
+            "market": StreamDescriptor(
+                channel="market",
+                transport="websocket",
+                url=str(self.ws_url),
+                heartbeat_seconds=15.0,
+            ).to_dict()
+        }
+
+
 class CoinbaseAdapter:
     """
     Coinbase Pro / Advanced Trade adapter for crypto trading.

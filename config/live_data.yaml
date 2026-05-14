@@ -1,0 +1,101 @@
+# Live Market Data / Paper Execution Configuration
+# Uses real public market data while keeping all order execution simulated.
+
+mode: paper_trading
+
+markets:
+  crypto:
+    enabled: true
+    exchanges:
+      - name: coinbase
+        public_market_data: true
+        public_market_data_live: true
+        symbols:
+          - BTC-USD
+          - ETH-USD
+          - SOL-USD
+
+  equities:
+    enabled: false
+    brokers: []
+
+  forex:
+    enabled: false
+    brokers: []
+
+strategies:
+  trend_following:
+    enabled: true
+    markets: [crypto]
+    timeframes: ['1h', '4h', '1d']
+    max_positions: 3
+
+risk:
+  initial_capital: 10000.0
+  risk_tolerance_profile: conservative
+  max_portfolio_risk_pct: 1.0
+  max_position_risk_pct: 0.5
+  max_drawdown_pct: 5.0
+  max_positions: 3
+  max_leverage: 1.0
+  max_order_notional: 250.0
+  max_participation: 0.01
+  max_slippage_bps: 35.0
+  position_sizing: fixed_amount
+
+execution:
+  reliability:
+    enable_failover: false
+  expected_alpha_bps_by_strategy:
+    trend_following: 9.0
+    # Campaign probes require a research report or explicit simulation-only
+    # override; live-data validation should not assume edge by default.
+    campaign: 0.0
+  profitability_gate:
+    enabled: true
+    min_edge_bps: 0.5
+    block_non_positive_expected_alpha: false
+    auto_block_campaign_zero_alpha: true
+    campaign_strategy_ids: ['campaign']
+  paper_fill_model:
+    enabled: true
+    reality_stress_mode: true
+    stress_slippage_multiplier: 2.5
+    stress_fill_ratio_multiplier: 0.70
+  market_data_resilience:
+    enabled: true
+    stale_after_seconds: 5.0
+    replay_window_seconds: 120.0
+    # Live-data paper runs must fail closed on unresolved quotes. They may
+    # replay a recent sane quote, but must not invent synthetic tradable prices.
+    allow_synthetic_fallback: false
+    max_price_deviation_bps: 2000.0
+    max_mid_deviation_bps: 250.0
+    max_spread_bps: 150.0
+    rolling_window_size: 120
+    min_rolling_samples: 12
+    max_rolling_price_deviation_bps: 1200.0
+    min_price_by_symbol:
+      BTC-USD: 10000.0
+      ETH-USD: 500.0
+      SOL-USD: 10.0
+    max_price_by_symbol:
+      BTC-USD: 500000.0
+      ETH-USD: 50000.0
+      SOL-USD: 1000.0
+
+analytics:
+  data_dir: data/analytics
+  tca_db_path: data/live_data_tca_records.csv
+  report_interval_hours: 24
+  save_trades: true
+  update_equity: true
+
+runtime:
+  state_path: data/live_data_engine_state.json
+  performance:
+    profile: balanced
+    require_native_hotpath: false
+  autopilot:
+    mode: manual
+    auto_apply_on_start: false

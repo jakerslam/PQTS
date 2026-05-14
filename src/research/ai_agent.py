@@ -89,6 +89,7 @@ from portfolio.strategy_allocator import (
 from research.artifact_registry import StrategyArtifactManifest, StrategyArtifactRegistry
 from research.auto_generator import AutoStrategyGenerator, StrategyVariant
 from research.database import BacktestResult, Experiment, ResearchDatabase
+from research.markov_regime import MarkovRegimeConfig, build_walkforward_markov_signal
 from research.r_analytics_bridge import RAnalyticsBridge
 from research.regime_detector import MarketRegime, RegimeDetector
 from research.report_builder import ResearchAnalyticsReportBuilder
@@ -334,6 +335,10 @@ class AIResearchAgent:
                 "stat_arb",
                 "swing_trend",
                 "hold_carry",
+                "cross_sectional_momentum",
+                "adaptive_trend",
+                "drawdown_reversion",
+                "markov_regime",
             ]
 
         objective_assessment = self.validate_objective_constraints(self.config.get("objective", {}))
@@ -400,6 +405,10 @@ class AIResearchAgent:
             "trend_following": "swing",
             "swing_trend": "swing",
             "hold_carry": "hold",
+            "cross_sectional_momentum": "swing",
+            "adaptive_trend": "swing",
+            "drawdown_reversion": "swing",
+            "markov_regime": "swing",
             "short_momentum": "intraday",
             "mean_reversion": "intraday",
         }
@@ -536,15 +545,25 @@ class AIResearchAgent:
         strategy_types: List[str],
         variants_per_type: int = 10,
     ) -> List[StrategyVariant]:
-        candidates: List[StrategyVariant] = []
+        variants_by_type: List[List[StrategyVariant]] = []
         for strategy_type in strategy_types:
             variants = self.generator.generate_strategy_variants(
                 strategy_type=strategy_type,
                 n_per_feature_set=variants_per_type,
             )
-            candidates.extend(variants)
+            variants_by_type.append(sorted(variants, key=lambda v: v.strategy_id))
 
-        candidates = sorted(candidates, key=lambda v: v.strategy_id)[: self.search_budget]
+        candidates: List[StrategyVariant] = []
+        max_variants = max((len(rows) for rows in variants_by_type), default=0)
+        for offset in range(max_variants):
+            for variants in variants_by_type:
+                if len(candidates) >= self.search_budget:
+                    break
+                if offset < len(variants):
+                    candidates.append(variants[offset])
+            if len(candidates) >= self.search_budget:
+                break
+
         logger.info("Generated %s candidate strategies", len(candidates))
         return candidates
 
@@ -624,6 +643,9 @@ class AIResearchAgent:
         variant: StrategyVariant,
         data: Dict[str, pd.DataFrame],
     ) -> Dict[str, Any]:
+        if self._is_symbol_aware_strategy(variant.strategy_type):
+            return self._run_symbol_aware_backtest(variant, data)
+
         returns = self._aggregate_market_returns(data)
         signal = self._build_variant_signal(variant, returns)
         position = signal.clip(-1.0, 1.0)
@@ -634,6 +656,192 @@ class AIResearchAgent:
         ) / 10000.0
         pnl_series = position.shift(1).fillna(0.0) * returns - turnover * cost_per_turnover
         pnl_series = pnl_series.replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        return self._summarize_backtest_pnl(pnl_series=pnl_series, turnover=turnover)
+
+    @staticmethod
+    def _is_symbol_aware_strategy(strategy_type: str) -> bool:
+        return str(strategy_type).strip().lower() in {
+            "cross_sectional_momentum",
+            "adaptive_trend",
+            "drawdown_reversion",
+            "markov_regime",
+        }
+
+    def _run_symbol_aware_backtest(
+        self,
+        variant: StrategyVariant,
+        data: Dict[str, pd.DataFrame],
+    ) -> Dict[str, Any]:
+        close = self._aligned_close_prices(data)
+        if close.empty or len(close) < 2:
+            return self._empty_backtest_metrics()
+
+        returns = close.pct_change().replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        returns = returns.clip(-0.2, 0.2)
+        weights = self._build_symbol_aware_weights(variant, close, returns)
+        weights = weights.reindex(index=returns.index, columns=returns.columns).fillna(0.0)
+
+        turnover = weights.diff().abs().sum(axis=1).fillna(0.0)
+        if len(turnover) > 0:
+            turnover.iloc[0] = float(weights.iloc[0].abs().sum())
+
+        cost_per_turnover = (
+            self.commission_bps + self.slippage_bps + self.borrow_funding_bps
+        ) / 10000.0
+        gross_returns = (weights.shift(1).fillna(0.0) * returns).sum(axis=1)
+        pnl_series = gross_returns - turnover * cost_per_turnover
+        pnl_series = pnl_series.replace([np.inf, -np.inf], 0.0).fillna(0.0)
+        return self._summarize_backtest_pnl(pnl_series=pnl_series, turnover=turnover)
+
+    def _build_symbol_aware_weights(
+        self,
+        variant: StrategyVariant,
+        close: pd.DataFrame,
+        returns: pd.DataFrame,
+    ) -> pd.DataFrame:
+        strategy_type = str(variant.strategy_type).strip().lower()
+        params = dict(variant.parameters or {})
+
+        if strategy_type == "cross_sectional_momentum":
+            weights = self._cross_sectional_momentum_weights(close=close, params=params)
+        elif strategy_type == "adaptive_trend":
+            weights = self._adaptive_trend_weights(close=close, returns=returns, params=params)
+        elif strategy_type == "drawdown_reversion":
+            weights = self._drawdown_reversion_weights(close=close, params=params)
+        elif strategy_type == "markov_regime":
+            weights = self._markov_regime_weights(close=close, returns=returns, params=params)
+        else:
+            weights = pd.DataFrame(0.0, index=close.index, columns=close.columns)
+
+        rebalance_periods = int(max(float(params.get("rebalance_periods", 1)), 1.0))
+        return self._apply_rebalance_schedule(weights, periods=rebalance_periods)
+
+    def _cross_sectional_momentum_weights(
+        self,
+        *,
+        close: pd.DataFrame,
+        params: Dict[str, Any],
+    ) -> pd.DataFrame:
+        lookback = int(max(float(params.get("lookback_periods", 168)), 2.0))
+        top_n = int(max(float(params.get("top_n", 1)), 1.0))
+        threshold = float(params.get("min_signal_bps", 0.0)) / 10000.0
+
+        score = close.pct_change(lookback)
+        rank = score.rank(axis=1, ascending=False, method="first")
+        active = (rank <= min(top_n, len(close.columns))) & (score > threshold)
+        return self._normalize_long_only(active.astype(float))
+
+    def _adaptive_trend_weights(
+        self,
+        *,
+        close: pd.DataFrame,
+        returns: pd.DataFrame,
+        params: Dict[str, Any],
+    ) -> pd.DataFrame:
+        fast = int(max(float(params.get("fast_periods", 24)), 2.0))
+        slow = int(max(float(params.get("slow_periods", 168)), float(fast + 1)))
+        threshold = float(params.get("min_trend_bps", 0.0)) / 10000.0
+
+        fast_ma = close.rolling(fast, min_periods=max(2, min(fast, 12))).mean()
+        slow_ma = close.rolling(slow, min_periods=max(2, min(slow, 24))).mean()
+        trend_score = (fast_ma / slow_ma.replace(0.0, np.nan)) - 1.0
+        active = trend_score > threshold
+
+        vol_window = max(fast, 24)
+        volatility = returns.rolling(vol_window, min_periods=3).std().clip(lower=1e-6)
+        raw = active.astype(float) / volatility.replace(0.0, np.nan)
+        return self._normalize_long_only(raw)
+
+    def _drawdown_reversion_weights(
+        self,
+        *,
+        close: pd.DataFrame,
+        params: Dict[str, Any],
+    ) -> pd.DataFrame:
+        lookback = int(max(float(params.get("lookback_periods", 168)), 5.0))
+        entry_drawdown = float(params.get("entry_drawdown_bps", 600.0)) / 10000.0
+        recovery = float(params.get("recovery_bps", 0.0)) / 10000.0
+        max_assets = int(max(float(params.get("max_assets", 1)), 1.0))
+
+        rolling_high = close.rolling(lookback, min_periods=max(5, min(lookback, 24))).max()
+        drawdown = (close / rolling_high.replace(0.0, np.nan)) - 1.0
+        recent_window = max(3, min(24, lookback // 8))
+        recent_return = close.pct_change(recent_window)
+
+        score = (-drawdown).where((drawdown <= -entry_drawdown) & (recent_return >= recovery), 0.0)
+        rank = score.rank(axis=1, ascending=False, method="first")
+        active = (rank <= min(max_assets, len(close.columns))) & (score > 0.0)
+        return self._normalize_long_only(active.astype(float))
+
+    def _markov_regime_weights(
+        self,
+        *,
+        close: pd.DataFrame,
+        returns: pd.DataFrame,
+        params: Dict[str, Any],
+    ) -> pd.DataFrame:
+        regime_window = int(max(float(params.get("regime_window", 24)), 2.0))
+        transition_lookback = int(max(float(params.get("transition_lookback", 168)), 4.0))
+        bull_threshold = float(params.get("bull_threshold_bps", 150.0)) / 10000.0
+        bear_threshold = float(params.get("bear_threshold_bps", -150.0)) / 10000.0
+        signal_threshold = float(params.get("signal_threshold", 0.10))
+        forecast_steps = int(max(float(params.get("forecast_steps", 1)), 1.0))
+        min_row_transitions = int(max(float(params.get("min_row_transitions", 5)), 0.0))
+        smoothing = float(params.get("smoothing", 1.0))
+        max_assets = int(max(float(params.get("max_assets", len(close.columns))), 1.0))
+
+        if bull_threshold <= bear_threshold:
+            return pd.DataFrame(0.0, index=close.index, columns=close.columns)
+
+        config = MarkovRegimeConfig(
+            regime_window=regime_window,
+            transition_lookback=transition_lookback,
+            bull_threshold=bull_threshold,
+            bear_threshold=bear_threshold,
+            signal_threshold=signal_threshold,
+            smoothing=smoothing,
+            min_row_transitions=min_row_transitions,
+            forecast_steps=forecast_steps,
+        )
+        raw_scores = pd.DataFrame(0.0, index=close.index, columns=close.columns)
+        for symbol in close.columns:
+            symbol_signal = build_walkforward_markov_signal(returns[symbol], config)
+            raw_scores[symbol] = symbol_signal.reindex(close.index).fillna(0.0).clip(lower=0.0)
+
+        if max_assets < len(close.columns):
+            rank = raw_scores.rank(axis=1, ascending=False, method="first")
+            raw_scores = raw_scores.where(rank <= max_assets, 0.0)
+
+        return self._normalize_long_only(raw_scores)
+
+    @staticmethod
+    def _normalize_long_only(raw: pd.DataFrame) -> pd.DataFrame:
+        clean = raw.replace([np.inf, -np.inf], 0.0).fillna(0.0).clip(lower=0.0)
+        gross = clean.sum(axis=1).replace(0.0, np.nan)
+        return clean.div(gross, axis=0).fillna(0.0).clip(lower=0.0, upper=1.0)
+
+    @staticmethod
+    def _apply_rebalance_schedule(weights: pd.DataFrame, *, periods: int) -> pd.DataFrame:
+        if weights.empty:
+            return weights
+        step = max(int(periods), 1)
+        if step <= 1:
+            return weights.fillna(0.0)
+
+        rebalanced = weights.astype(float).copy()
+        mask = pd.Series(False, index=rebalanced.index)
+        mask.iloc[::step] = True
+        rebalanced.loc[~mask, :] = np.nan
+        return rebalanced.ffill().fillna(0.0)
+
+    def _summarize_backtest_pnl(
+        self,
+        *,
+        pnl_series: pd.Series,
+        turnover: pd.Series,
+    ) -> Dict[str, Any]:
+        if pnl_series.empty:
+            return self._empty_backtest_metrics()
 
         equity = (1.0 + pnl_series).cumprod()
         if equity.empty:
@@ -641,7 +849,12 @@ class AIResearchAgent:
 
         total_return = float(equity.iloc[-1] - 1.0)
         pnl_std = float(pnl_series.std(ddof=0))
-        periods_per_year = self._periods_per_year(returns.index)
+        index = (
+            pd.DatetimeIndex(pnl_series.index)
+            if isinstance(pnl_series.index, pd.DatetimeIndex)
+            else pd.DatetimeIndex([])
+        )
+        periods_per_year = self._periods_per_year(index) if len(index) >= 3 else 252.0
         sharpe = float(
             (pnl_series.mean() / pnl_std) * np.sqrt(periods_per_year) if pnl_std > 0 else 0.0
         )
@@ -663,6 +876,9 @@ class AIResearchAgent:
             else float("inf")
         )
         annual_return_estimate = float(pnl_series.mean()) * periods_per_year
+        cost_per_turnover = (
+            self.commission_bps + self.slippage_bps + self.borrow_funding_bps
+        ) / 10000.0
 
         return {
             "sharpe": sharpe,
@@ -675,6 +891,21 @@ class AIResearchAgent:
             "cost_drag_bps": float(turnover.sum() * cost_per_turnover * 10000.0),
             "capacity_ratio": float(capacity_ratio),
             "returns_series": pnl_series,
+        }
+
+    @staticmethod
+    def _empty_backtest_metrics() -> Dict[str, Any]:
+        return {
+            "sharpe": 0.0,
+            "total_return": 0.0,
+            "max_drawdown": 0.0,
+            "win_rate": 0.0,
+            "total_trades": 0,
+            "turnover_annualized": 0.0,
+            "annual_return_estimate": 0.0,
+            "cost_drag_bps": 0.0,
+            "capacity_ratio": 0.0,
+            "returns_series": pd.Series(dtype=float),
         }
 
     def _run_purged_cv(
@@ -1667,6 +1898,22 @@ class AIResearchAgent:
     # =========================================================================
     # Deterministic Helpers
     # =========================================================================
+
+    @staticmethod
+    def _aligned_close_prices(data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
+        aligned: List[pd.Series] = []
+        for symbol in sorted(data.keys()):
+            frame = data[symbol]
+            if "close" not in frame.columns:
+                continue
+            close = pd.to_numeric(frame["close"], errors="coerce").astype(float)
+            aligned.append(close.rename(symbol))
+
+        if not aligned:
+            return pd.DataFrame()
+
+        merged = pd.concat(aligned, axis=1).sort_index()
+        return merged.ffill().dropna(how="all")
 
     def _aggregate_market_returns(self, data: Dict[str, pd.DataFrame]) -> pd.Series:
         aligned: List[pd.Series] = []

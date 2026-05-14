@@ -22,6 +22,10 @@ markets:
         api_key: ${BINANCE_TESTNET_API_KEY}
         api_secret: ${BINANCE_TESTNET_API_SECRET}
         testnet: true
+        # Use live public Binance market data when trading credentials are not
+        # present. This keeps paper runs on real prices without enabling orders.
+        public_market_data: true
+        public_market_data_live: true
         symbols:
           # Symbol format: BASEQUOTE (e.g., BTCUSDT = BTC quoted in USDT)
           # These symbols must match the exchange's exact naming convention
@@ -36,6 +40,9 @@ markets:
         api_secret: ${COINBASE_SANDBOX_SECRET}
         passphrase: ${COINBASE_SANDBOX_PASSPHRASE}
         sandbox: true
+        # Coinbase is the preferred US-friendly public live data fallback.
+        public_market_data: true
+        public_market_data_live: true
         symbols:
           - BTC-USD
           - ETH-USD

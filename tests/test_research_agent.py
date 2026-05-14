@@ -109,6 +109,95 @@ def test_deterministic_backtest_metrics_repeat_exactly(tmp_path):
     assert first["total_trades"] == second["total_trades"]
 
 
+def test_symbol_aware_momentum_can_rotate_to_stronger_asset(tmp_path):
+    agent = AIResearchAgent(_agent_config(tmp_path))
+    index = pd.date_range("2025-01-01", periods=240, freq="h")
+    winner = 100.0 * np.exp(np.linspace(0.0, 0.30, len(index)))
+    loser = 100.0 * np.exp(np.linspace(0.0, -0.20, len(index)))
+    data = {
+        "WIN": pd.DataFrame({"close": winner}, index=index),
+        "LOSE": pd.DataFrame({"close": loser}, index=index),
+    }
+    variant = StrategyVariant(
+        strategy_id="cross_sectional_momentum_rotation",
+        strategy_type="cross_sectional_momentum",
+        features=["relative_strength_24h", "vol_regime"],
+        parameters={
+            "lookback_periods": 12,
+            "top_n": 1,
+            "rebalance_periods": 6,
+            "min_signal_bps": 0.0,
+        },
+    )
+
+    metrics = agent._run_deterministic_backtest(variant, data)
+
+    assert metrics["total_return"] > 0.10
+    assert metrics["sharpe"] > 0.0
+    assert metrics["total_trades"] > 0
+
+
+def test_symbol_aware_trend_can_sit_in_cash_during_downtrend(tmp_path):
+    agent = AIResearchAgent(_agent_config(tmp_path))
+    index = pd.date_range("2025-01-01", periods=180, freq="h")
+    falling_a = 100.0 * np.exp(np.linspace(0.0, -0.25, len(index)))
+    falling_b = 80.0 * np.exp(np.linspace(0.0, -0.18, len(index)))
+    data = {
+        "A": pd.DataFrame({"close": falling_a}, index=index),
+        "B": pd.DataFrame({"close": falling_b}, index=index),
+    }
+    variant = StrategyVariant(
+        strategy_id="adaptive_trend_cash_filter",
+        strategy_type="adaptive_trend",
+        features=["price_momentum_1h", "vol_regime"],
+        parameters={
+            "fast_periods": 12,
+            "slow_periods": 48,
+            "rebalance_periods": 6,
+            "min_trend_bps": 0.0,
+        },
+    )
+
+    metrics = agent._run_deterministic_backtest(variant, data)
+
+    assert metrics["max_drawdown"] <= 0.01
+    assert metrics["total_return"] >= -0.01
+
+
+def test_markov_regime_can_allocate_to_persistent_bull_asset(tmp_path):
+    agent = AIResearchAgent(_agent_config(tmp_path))
+    index = pd.date_range("2025-01-01", periods=240, freq="h")
+    bull = 100.0 * np.exp(np.linspace(0.0, 0.35, len(index)))
+    bear = 100.0 * np.exp(np.linspace(0.0, -0.25, len(index)))
+    data = {
+        "BULL": pd.DataFrame({"close": bull}, index=index),
+        "BEAR": pd.DataFrame({"close": bear}, index=index),
+    }
+    variant = StrategyVariant(
+        strategy_id="markov_regime_persistent_bull",
+        strategy_type="markov_regime",
+        features=["observable_regime_state", "transition_probability"],
+        parameters={
+            "regime_window": 6,
+            "transition_lookback": 24,
+            "bull_threshold_bps": 10.0,
+            "bear_threshold_bps": -10.0,
+            "signal_threshold": 0.01,
+            "forecast_steps": 1,
+            "min_row_transitions": 1,
+            "smoothing": 0.1,
+            "max_assets": 1,
+            "rebalance_periods": 6,
+        },
+    )
+
+    metrics = agent._run_deterministic_backtest(variant, data)
+
+    assert metrics["total_return"] > 0.10
+    assert metrics["sharpe"] > 0.0
+    assert metrics["total_trades"] > 0
+
+
 def test_stage_gate_promotes_paper_to_live_canary(tmp_path):
     agent = AIResearchAgent(_agent_config(tmp_path))
     strategy_id = "mm_gate_pass"
@@ -169,16 +258,51 @@ def test_research_cycle_returns_evidence_report(tmp_path):
     assert "profit_target_feasibility" in report["objective"]
 
 
+def test_candidate_generation_round_robins_strategy_families(tmp_path):
+    config = _agent_config(tmp_path)
+    config["search_budget"] = 6
+    agent = AIResearchAgent(config)
+
+    candidates = agent._generate_candidates(
+        [
+            "market_making",
+            "cross_sectional_momentum",
+            "adaptive_trend",
+        ],
+        variants_per_type=10,
+    )
+    strategy_types = {candidate.strategy_type for candidate in candidates}
+
+    assert len(candidates) == 6
+    assert strategy_types == {
+        "market_making",
+        "cross_sectional_momentum",
+        "adaptive_trend",
+    }
+
+
 def test_auto_generator_supports_swing_and_hold_variants():
     generator = AutoStrategyGenerator()
 
     swing = generator.generate_strategy_variants("swing_trend", n_per_feature_set=2)
     hold = generator.generate_strategy_variants("hold_carry", n_per_feature_set=2)
+    xmom = generator.generate_strategy_variants("cross_sectional_momentum", n_per_feature_set=2)
+    trend = generator.generate_strategy_variants("adaptive_trend", n_per_feature_set=2)
+    reversion = generator.generate_strategy_variants("drawdown_reversion", n_per_feature_set=2)
+    markov = generator.generate_strategy_variants("markov_regime", n_per_feature_set=2)
 
     assert swing
     assert hold
+    assert xmom
+    assert trend
+    assert reversion
+    assert markov
     assert all(variant.strategy_type == "swing_trend" for variant in swing)
     assert all(variant.strategy_type == "hold_carry" for variant in hold)
+    assert all(variant.strategy_type == "cross_sectional_momentum" for variant in xmom)
+    assert all(variant.strategy_type == "adaptive_trend" for variant in trend)
+    assert all(variant.strategy_type == "drawdown_reversion" for variant in reversion)
+    assert all(variant.strategy_type == "markov_regime" for variant in markov)
 
 
 def test_stage_gate_uses_horizon_specific_thresholds(tmp_path):

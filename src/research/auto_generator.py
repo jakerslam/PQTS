@@ -45,12 +45,24 @@ class StrategySearchSpace:
                 "volatility_percentile",
                 "atr_ratio",
             ],
-            "momentum": ["price_momentum_5m", "price_momentum_1h", "rsi_14", "macd_signal"],
+            "momentum": [
+                "price_momentum_5m",
+                "price_momentum_1h",
+                "relative_strength_24h",
+                "rsi_14",
+                "macd_signal",
+            ],
             "microstructure": [
                 "kyle_lambda",
                 "amihud_illiquidity",
                 "price_impact",
                 "quote_intensity",
+            ],
+            "regime": [
+                "observable_regime_state",
+                "transition_probability",
+                "regime_persistence",
+                "stationary_distribution",
             ],
         }
         self.parameter_spaces = {
@@ -65,6 +77,36 @@ class StrategySearchSpace:
             },
             "swing_trend": {"lookback_periods": [24, 48, 96], "entry_threshold": [0.4, 0.8, 1.2]},
             "hold_carry": {"rebalance_days": [3, 7, 14], "carry_threshold_bps": [5.0, 10.0, 15.0]},
+            "cross_sectional_momentum": {
+                "lookback_periods": [24, 72, 168, 336],
+                "top_n": [1, 2],
+                "rebalance_periods": [1, 6, 24],
+                "min_signal_bps": [0.0, 25.0, 75.0],
+            },
+            "adaptive_trend": {
+                "fast_periods": [12, 24, 48],
+                "slow_periods": [72, 168, 336],
+                "rebalance_periods": [1, 6, 24],
+                "min_trend_bps": [0.0, 10.0, 25.0],
+            },
+            "drawdown_reversion": {
+                "lookback_periods": [72, 168, 336],
+                "entry_drawdown_bps": [300.0, 600.0, 1000.0],
+                "recovery_bps": [0.0, 50.0, 150.0],
+                "max_assets": [1, 2],
+            },
+            "markov_regime": {
+                "regime_window": [12, 24, 72],
+                "transition_lookback": [96, 168, 336],
+                "bull_threshold_bps": [75.0, 150.0, 300.0],
+                "bear_threshold_bps": [-75.0, -150.0, -300.0],
+                "signal_threshold": [0.05, 0.10, 0.20],
+                "forecast_steps": [1, 3, 6],
+                "min_row_transitions": [3, 5, 10],
+                "smoothing": [0.5, 1.0],
+                "max_assets": [1, 2],
+                "rebalance_periods": [1, 6, 24],
+            },
         }
         self.model_types = ["linear", "xgboost", "lightgbm", "neural_net"]
 
@@ -107,6 +149,26 @@ class AutoStrategyGenerator:
             return [
                 ["realized_vol_24h", "atr_ratio", "amihud_illiquidity"],
                 ["vol_regime", "kyle_lambda", "price_momentum_1h"],
+            ]
+        elif strategy_type == "cross_sectional_momentum":
+            return [
+                ["relative_strength_24h", "volume_velocity", "vol_regime"],
+                ["price_momentum_1h", "atr_ratio", "amihud_illiquidity"],
+            ]
+        elif strategy_type == "adaptive_trend":
+            return [
+                ["price_momentum_1h", "macd_signal", "volatility_percentile"],
+                ["realized_vol_24h", "atr_ratio", "vol_regime"],
+            ]
+        elif strategy_type == "drawdown_reversion":
+            return [
+                ["rsi_14", "atr_ratio", "amihud_illiquidity"],
+                ["price_momentum_1h", "vol_regime", "realized_vol_24h"],
+            ]
+        elif strategy_type == "markov_regime":
+            return [
+                ["observable_regime_state", "transition_probability", "regime_persistence"],
+                ["transition_probability", "stationary_distribution", "vol_regime"],
             ]
         return [all_features[:n_features]]
 
@@ -167,6 +229,10 @@ class AutoStrategyGenerator:
             "trend_following": ["momentum", "volatility"],
             "swing_trend": ["momentum", "volatility", "microstructure"],
             "hold_carry": ["volatility", "microstructure", "trade_flow"],
+            "cross_sectional_momentum": ["momentum", "volatility", "microstructure"],
+            "adaptive_trend": ["momentum", "volatility"],
+            "drawdown_reversion": ["momentum", "volatility", "microstructure"],
+            "markov_regime": ["regime", "volatility", "momentum"],
         }
         return mapping.get(strategy_type, ["order_book", "momentum"])
 

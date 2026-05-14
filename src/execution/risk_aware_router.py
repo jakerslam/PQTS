@@ -473,6 +473,23 @@ class RiskAwareRouter:
                     ]
                     for k, values in dict(backup_by_market).items()
                 },
+                allow_synthetic_fallback=bool(md_res_cfg.get("allow_synthetic_fallback", True)),
+                min_price_by_symbol={
+                    str(k): float(v)
+                    for k, v in dict(md_res_cfg.get("min_price_by_symbol", {}) or {}).items()
+                },
+                max_price_by_symbol={
+                    str(k): float(v)
+                    for k, v in dict(md_res_cfg.get("max_price_by_symbol", {}) or {}).items()
+                },
+                max_price_deviation_bps=float(md_res_cfg.get("max_price_deviation_bps", 0.0)),
+                max_mid_deviation_bps=float(md_res_cfg.get("max_mid_deviation_bps", 0.0)),
+                max_spread_bps=float(md_res_cfg.get("max_spread_bps", 0.0)),
+                rolling_window_size=int(md_res_cfg.get("rolling_window_size", 0)),
+                min_rolling_samples=int(md_res_cfg.get("min_rolling_samples", 0)),
+                max_rolling_price_deviation_bps=float(
+                    md_res_cfg.get("max_rolling_price_deviation_bps", 0.0)
+                ),
             )
         )
         # Partitioned order admission locks keyed by venue+symbol.
@@ -2369,16 +2386,28 @@ class RiskAwareRouter:
         """
         Construct venue adapters with router token enforcement.
 
-        Missing credentials keep the venue in deterministic stub mode.
+        Missing credentials keep the venue in deterministic stub mode unless
+        an explicit public market-data fallback is enabled for that venue.
         """
         venue = venue_name.lower()
         try:
             if market == "crypto" and venue == "binance":
-                from markets.crypto.binance_adapter import BinanceAdapter
+                from markets.crypto.binance_adapter import (
+                    BinanceAdapter,
+                    BinancePublicMarketDataAdapter,
+                )
 
                 api_key = self._resolve_secret(cfg.get("api_key"))
                 api_secret = self._resolve_secret(cfg.get("api_secret"))
                 if not api_key or not api_secret:
+                    if bool(cfg.get("public_market_data", False)):
+                        return BinancePublicMarketDataAdapter(
+                            router_token=self._router_token,
+                            live=bool(cfg.get("public_market_data_live", True)),
+                            request_timeout_seconds=float(
+                                cfg.get("request_timeout_seconds", 10.0)
+                            ),
+                        )
                     return None
                 return BinanceAdapter(
                     api_key=api_key,
@@ -2388,12 +2417,23 @@ class RiskAwareRouter:
                 )
 
             if market == "crypto" and venue == "coinbase":
-                from markets.crypto.coinbase_adapter import CoinbaseAdapter
+                from markets.crypto.coinbase_adapter import (
+                    CoinbaseAdapter,
+                    CoinbasePublicMarketDataAdapter,
+                )
 
                 api_key = self._resolve_secret(cfg.get("api_key"))
                 api_secret = self._resolve_secret(cfg.get("api_secret"))
                 passphrase = self._resolve_secret(cfg.get("passphrase"))
                 if not api_key or not api_secret or not passphrase:
+                    if bool(cfg.get("public_market_data", False)):
+                        return CoinbasePublicMarketDataAdapter(
+                            router_token=self._router_token,
+                            live=bool(cfg.get("public_market_data_live", True)),
+                            request_timeout_seconds=float(
+                                cfg.get("request_timeout_seconds", 10.0)
+                            ),
+                        )
                     return None
                 return CoinbaseAdapter(
                     api_key=api_key,
@@ -2530,7 +2570,7 @@ class RiskAwareRouter:
                 raw_quotes[(venue_name, symbol)] = await self._fetch_symbol_quote(venue, symbol)
 
         for venue_name, venue in self.market_venues.items():
-            venue_quotes: Dict[str, Dict[str, float]] = {}
+            venue_quotes: Dict[str, Dict[str, Any]] = {}
             for symbol in venue.symbols:
                 raw_quote = raw_quotes.get((venue_name, symbol))
                 quote, resolution = self.market_data_resilience.resolve(
@@ -2541,25 +2581,18 @@ class RiskAwareRouter:
                     raw_quotes=raw_quotes,
                     now=now,
                 )
-                if quote is None:
+                if quote is None and self.market_data_resilience.policy.allow_synthetic_fallback:
                     quote = self._synthetic_quote(symbol=symbol, venue=venue_name)
+                    self.market_data_resilience.record_synthetic_quote()
                     resolution = type(resolution)(
                         mode="synthetic",
                         source_venue=venue_name,
                         stale=resolution.stale,
                         gap=resolution.gap,
                         replay_age_seconds=resolution.replay_age_seconds,
+                        reason="synthetic_fallback_enabled",
                     )
 
-                venue_quotes[symbol] = {
-                    "price": quote["price"],
-                    "spread": quote["spread"],
-                    "volume_24h": quote["volume_24h"],
-                }
-                aggregated_prices.append(quote["price"])
-                aggregated_volumes.append(quote["volume_24h"])
-                if fallback_order_book is None:
-                    fallback_order_book = quote["order_book"]
                 resilience_decisions.append(
                     {
                         "venue": venue_name,
@@ -2567,15 +2600,35 @@ class RiskAwareRouter:
                         **resolution.to_dict(),
                     }
                 )
+                if quote is None:
+                    continue
+
+                venue_quotes[symbol] = {
+                    "price": float(quote["price"]),
+                    "spread": float(quote["spread"]),
+                    "volume_24h": float(quote["volume_24h"]),
+                    "quality_mode": str(resolution.mode),
+                    "quality_reason": str(resolution.reason),
+                    "source_venue": str(resolution.source_venue),
+                }
+                aggregated_prices.append(float(quote["price"]))
+                aggregated_volumes.append(float(quote["volume_24h"]))
+                if fallback_order_book is None:
+                    fallback_order_book = quote["order_book"]
 
             if venue_quotes:
                 snapshot[venue_name] = venue_quotes
 
         if not aggregated_prices:
-            default_quote = self._synthetic_quote(symbol="DEFAULT", venue="stub")
-            aggregated_prices = [default_quote["price"]]
-            aggregated_volumes = [default_quote["volume_24h"]]
-            fallback_order_book = default_quote["order_book"]
+            if self.market_data_resilience.policy.allow_synthetic_fallback:
+                default_quote = self._synthetic_quote(symbol="DEFAULT", venue="stub")
+                aggregated_prices = [float(default_quote["price"])]
+                aggregated_volumes = [float(default_quote["volume_24h"])]
+                fallback_order_book = default_quote["order_book"]
+            else:
+                aggregated_prices = [0.0]
+                aggregated_volumes = [0.0]
+                fallback_order_book = {"bids": [], "asks": []}
 
         snapshot["last_price"] = float(sum(aggregated_prices) / len(aggregated_prices))
         snapshot["vol_24h"] = float(sum(aggregated_volumes) / len(aggregated_volumes))
@@ -2612,6 +2665,8 @@ class RiskAwareRouter:
                 return {
                     "price": price or (ask + bid) / 2,
                     "spread": spread,
+                    "bid": bid,
+                    "ask": ask,
                     "volume_24h": float(
                         ticker.get("quoteVolume", 0) or ticker.get("volume", 0) or 0
                     ),
@@ -2634,6 +2689,8 @@ class RiskAwareRouter:
                 return {
                     "price": price or (ask + bid) / 2,
                     "spread": spread,
+                    "bid": bid,
+                    "ask": ask,
                     "volume_24h": float(ticker.get("volume", 0) or 0),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "order_book": self._synthetic_order_book(price or (ask + bid) / 2),
@@ -2651,6 +2708,8 @@ class RiskAwareRouter:
                 return {
                     "price": price,
                     "spread": spread,
+                    "bid": bid,
+                    "ask": ask,
                     "volume_24h": float(quote.get("v", 0) or quote.get("volume", 0) or 0),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "order_book": self._synthetic_order_book(price),
@@ -2671,6 +2730,8 @@ class RiskAwareRouter:
                 return {
                     "price": price,
                     "spread": spread,
+                    "bid": bid,
+                    "ask": ask,
                     "volume_24h": float(row.get("tradeable", 1)) * 1_000_000,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "order_book": self._synthetic_order_book(price),
@@ -2720,6 +2781,8 @@ class RiskAwareRouter:
         return {
             "price": base,
             "spread": spread,
+            "bid": float(order_book["bids"][0][0]),
+            "ask": float(order_book["asks"][0][0]),
             "volume_24h": volume,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "order_book": order_book,
@@ -2869,6 +2932,7 @@ class RiskAwareRouter:
             "capital": self._capital,
             "audit_entries": len(self.audit_log),
             "reliability": self.reliability_monitor.summary(),
+            "market_data_resilience": self.market_data_resilience.snapshot_metrics(),
             "routing_controls": {
                 "failover_enabled": bool(self.failover_enabled),
             },

@@ -299,7 +299,7 @@ class PolymarketMCPServer:
             for market in markets
         ]
 
-    def place_order(self, *, market_id: str, side: str, price: float, size: float) -> Order:
+    def route_mcp_order(self, *, market_id: str, side: str, price: float, size: float) -> Order:
         self._rate_limit("trading")
         self._require_auth()
         market = self.market_details(market_id)
@@ -329,7 +329,7 @@ class PolymarketMCPServer:
 
     def batch_orders(self, orders: Sequence[Mapping[str, Any]]) -> list[Order]:
         return [
-            self.place_order(
+            self.route_mcp_order(
                 market_id=str(row["market_id"]),
                 side=str(row["side"]),
                 price=float(row["price"]),
@@ -360,7 +360,7 @@ class PolymarketMCPServer:
         market = self.market_details(market_id)
         price = market.yes_price if side.lower() == "yes" else market.no_price
         size = float(budget) / max(price, 1e-6)
-        return self.place_order(market_id=market_id, side=side, price=price, size=size)
+        return self.route_mcp_order(market_id=market_id, side=side, price=price, size=size)
 
     def rebalance(self, targets: Sequence[Mapping[str, Any]]) -> list[Order]:
         orders: list[Order] = []
@@ -371,7 +371,9 @@ class PolymarketMCPServer:
             price = float(target.get("price", 0.0))
             if size <= 0 or price <= 0:
                 continue
-            orders.append(self.place_order(market_id=market_id, side=side, price=price, size=size))
+            orders.append(
+                self.route_mcp_order(market_id=market_id, side=side, price=price, size=size)
+            )
         return orders
 
     def portfolio_state(self) -> PortfolioState:

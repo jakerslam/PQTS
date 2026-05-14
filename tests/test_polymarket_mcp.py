@@ -78,9 +78,9 @@ def test_market_analysis_and_opportunity() -> None:
 def test_trading_requires_auth_and_limits() -> None:
     server = _server()
     with pytest.raises(MCPError):
-        server.place_order(market_id="1", side="yes", price=0.6, size=1)
+        server.route_mcp_order(market_id="1", side="yes", price=0.6, size=1)
     server.auth = server.auth.__class__(mode="l2", wallet_address="0xabc")
-    order = server.place_order(market_id="1", side="yes", price=0.6, size=1)
+    order = server.route_mcp_order(market_id="1", side="yes", price=0.6, size=1)
     assert order.market_id == "1"
     assert len(server.router.submitted) == 1
 
@@ -90,7 +90,7 @@ def test_rate_limit_and_validation() -> None:
     server.rate_limits["trading"].capacity = 0
     server.auth = server.auth.__class__(mode="l2", wallet_address="0xabc")
     with pytest.raises(MCPError):
-        server.place_order(market_id="1", side="yes", price=0.6, size=1)
+        server.route_mcp_order(market_id="1", side="yes", price=0.6, size=1)
 
 
 def test_dashboard_and_websocket_status() -> None:
