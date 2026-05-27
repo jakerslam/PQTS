@@ -1,6 +1,6 @@
 # Agent Pilot API + SDK
 
-Last updated: 2026-03-11 (America/Denver)
+Last updated: 2026-05-27 (America/Denver)
 
 This document describes the canonical agent-pilot control-plane endpoints and the Python SDK wrapper shipped in `app.agent_pilot_client`.
 
@@ -55,3 +55,52 @@ operator.execute_intent(intent_id=intent_id)
 - Simulation pass is required before execute.
 - Hook creation is allowlist-constrained and secret values are fingerprinted (not stored raw).
 - Default policy starts with `execute=false` and fails closed.
+- Local LLM/agent challengers may propose intents, but they do not place orders and do not bypass simulation, stage gates, kill switches, or `RiskAwareRouter.submit_order()`.
+
+## Local Ollama/Kimi Challenger
+
+PQTS ships a bounded Ollama challenger in `app.ollama_agent_pilot`. It builds the required fixed-block pilot context:
+
+1. `SYSTEM_FACTS`
+2. `CURRENT_STATE`
+3. `RELEVANT_CARDS`
+4. `COUNTEREVIDENCE`
+5. `DECISION_TEMPLATE`
+
+The model must return one JSON object with the strict pilot fields:
+
+```json
+{
+  "action": "hold",
+  "strategy_id": "example_strategy",
+  "rationale": "Evidence is insufficient for promotion.",
+  "supporting_card_ids": ["card_id"],
+  "current_metrics": {},
+  "gate_checks": {},
+  "risk_impact": {}
+}
+```
+
+Only these actions are accepted: `promote_to_paper`, `promote_to_live_canary`, `promote_to_live`, `hold`, `demote`, `kill`. Any unsupported action, malformed JSON, missing field, or empty support list fails closed and creates no intent.
+
+Run a local Kimi 2.6 smoke test without touching the API:
+
+```bash
+python3 scripts/run_ollama_agent_pilot.py \
+  --sample-context \
+  --model kimi-k2.6:cloud \
+  --timeout-seconds 60
+```
+
+To let a valid model response create and simulate an intent through the API:
+
+```bash
+PQTS_API_TOKEN=operator-token python3 scripts/run_ollama_agent_pilot.py \
+  --api-base-url http://localhost:8000 \
+  --agent-id ollama-kimi-pilot \
+  --model kimi-k2.6:cloud \
+  --create-intent \
+  --simulate
+```
+
+The runner writes a JSON report under `data/reports/ollama_agent_pilot/` containing the model, prompt hash, raw response, validation errors, decision payload, created intent, and simulation response. It never executes intents.
