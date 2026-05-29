@@ -64,6 +64,9 @@ class AgentProposalStore:
     def pending(self) -> tuple[AgentProposal, ...]:
         return self._queue.pending()
 
+    def proposals(self) -> tuple[AgentProposal, ...]:
+        return self._queue.proposals()
+
     def enqueue(self, proposal: AgentProposal, *, now: datetime | None = None) -> AgentProposalQueueResult:
         result = self._queue.enqueue(proposal, now=now)
         event_type = "proposal_queued" if result.accepted else "proposal_rejected"

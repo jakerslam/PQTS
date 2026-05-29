@@ -16,7 +16,7 @@ This ledger is the working checklist for turning PQTS into a serious production 
 | Single router-only capital path | `PGQ-3`, `PGQ-11` | Partial | `TradingEngine.submit_order_intent()`, `RiskAwareRouter.submit_order()`, `tests/test_enforcement.py` | More runtime surfaces must be covered by regression tests. | User, agent, and auto tests prove router-only execution. |
 | Order intent lifecycle | `PGQ-4` | Partial | `src/contracts/execution_flow.py`, API order-intent flow | Lifecycle is not yet a single immutable transition ledger. | Every transition has actor, timestamp, prior/new state, reason, evidence. |
 | User-directed trading surface | `PGQ-5` | Partial | API order-intent simulation/approval flow | UI/operator surface still needs full pre-trade risk and cost display. | Manual order cannot route without approval and risk impact preview. |
-| Agent proposal queue | `PGQ-6`, `PGQ-8`, `PGQ-16` | Partial | `src/core/trading_control.py`, `src/core/agent_proposal_store.py`, `tests/test_trading_control.py`, `tests/test_agent_proposal_store.py` | Durable core ledger exists; still needs API/operator-surface integration. | Proposals require evidence, expiry, gate checks, risk impact, operator approval, and replayable decision events. |
+| Agent proposal queue | `PGQ-6`, `PGQ-8`, `PGQ-16` | Partial | `src/core/trading_control.py`, `src/core/agent_proposal_store.py`, `services/api/routes/core.py`, `tests/test_trading_control.py`, `tests/test_agent_proposal_store.py`, `tests/test_services_api_rest_endpoints.py` | API/operator surface exists; still needs UI workflow and persistence promotion from JSONL to production DB where configured. | Proposals require evidence, expiry, gate checks, risk impact, operator approval, replayable decision events, and materialize only approved `OrderIntent`s. |
 | Autonomous strategy constraints | `PGQ-7`, `PGQ-18`, `PGQ-19` | Partial | stage-gate APIs, autopilot policy pack | Order-time stage eligibility must be enforced for auto/live paths. | Auto mode admits only stage-promoted strategies within budgets. |
 | Immutable decision ledger | `PGQ-8`, `PGQ-21` | Partial | `OpsEventStore`, agent receipts, order truth artifacts | Multiple ledgers are not yet unified/replayable end to end. | Proposal-to-fill replay reconstructs all decisions and risk gates. |
 | Production data plane | `PGQ-9`, `PGQ-14` | Started | `src/adapters/prediction_market_*`, `src/research/prediction_market_microstructure.py` | Need raw snapshot storage and entitlement manifests for real feeds. | Raw order book/trade/resolution data can replay features point-in-time. |
@@ -41,7 +41,7 @@ This ledger is the working checklist for turning PQTS into a serious production 
 - [ ] `pytest -q tests/test_prediction_market_microstructure.py` passes.
 - [ ] Control-mode policy matrix exists and fails closed when missing or invalid.
 - [x] Agent proposal queue has durable append-only core ledger and replay tests.
-- [ ] Agent proposal queue is connected to API/operator approval surfaces.
+- [x] Agent proposal queue is connected to API/operator approval surfaces.
 - [ ] No live-capable route can execute without `TradingEngine.submit_order_intent()`.
 - [ ] Prediction-market raw snapshots have manifests, provenance, and replay.
 - [ ] Feature builder is point-in-time and labels future resolution data as non-feature metadata.
@@ -55,4 +55,4 @@ This ledger is the working checklist for turning PQTS into a serious production 
 
 ## Current Operator Note
 
-The system has useful bones: router-only execution enforcement, a typed `OrderIntent`, promotion APIs, prediction-market adapters, durable agent proposal events, and microstructure controls. It is not yet a proven money printer. The next high-leverage work is connecting proposal replay to the operator API and building real prediction-market order-book replay, not more OHLCV parameter search.
+The system has useful bones: router-only execution enforcement, a typed `OrderIntent`, promotion APIs, prediction-market adapters, durable agent proposal events with API approval/materialization, and microstructure controls. It is not yet a proven money printer. The next high-leverage work is building real prediction-market order-book replay and feature manifests, not more OHLCV parameter search.

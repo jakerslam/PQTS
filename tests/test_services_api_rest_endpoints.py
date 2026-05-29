@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -634,6 +634,95 @@ def test_agent_default_policy_blocks_execute_even_for_operator() -> None:
 
     denied = client.post(f"/v1/agent/intents/{intent_id}/execute", headers=_operator())
     assert denied.status_code == 403
+
+
+def test_agent_proposal_durable_order_intent_api_flow(tmp_path) -> None:
+    client = TestClient(create_app(_settings()))
+    client.app.state.store.agent_proposal_ledger_path = str(tmp_path / "agent_proposals.jsonl")
+
+    mode_write = client.put(
+        "/v1/trading/mode",
+        json={"mode": "assisted_manual", "reason": "agent proposal desk test"},
+        headers=_operator(),
+    )
+    assert mode_write.status_code == 200
+
+    me = client.get("/v1/auth/me", headers=_viewer())
+    agent_id = me.json()["identity"]["subject"]
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+    created = client.post(
+        "/v1/agent/proposals",
+        json={
+            "agent_id": agent_id,
+            "action": "create_order_intent",
+            "strategy_id": "pm_micro_alpha",
+            "rationale": "positive prediction-market microstructure edge",
+            "supporting_card_ids": ["card_pm_micro_1"],
+            "current_metrics": {"edge_bps": 13.0},
+            "gate_checks": {"passed": True, "stage": "paper"},
+            "risk_impact": {"notional_usd": 45.0, "risk_budget_pct": 1.0},
+            "approval_required": True,
+            "expires_at": expires_at,
+            "order_intent": {
+                "order_id": "oi_agent_api_1",
+                "strategy_id": "pm_micro_alpha",
+                "symbol": "PM-MKT-YES",
+                "side": "buy",
+                "quantity": 100.0,
+                "order_type": "limit",
+                "requested_price": 0.45,
+                "expected_alpha_bps": 13.0,
+                "source": "agent",
+                "mode": "assisted_manual",
+                "approval_status": "proposed",
+                "market": "prediction",
+            },
+        },
+        headers=_viewer(),
+    )
+    assert created.status_code == 200
+    proposal_id = created.json()["proposal"]["proposal_id"]
+    assert created.json()["status"] == "queued"
+
+    premature = client.post(
+        f"/v1/agent/proposals/{proposal_id}/materialize-order-intent",
+        headers=_operator(),
+    )
+    assert premature.status_code == 409
+
+    approved = client.post(
+        f"/v1/agent/proposals/{proposal_id}/approve",
+        json={"reason": "operator reviewed evidence"},
+        headers=_operator(),
+    )
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "approved"
+
+    materialized = client.post(
+        f"/v1/agent/proposals/{proposal_id}/materialize-order-intent",
+        headers=_operator(),
+    )
+    assert materialized.status_code == 200
+    intent = materialized.json()["intent"]
+    assert intent["source"] == "agent"
+    assert intent["approval_status"] == "approved"
+    assert materialized.json()["executed"] is False
+    assert materialized.json()["router_only_execution_enforced"] is True
+
+    simulated = client.post(
+        f"/v1/trading/order-intents/{intent['intent_id']}/simulate",
+        headers=_operator(),
+    )
+    assert simulated.status_code == 200
+    assert simulated.json()["simulation"]["ready_to_submit"] is True
+
+    events = client.get(f"/v1/agent/proposals/{proposal_id}/events", headers=_viewer())
+    assert events.status_code == 200
+    assert [row["event_type"] for row in events.json()["events"]] == [
+        "proposal_queued",
+        "proposal_approved",
+        "proposal_materialized",
+    ]
 
 
 def test_trading_mode_order_intent_manual_ticket_flow() -> None:

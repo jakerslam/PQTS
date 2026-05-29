@@ -31,8 +31,11 @@ from contracts.api import (
 )
 from contracts.execution_flow import OrderIntent
 from contracts.instruments import normalize_instrument
+from core.agent_proposal_store import AgentProposalStore
 from core.trading_control import (
+    AGENT_PROPOSAL_ACTIONS,
     TRADING_MODES,
+    AgentProposal,
     SteeringCommand,
     TradingModeState,
     evaluate_order_intent,
@@ -532,6 +535,57 @@ def _router_submission_contract(intent: OrderIntent) -> dict[str, Any]:
     }
 
 
+def _agent_proposal_store(store: APIRuntimeStore) -> AgentProposalStore:
+    return AgentProposalStore(path=str(store.agent_proposal_ledger_path))
+
+
+def _build_agent_order_intent(
+    payload: dict[str, Any],
+    *,
+    agent_id: str,
+    store: APIRuntimeStore,
+) -> OrderIntent | None:
+    order_payload = payload.get("order_intent")
+    if not isinstance(order_payload, dict):
+        return None
+    candidate = dict(order_payload)
+    candidate["source"] = "agent"
+    candidate["approval_status"] = str(candidate.get("approval_status", "proposed")).lower()
+    if candidate["approval_status"] == "auto_approved":
+        candidate["approval_status"] = "proposed"
+    candidate["mode"] = str(candidate.get("mode", _trading_mode_state(store).mode)).strip().lower()
+    candidate.setdefault("account_id", "paper-main")
+    candidate.setdefault("market", "prediction")
+    metadata = dict(candidate.get("metadata", {}) or {})
+    metadata["proposed_by_agent_id"] = agent_id
+    candidate["metadata"] = metadata
+    return OrderIntent.from_dict(candidate)
+
+
+def _build_agent_proposal(
+    payload: dict[str, Any],
+    *,
+    identity: APIIdentity,
+    store: APIRuntimeStore,
+) -> AgentProposal:
+    resolved_agent_id = str(payload.get("agent_id", identity.subject)).strip() or identity.subject
+    _assert_agent_access(identity, resolved_agent_id)
+    if "expires_at" not in payload:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="expires_at is required")
+    order_intent = _build_agent_order_intent(payload, agent_id=resolved_agent_id, store=store)
+    proposal_payload = {
+        **payload,
+        "proposal_id": str(payload.get("proposal_id", f"proposal_{uuid4().hex[:12]}")).strip(),
+        "agent_id": resolved_agent_id,
+        "order_intent": order_intent.to_dict() if order_intent is not None else None,
+        "approval_required": bool(payload.get("approval_required", True)),
+    }
+    try:
+        return AgentProposal.from_dict(proposal_payload)
+    except Exception as exc:
+        raise _invalid_payload(exc) from exc
+
+
 def _default_agent_policy(agent_id: str) -> dict[str, Any]:
     return {
         "agent_id": agent_id,
@@ -547,6 +601,7 @@ def _default_agent_policy(agent_id: str) -> dict[str, Any]:
         "risk_budget_pct": 2.0,
         "allowed_markets": ["crypto"],
         "allowed_actions": sorted(_AGENT_ACTIONS),
+        "allowed_proposal_actions": sorted(AGENT_PROPOSAL_ACTIONS),
         "updated_at": _utc_now_iso(),
     }
 
@@ -2382,6 +2437,10 @@ def upsert_agent_policy(
     allowed_actions = payload.get(
         "allowed_actions", current.get("allowed_actions", sorted(_AGENT_ACTIONS))
     )
+    allowed_proposal_actions = payload.get(
+        "allowed_proposal_actions",
+        current.get("allowed_proposal_actions", sorted(AGENT_PROPOSAL_ACTIONS)),
+    )
     if not isinstance(allowed_markets, list) or not all(
         isinstance(item, str) for item in allowed_markets
     ):
@@ -2394,6 +2453,13 @@ def upsert_agent_policy(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="allowed_actions must be string array"
         )
+    if not isinstance(allowed_proposal_actions, list) or not all(
+        isinstance(item, str) for item in allowed_proposal_actions
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="allowed_proposal_actions must be string array",
+        )
     normalized_actions = sorted(
         {str(item).strip().lower() for item in allowed_actions if str(item).strip()}
     )
@@ -2401,6 +2467,17 @@ def upsert_agent_policy(
     if unknown_actions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=f"unknown actions: {unknown_actions}"
+        )
+    normalized_proposal_actions = sorted(
+        {str(item).strip().lower() for item in allowed_proposal_actions if str(item).strip()}
+    )
+    unknown_proposal_actions = [
+        item for item in normalized_proposal_actions if item not in AGENT_PROPOSAL_ACTIONS
+    ]
+    if unknown_proposal_actions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"unknown proposal actions: {unknown_proposal_actions}",
         )
     updated = {
         "agent_id": resolved,
@@ -2411,11 +2488,188 @@ def upsert_agent_policy(
             {str(item).strip().lower() for item in allowed_markets if str(item).strip()}
         ),
         "allowed_actions": normalized_actions,
+        "allowed_proposal_actions": normalized_proposal_actions,
         "updated_at": _utc_now_iso(),
         "updated_by": identity.subject,
     }
     store.agent_policies[resolved] = updated
     return with_correlation(request, {"policy": updated})
+
+
+@router.get("/agent/proposals")
+def list_agent_proposals(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    agent_id: Annotated[Optional[str], Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    resolved_agent_id = str(agent_id or "").strip()
+    if resolved_agent_id:
+        _assert_agent_access(identity, resolved_agent_id)
+    proposal_store = _agent_proposal_store(store)
+    rows = [
+        proposal.to_dict()
+        for proposal in proposal_store.proposals()
+        if not resolved_agent_id or proposal.agent_id == resolved_agent_id
+    ][:limit]
+    return with_correlation(request, {"proposals": rows, "count": len(rows)})
+
+
+@router.post("/agent/proposals")
+def create_agent_proposal(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    proposal = _build_agent_proposal(payload, identity=identity, store=store)
+    _assert_agent_access(identity, proposal.agent_id)
+    policy = _get_agent_policy(store, proposal.agent_id)
+    _ensure_agent_capability(policy, "propose")
+    allowed_actions = set(policy.get("allowed_proposal_actions", sorted(AGENT_PROPOSAL_ACTIONS)))
+    if proposal.action not in allowed_actions:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="proposal action denied by agent policy",
+        )
+    proposal_store = _agent_proposal_store(store)
+    result = proposal_store.enqueue(proposal)
+    status_code = status.HTTP_200_OK if result.accepted else status.HTTP_400_BAD_REQUEST
+    if not result.accepted:
+        raise HTTPException(status_code=status_code, detail=result.to_dict())
+    return with_correlation(request, result.to_dict())
+
+
+@router.get("/agent/proposals/{proposal_id}")
+def get_agent_proposal(
+    proposal_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    proposal_store = _agent_proposal_store(store)
+    proposal = proposal_store.get(str(proposal_id).strip())
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="proposal not found")
+    _assert_agent_access(identity, proposal.agent_id)
+    return with_correlation(
+        request,
+        {
+            "proposal": proposal.to_dict(),
+            "approval": (
+                proposal_store.queue.approval_for(proposal.proposal_id).to_dict()
+                if proposal_store.queue.approval_for(proposal.proposal_id) is not None
+                else None
+            ),
+        },
+    )
+
+
+@router.get("/agent/proposals/{proposal_id}/events")
+def replay_agent_proposal_events(
+    proposal_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    proposal_store = _agent_proposal_store(store)
+    proposal = proposal_store.get(str(proposal_id).strip())
+    if proposal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="proposal not found")
+    _assert_agent_access(identity, proposal.agent_id)
+    events = proposal_store.replay(proposal.proposal_id)
+    return with_correlation(request, {"events": events, "count": len(events)})
+
+
+@router.post("/agent/proposals/{proposal_id}/approve")
+def approve_agent_proposal(
+    proposal_id: str,
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    proposal_store = _agent_proposal_store(store)
+    result = proposal_store.approve(
+        str(proposal_id).strip(),
+        actor=identity.subject,
+        actor_role=identity.role.value,
+        reason=str(payload.get("reason", payload.get("note", ""))).strip(),
+    )
+    if not result.accepted:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result.to_dict())
+    return with_correlation(request, result.to_dict())
+
+
+@router.post("/agent/proposals/{proposal_id}/reject")
+def reject_agent_proposal(
+    proposal_id: str,
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    proposal_store = _agent_proposal_store(store)
+    result = proposal_store.reject(
+        str(proposal_id).strip(),
+        actor=identity.subject,
+        actor_role=identity.role.value,
+        reason=str(payload.get("reason", payload.get("note", ""))).strip(),
+    )
+    if not result.accepted:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=result.to_dict())
+    return with_correlation(request, result.to_dict())
+
+
+@router.post("/agent/proposals/{proposal_id}/materialize-order-intent")
+def materialize_agent_proposal_order_intent(
+    proposal_id: str,
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    proposal_store = _agent_proposal_store(store)
+    try:
+        intent = proposal_store.materialize_order_intent(
+            str(proposal_id).strip(),
+            mode_state=_trading_mode_state(store),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    now_iso = _utc_now_iso()
+    row = {
+        **intent.to_dict(),
+        "intent_id": intent.order_id,
+        "status": "approved",
+        "created_by": identity.subject,
+        "updated_at": now_iso,
+        "source_proposal_id": str(proposal_id).strip(),
+    }
+    store.trading_order_intents[intent.order_id] = row
+    return with_correlation(
+        request,
+        {
+            "proposal": proposal_store.get(str(proposal_id).strip()).to_dict(),
+            "intent": row,
+            "executed": False,
+            "router_only_execution_enforced": True,
+        },
+    )
 
 
 @router.post("/agent/intents")

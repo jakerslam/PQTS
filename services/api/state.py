@@ -48,6 +48,7 @@ class APIRuntimeStore:
     trading_mode: dict[str, Any] = field(default_factory=dict)
     trading_order_intents: dict[str, dict[str, Any]] = field(default_factory=dict)
     trading_steering_actions: list[dict[str, Any]] = field(default_factory=list)
+    agent_proposal_ledger_path: str = "data/analytics/agent_proposals.jsonl"
     marketplace_listings: dict[str, dict[str, Any]] = field(default_factory=dict)
     workspaces: dict[str, dict[str, Any]] = field(default_factory=dict)
     workspace_subscriptions: dict[str, dict[str, Any]] = field(default_factory=dict)

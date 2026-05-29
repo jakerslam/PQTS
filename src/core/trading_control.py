@@ -456,6 +456,15 @@ class AgentProposalQueue:
             proposal for proposal in self._proposals.values() if proposal.status == "queued"
         )
 
+    def proposals(self) -> tuple[AgentProposal, ...]:
+        return tuple(
+            sorted(
+                self._proposals.values(),
+                key=lambda proposal: (proposal.created_at, proposal.proposal_id),
+                reverse=True,
+            )
+        )
+
     def approval_for(self, proposal_id: str) -> AgentProposalApproval | None:
         return self._approvals.get(str(proposal_id).strip())
 
