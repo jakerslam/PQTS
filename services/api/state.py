@@ -45,6 +45,9 @@ class APIRuntimeStore:
     agent_intents: dict[str, dict[str, Any]] = field(default_factory=dict)
     agent_receipts: dict[str, dict[str, Any]] = field(default_factory=dict)
     agent_hooks: dict[str, dict[str, Any]] = field(default_factory=dict)
+    trading_mode: dict[str, Any] = field(default_factory=dict)
+    trading_order_intents: dict[str, dict[str, Any]] = field(default_factory=dict)
+    trading_steering_actions: list[dict[str, Any]] = field(default_factory=list)
     marketplace_listings: dict[str, dict[str, Any]] = field(default_factory=dict)
     workspaces: dict[str, dict[str, Any]] = field(default_factory=dict)
     workspace_subscriptions: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -143,6 +146,15 @@ class APIRuntimeStore:
             agent_intents={},
             agent_receipts={},
             agent_hooks={},
+            trading_mode={
+                "mode": "manual",
+                "live_execution_enabled": False,
+                "updated_by": "system",
+                "reason": "api_bootstrap_default",
+                "updated_at": now_iso,
+            },
+            trading_order_intents={},
+            trading_steering_actions=[],
             marketplace_listings={
                 "listing_market_making_reference": {
                     "listing_id": "listing_market_making_reference",

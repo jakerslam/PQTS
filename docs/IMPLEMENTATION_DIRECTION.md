@@ -56,6 +56,10 @@ Last updated: 2026-03-17 (America/Denver)
 - Prefer prediction-market and forecast-monetization implementations when choosing between equally valuable expansion paths.
 - Keep one primary runtime path per release phase (no mixed Streamlit/Dash runtime ambiguity), and maintain all public proof/docs claims from canonical artifact feeds (`results/reference_performance_latest.json`, release-readiness outputs, and `docs/REFERENCE_PERFORMANCE.md`).
 - Enforce typed boundaries (Pydantic models) for runtime config, API payloads, and strategy manifests.
+- Keep manual, agent-assisted, and autopilot execution behind the shared
+  trading-control mode and `OrderIntent` lifecycle documented in
+  `docs/TRADING_CONTROL_PLANE.md`; do not add any UI/API shortcut around the
+  router-owned execution path.
 - Every structural change should include:
   - boundary validation (`tools/check_architecture_boundaries.py`)
   - architecture map check (`tools/print_architecture_map.py`)

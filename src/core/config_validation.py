@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping
 
 from core.performance_profile import ALLOWED_PERFORMANCE_PROFILES
+from core.trading_control import TRADING_MODES
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,35 @@ def validate_engine_config(config: Mapping[str, Any]) -> List[ConfigValidationIs
                     ConfigValidationIssue(
                         key="runtime.autopilot.mode",
                         message="runtime.autopilot.mode must be manual/auto/hybrid",
+                    )
+                )
+
+        trading_control = runtime.get("trading_control", {})
+        if trading_control and not isinstance(trading_control, Mapping):
+            issues.append(
+                ConfigValidationIssue(
+                    key="runtime.trading_control",
+                    message="runtime.trading_control must be a mapping when provided",
+                )
+            )
+        elif isinstance(trading_control, Mapping):
+            mode_token = str(trading_control.get("mode", "paper_autopilot")).strip().lower()
+            if mode_token not in TRADING_MODES:
+                issues.append(
+                    ConfigValidationIssue(
+                        key="runtime.trading_control.mode",
+                        message=(
+                            "runtime.trading_control.mode must be one of "
+                            + ",".join(sorted(TRADING_MODES))
+                        ),
+                    )
+                )
+            live_enabled = trading_control.get("live_execution_enabled", False)
+            if not isinstance(live_enabled, bool):
+                issues.append(
+                    ConfigValidationIssue(
+                        key="runtime.trading_control.live_execution_enabled",
+                        message="runtime.trading_control.live_execution_enabled must be boolean",
                     )
                 )
     return issues

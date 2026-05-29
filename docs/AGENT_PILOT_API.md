@@ -56,6 +56,7 @@ operator.execute_intent(intent_id=intent_id)
 - Hook creation is allowlist-constrained and secret values are fingerprinted (not stored raw).
 - Default policy starts with `execute=false` and fails closed.
 - Local LLM/agent challengers may propose intents, but they do not place orders and do not bypass simulation, stage gates, kill switches, or `RiskAwareRouter.submit_order()`.
+- Trading/order steering uses the separate `OrderIntent` lifecycle in `docs/TRADING_CONTROL_PLANE.md`; agents may propose steering only when policy grants `steer=true`, and privileged actions still require operator approval.
 
 ## Local Ollama/Kimi Challenger
 

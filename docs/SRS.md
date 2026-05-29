@@ -6762,3 +6762,214 @@ Observed source links:
 
 - PQTS SHALL support a packaged desktop launch option that runs without a local Python toolchain, with clear first-run unpacking diagnostics and security warnings handling guidance.
 - Packaged launch SHALL still enforce canonical risk/router gates and record provenance artifacts.
+
+## 110. Production-Grade Quant Control Plane and Agentic Trading Modes
+
+These requirements capture the product direction for PQTS as production-grade quant software that can operate under three governed control modes: user-directed, agent-steered, and autonomous. They synthesize patterns from successful algorithmic trading systems and current agentic trading research while preserving PQTS hard safety rules.
+
+Reference patterns considered:
+- QuantConnect LEAN: shared research, backtest, optimization, and live trading engine.
+- NautilusTrader: event-driven architecture with strategy parity between backtest and live nodes.
+- Freqtrade: explicit backtest, dry-run/paper, and live operation modes for crypto trading.
+- Qlib / FinRL-X: AI-native quant research infrastructure with reproducible data/model/backtest separation.
+- TradingAgents and related multi-agent frameworks: role-specialized analysts, researchers, traders, and risk managers producing structured recommendations.
+- PredictionMarketBench-style replay: deterministic, event-driven replay for classical and LLM-based trading agents on prediction-market data.
+
+### PGQ-1 Canonical Trading Control Modes
+
+- System SHALL define exactly three capital-control modes: `user`, `agent_steered`, and `auto`.
+- `user` mode SHALL require a human-originated order intent and explicit confirmation before routing.
+- `agent_steered` mode SHALL allow agents to propose trades, parameter changes, hedges, demotions, and promotions, but SHALL require human approval unless a specific low-risk action is pre-authorized by policy.
+- `auto` mode SHALL allow only stage-promoted strategies to generate order intents automatically within configured capital, venue, and risk budgets.
+
+### PGQ-2 Mode Policy Matrix
+
+- System SHALL maintain a machine-readable policy matrix for each control mode.
+- The policy matrix SHALL define who or what can create intents, who can approve, maximum notional, venue allowlist, strategy allowlist, required evidence, and confirmation thresholds.
+- Runtime SHALL fail closed to read-only or paper mode when mode policy cannot be loaded, validated, or proven current.
+
+### PGQ-3 Single Capital Path Contract
+
+- All capital-affecting actions SHALL flow through:
+  - signal/proposal,
+  - `OrderIntent`,
+  - risk check,
+  - approval when required,
+  - `RiskAwareRouter.submit_order()`,
+  - execution adapter,
+  - reconciliation and TCA.
+- Agents, UI surfaces, notebooks, scripts, and strategy modules SHALL NOT instantiate exchange adapters directly or bypass the router.
+- Any attempted bypass SHALL be rejected and recorded as a typed policy violation.
+
+### PGQ-4 OrderIntent Lifecycle Contract
+
+- `OrderIntent` SHALL support an auditable lifecycle at minimum:
+  - `draft`,
+  - `risk_checked`,
+  - `approved`,
+  - `routed`,
+  - `reconciled`,
+  - `rejected`,
+  - `canceled`.
+- Every lifecycle transition SHALL include actor/source, timestamp, mode, reason, prior state, new state, and evidence references.
+- Rejected intents SHALL preserve full rationale and gate outputs for replay and operator review.
+
+### PGQ-5 User-Directed Trading Surface
+
+- Manual trading UI/API SHALL present risk impact, expected cost, liquidity/spread state, current exposure, and projected post-trade exposure before confirmation.
+- User-directed orders SHALL still pass all profitability, capacity, shorting, venue, kill-switch, and portfolio limits.
+- Manual override actions SHALL be auditable and SHALL NOT disable hard risk controls.
+
+### PGQ-6 Agent-Steered Proposal Queue
+
+- Agent proposals SHALL enter a proposal queue with structured fields before any order intent can be created.
+- Required proposal fields SHALL include action, strategy ID, rationale, supporting evidence/card IDs, current metrics, gate checks, risk impact, approval requirement, and expiration time.
+- Expired, malformed, or evidence-incomplete proposals SHALL be rejected with explicit reason codes.
+
+### PGQ-7 Autonomous Trading Constraints
+
+- Auto mode SHALL only activate strategies that have passed the configured stage-promotion ladder.
+- Auto mode SHALL enforce per-strategy capital budgets, max daily loss, max drawdown, max leverage, max concentration, venue eligibility, and kill-switch policy.
+- Auto mode SHALL automatically demote, pause, or kill strategies when live/paper drift, slippage, reconciliation, or risk metrics breach thresholds.
+
+### PGQ-8 Immutable Decision Ledger
+
+- System SHALL maintain an immutable decision ledger covering proposals, approvals, rejections, overrides, order submissions, fills, cancels, risk events, kill-switch events, mode changes, and promotion/demotion decisions.
+- Ledger records SHALL be replayable and SHALL link to data snapshots, strategy artifacts, risk-check outputs, and execution/TCA records.
+- Reporting surfaces SHALL distinguish promotional summaries from ledger-derived accounting truth.
+
+### PGQ-9 Production Data Plane
+
+- System SHALL maintain immutable raw data stores for market data, order books, trades, funding/borrow rates, fees, spreads, liquidity, news/events, prediction-market metadata, and settlement/resolution data where applicable.
+- Normalized datasets SHALL include provenance, source, timestamp, schema version, and quality metrics.
+- Stale, missing, non-entitled, or causally ambiguous data SHALL force hold/no-trade behavior for affected strategies.
+
+### PGQ-10 Point-in-Time Feature Store
+
+- Feature generation SHALL use point-in-time joins and preserve as-of timestamps to prevent lookahead.
+- Feature rows SHALL include source lineage, transformation version, model/config version, and quality flags.
+- Any capital-affecting experiment SHALL be reproducible from code revision, config, dataset manifest, feature snapshot, and random seed.
+
+### PGQ-11 Backtest/Paper/Live Strategy Parity
+
+- Strategies SHALL implement one canonical strategy contract that can run in backtest, shadow, paper, canary, and live contexts without strategy-code rewrites.
+- Strategy outputs SHALL be portfolio targets or order-intent requests, not direct exchange orders.
+- Backtest, paper, and live paths SHALL share risk, sizing, order-intent, and router contracts.
+
+### PGQ-12 Execution-Realistic Simulation
+
+- Simulator SHALL model fees, spread, slippage, liquidity/depth, partial fills, latency, rate limits, rejects, and queue/impact assumptions where data supports them.
+- Simulation reports SHALL label any unmodeled execution assumptions and SHALL not present gross returns as deployable net performance.
+- TCA SHALL compare expected execution assumptions against paper/live realized fills and feed drift metrics back into promotion gates.
+
+### PGQ-13 Research Validation Gate Suite
+
+- Strategy promotion from research SHALL require out-of-sample evidence, walk-forward testing, purged CV where applicable, deflated Sharpe or equivalent multiple-testing control, PBO/overfit controls, parameter-neighborhood robustness, cost realism, capacity checks, and regime robustness.
+- Single-window headline Sharpe, social PnL screenshots, or agent confidence SHALL NOT be sufficient for paper promotion.
+- Strategies failing walk-forward or robustness gates SHALL remain research-only regardless of full-period backtest performance.
+
+### PGQ-14 Alpha Source Program
+
+- Research roadmap SHALL prioritize alpha sources with data and replay support beyond OHLCV-only curve fitting.
+- Supported alpha tracks SHOULD include prediction-market mispricing, resolution/settlement modeling, order-book microstructure, funding/basis/carry, cross-venue inefficiency, event/news/forecast lead-lag, sentiment/catalyst extraction, and portfolio/risk alpha.
+- Each alpha claim SHALL be expressed as a falsifiable research card with evidence, boundary conditions, costs, failure modes, venue/symbol/regime scope, and current stage.
+
+### PGQ-15 Agent Role Separation
+
+- Agentic workflows SHALL separate roles for research hypothesis generation, data QA, implementation assistance, skeptic/risk review, portfolio sizing, execution/TCA monitoring, and operator summarization.
+- Role outputs SHALL be persisted with prompt/config hashes, model/provider metadata when applicable, artifacts produced, and review outcome.
+- Agents SHALL be allowed to steer research and propose actions but SHALL NOT bypass deterministic risk, approval, or execution controls.
+
+### PGQ-16 Structured Agent Decision Contract
+
+- Capital-affecting agent recommendations SHALL use a strict structured decision contract containing:
+  - action,
+  - strategy ID,
+  - rationale,
+  - supporting card IDs,
+  - counterevidence IDs where applicable,
+  - current metrics,
+  - gate checks,
+  - risk impact,
+  - approval requirement,
+  - recommended mode/stage.
+- Recommendations missing required fields SHALL be invalid and SHALL NOT create order intents.
+
+### PGQ-17 Agent Challenger A/B Evaluation
+
+- Agent-steered promotion and trading recommendations SHALL run in challenger mode against deterministic autopilot controls before becoming default.
+- Evaluation SHALL track net out-of-sample Sharpe differential, net PnL after realistic costs, false-promotion rate, slippage MAPE, drawdown/risk-limit events, and kill-switch frequency.
+- Agent steering SHALL NOT become default unless it improves acceptance metrics without increasing hard-control violations.
+
+### PGQ-18 Stage Promotion Ladder
+
+- Strategy lifecycle SHALL include at minimum:
+  - research/backtest,
+  - shadow signal,
+  - paper trading,
+  - live canary,
+  - limited live,
+  - full live allocation.
+- Stages SHALL NOT be skipped.
+- Promotion and demotion criteria SHALL be explicit, versioned, and auditable per strategy family, venue, and control mode.
+
+### PGQ-19 Paper and Canary Evidence Requirements
+
+- Paper promotion SHALL require positive OOS evidence, validated costs, realistic capacity, and no unresolved high-severity data/risk defects.
+- Live canary promotion SHALL require minimum paper duration, minimum fills, slippage within tolerance, no kill-switch breaches, clean reconciliation, and stable expected-vs-realized alpha.
+- Live allocation expansion SHALL require canary stability and no hard-limit violations.
+
+### PGQ-20 Production Operations and Observability
+
+- Production runtime SHALL expose metrics, logs, traces, dashboards, and alerts for data health, strategy state, order intent state, execution quality, positions, PnL, risk budgets, venue health, and agent proposal state.
+- Operations surfaces SHALL expose degraded/empty states honestly and SHALL NOT synthesize healthy-looking placeholders.
+- Daily and weekly operator workflows SHALL review slippage drift, kill-switch events, active canaries, unresolved incidents, and strategy/agent challenger metrics.
+
+### PGQ-21 Reconciliation and TCA Truth Layer
+
+- System SHALL reconcile orders, fills, positions, balances, realized/unrealized PnL, fees, and venue/account state against internal ledgers.
+- Reconciliation breaks SHALL block promotion and may force mode downgrade, strategy pause, or flatten/cancel-all actions depending on severity.
+- TCA outputs SHALL be available by strategy, venue, symbol/market, order type, time bucket, and control mode.
+
+### PGQ-22 Incident and Disaster Controls
+
+- Runtime SHALL provide emergency controls at minimum:
+  - cancel all,
+  - flatten positions,
+  - disable venue,
+  - disable strategy,
+  - downgrade mode,
+  - pause agent proposals,
+  - revoke external endpoint.
+- Incident actions SHALL be idempotent, auditable, and available through operator-approved surfaces.
+- Recovery from emergency state SHALL require explicit health revalidation.
+
+### PGQ-23 Security, Secrets, and Deployment Environments
+
+- Production deployment SHALL separate research, paper, canary, and live environments.
+- Secrets SHALL use approved secret stores or environment injection and SHALL never be hardcoded in strategy, agent, or UI code.
+- Live credentials SHALL be least-privilege, rotatable, and scoped by venue/account/capability.
+- Public administrative ingress SHALL be disabled by default unless production auth, TLS/HTTPS, CORS, rate limits, and operator allowlists are configured.
+
+### PGQ-24 Production Readiness Ledger
+
+- System SHALL maintain a production-readiness ledger that maps each production-grade capability to status, owner, evidence, open risks, test coverage, and release gate.
+- Readiness records SHALL reference SRS IDs, generated artifacts, validation commands, and incident history where applicable.
+- A strategy, agent pathway, or venue integration SHALL NOT be considered production-ready without readiness-ledger evidence.
+
+### PGQ-25 Reference-System Assimilation Governance
+
+- Architecture and workflow ideas borrowed from external systems SHALL be captured as design patterns, not copied blindly.
+- Assimilation notes SHALL identify which reference system motivated the pattern, which PQTS component owns it, what safety gates apply, and what acceptance evidence is required.
+- External claims about profitability or agent trading ability SHALL remain `unverified` unless reproduced through PQTS trade-level replay, paper, or live ledgers.
+
+### PGQ-26 Production Acceptance Criteria
+
+- PQTS SHALL NOT be classified as production-grade auto-trading software until:
+  - all three control modes operate through one audited order-intent/router path,
+  - backtest/paper/live strategy parity is demonstrated,
+  - data and feature snapshots are reproducible,
+  - reconciliation and TCA are live for all routed venues,
+  - emergency controls are tested,
+  - at least one strategy passes research, paper, and canary gates without hard-control violations.
+- Until these criteria are met, the product SHALL label live-money capability as `not production approved` or equivalent in operator-facing surfaces.

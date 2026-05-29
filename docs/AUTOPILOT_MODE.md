@@ -18,6 +18,22 @@ Overrides are applied **after** autopilot ranking:
 
 Risk controls remain hard-gated through `RiskAwareRouter` regardless of autopilot output.
 
+## Trading Control Modes
+
+Strategy selection mode is separate from trading mode. Autopilot can choose which
+strategies are active, but actual order admission is governed by
+`docs/TRADING_CONTROL_PLANE.md`:
+
+- `manual`
+- `assisted_manual`
+- `paper_autopilot`
+- `live_canary`
+- `live_autopilot`
+- `kill_only`
+
+Runtime order entry uses `TradingEngine.submit_order_intent()` and still reaches
+capital only through `RiskAwareRouter.submit_order()`.
+
 ## Configuration
 
 `config/paper.yaml`:

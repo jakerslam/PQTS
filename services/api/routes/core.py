@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
-from pathlib import Path
+import json
 import sys
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated, Any, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -29,7 +29,18 @@ from contracts.api import (
     PositionSnapshot,
     RiskStateSnapshot,
 )
+from contracts.execution_flow import OrderIntent
 from contracts.instruments import normalize_instrument
+from core.trading_control import (
+    TRADING_MODES,
+    SteeringCommand,
+    TradingModeState,
+    evaluate_order_intent,
+    evaluate_steering_command,
+    mode_capability,
+    normalize_trading_mode,
+    order_intent_notional,
+)
 from execution.venue_failover import select_primary_and_fallback
 from research.advanced_training import (
     run_adaptive_ensemble_training,
@@ -118,7 +129,9 @@ _OPS_JOB_TYPES = {"data_seed", "notify_test"}
 _OPS_JOB_TERMINAL_STATUS = {"succeeded", "failed"}
 _OPS_JOB_RETENTION = 300
 _OFFICIAL_INTEGRATIONS_PATH = Path("config/integrations/official_integrations.json")
-_OFFICIAL_INTEGRATION_REQUIREMENTS_PATH = Path("config/integrations/official_integration_requirements.json")
+_OFFICIAL_INTEGRATION_REQUIREMENTS_PATH = Path(
+    "config/integrations/official_integration_requirements.json"
+)
 _CONNECTOR_REGISTRY_PATH = Path("config/integrations/connector_registry.json")
 
 
@@ -162,7 +175,10 @@ def _resolve_adapter_stage_requirements(provider: str) -> dict[str, Any]:
         "paper_ok": bool(entry.get("paper_ok", defaults.get("paper_ok", False))),
         "required_status_by_stage": dict(
             entry.get("required_status_by_stage", defaults.get("required_status_by_stage", {}))
-            if isinstance(entry.get("required_status_by_stage", defaults.get("required_status_by_stage", {})), dict)
+            if isinstance(
+                entry.get("required_status_by_stage", defaults.get("required_status_by_stage", {})),
+                dict,
+            )
             else {}
         ),
     }
@@ -216,11 +232,7 @@ def _find_connector_rows(*, connector_id_or_provider: str) -> list[dict[str, Any
     by_id = [row for row in rows if str(row.get("connector_id", "")).strip().lower() == target]
     if by_id:
         return by_id
-    return [
-        row
-        for row in rows
-        if str(row.get("provider", "")).strip().lower() == target
-    ]
+    return [row for row in rows if str(row.get("provider", "")).strip().lower() == target]
 
 
 def _filter_connectors(
@@ -239,7 +251,9 @@ def _filter_connectors(
             if str(row.get("connector_class", "")).strip().lower() != connector_class:
                 continue
         if market_class:
-            classes = [str(token).strip().lower() for token in list(row.get("market_classes") or [])]
+            classes = [
+                str(token).strip().lower() for token in list(row.get("market_classes") or [])
+            ]
             if market_class not in classes:
                 continue
         if status:
@@ -351,16 +365,171 @@ def _collect_brokerage_sync_health(store: APIRuntimeStore) -> list[dict[str, Any
         if not isinstance(link, dict):
             continue
         state = _compute_sync_state(link)
-        rows.append({
-            "link_id": str(link.get("link_id", "")),
-            "connection_id": str(link.get("connection_id", "")),
-            "provider": str(link.get("provider", "plaid")),
-            "institution": str(link.get("institution", "")),
-            "last_sync_at": str(link.get("last_sync_at", "")),
-            **state,
-        })
+        rows.append(
+            {
+                "link_id": str(link.get("link_id", "")),
+                "connection_id": str(link.get("connection_id", "")),
+                "provider": str(link.get("provider", "plaid")),
+                "institution": str(link.get("institution", "")),
+                "last_sync_at": str(link.get("last_sync_at", "")),
+                **state,
+            }
+        )
     rows.sort(key=lambda item: str(item.get("link_id", "")))
     return rows
+
+
+def _trading_mode_state(store: APIRuntimeStore) -> TradingModeState:
+    raw = store.trading_mode if isinstance(store.trading_mode, dict) else {}
+    updated_at = raw.get("updated_at")
+    if isinstance(updated_at, str) and updated_at:
+        try:
+            parsed_updated_at = datetime.fromisoformat(updated_at)
+        except ValueError:
+            parsed_updated_at = datetime.now(timezone.utc)
+    elif isinstance(updated_at, datetime):
+        parsed_updated_at = updated_at
+    else:
+        parsed_updated_at = datetime.now(timezone.utc)
+    mode = normalize_trading_mode(raw.get("mode", "manual"))
+    live_enabled = bool(raw.get("live_execution_enabled", False)) and mode.startswith("live")
+    return TradingModeState(
+        mode=mode,
+        live_execution_enabled=live_enabled,
+        updated_by=str(raw.get("updated_by", "system")),
+        reason=str(raw.get("reason", "")),
+        updated_at=parsed_updated_at,
+    )
+
+
+def _store_trading_mode(
+    store: APIRuntimeStore,
+    *,
+    mode: str,
+    live_execution_enabled: bool,
+    updated_by: str,
+    reason: str,
+) -> dict[str, Any]:
+    normalized = normalize_trading_mode(mode)
+    state = TradingModeState(
+        mode=normalized,
+        live_execution_enabled=bool(live_execution_enabled) and normalized.startswith("live"),
+        updated_by=updated_by,
+        reason=reason,
+    )
+    payload = state.to_dict()
+    store.trading_mode = payload
+    return payload
+
+
+def _trading_sync_payload(store: APIRuntimeStore) -> dict[str, Any]:
+    rows = _collect_brokerage_sync_health(store)
+    degraded = [row for row in rows if bool(row.get("fail_closed_trade_block"))]
+    return {
+        "has_brokerage_links": len(rows) > 0,
+        "degraded_count": len(degraded),
+        "all_clear": len(degraded) == 0,
+        "fail_closed_trade_block": len(degraded) > 0,
+    }
+
+
+def _risk_state_payload(store: APIRuntimeStore, account_id: str = "paper-main") -> dict[str, Any]:
+    risk = store.risk_states.get(account_id)
+    return risk.to_dict() if risk is not None else {}
+
+
+def _account_equity(store: APIRuntimeStore, account_id: str = "paper-main") -> float:
+    account = store.accounts.get(account_id)
+    return float(getattr(account, "equity", 0.0) or 0.0) if account is not None else 0.0
+
+
+def _build_order_intent(
+    payload: dict[str, Any], *, identity: APIIdentity, store: APIRuntimeStore
+) -> OrderIntent:
+    source = str(payload.get("source", "human")).strip().lower()
+    if source == "human" and not _identity_is_operator(identity):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="operator role required for human order intents",
+        )
+    mode_state = _trading_mode_state(store)
+    order_id = str(payload.get("order_id", f"oi_{uuid4().hex[:12]}")).strip()
+    symbol = str(payload.get("symbol", "")).strip()
+    if not symbol:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="symbol is required")
+    venue = str(payload.get("venue", "")).strip().lower()
+    market = str(payload.get("market", "crypto")).strip().lower() or "crypto"
+    normalized = normalize_instrument(venue=venue, symbol=symbol, market=market)
+    requested_price = float(
+        payload.get("requested_price", payload.get("limit_price", payload.get("price", 0.0))) or 0.0
+    )
+    return OrderIntent(
+        order_id=order_id,
+        account_id=str(payload.get("account_id", "paper-main")).strip() or "paper-main",
+        strategy_id=str(payload.get("strategy_id", "manual_trade")).strip() or "manual_trade",
+        symbol=normalized.symbol,
+        side=str(payload.get("side", "")).strip().lower(),
+        quantity=float(payload.get("quantity", 0.0) or 0.0),
+        order_type=str(payload.get("order_type", "market")).strip().lower() or "market",
+        requested_price=requested_price,
+        expected_alpha_bps=float(payload.get("expected_alpha_bps", 0.0) or 0.0),
+        source=source,
+        mode=str(payload.get("mode", mode_state.mode)).strip().lower() or mode_state.mode,
+        venue=venue,
+        market=normalized.asset_class,
+        notional_usd=float(payload.get("notional_usd", 0.0) or 0.0),
+        risk_budget_pct=float(payload.get("risk_budget_pct", 0.0) or 0.0),
+        approval_status=str(payload.get("approval_status", "proposed")).strip().lower()
+        or "proposed",
+        reason=str(payload.get("reason", "")).strip(),
+        time_in_force=str(payload.get("time_in_force", "gtc")).strip().lower() or "gtc",
+        reduce_only=bool(payload.get("reduce_only", False)),
+        metadata={
+            "instrument": normalized.to_dict(),
+            **dict(payload.get("metadata", {}) or {}),
+        },
+    )
+
+
+def _simulate_order_intent(store: APIRuntimeStore, intent: OrderIntent) -> dict[str, Any]:
+    mode_state = _trading_mode_state(store)
+    decision = evaluate_order_intent(
+        intent,
+        mode_state=mode_state,
+        risk_state=_risk_state_payload(store, account_id=intent.account_id),
+        sync_health=_trading_sync_payload(store),
+        account_equity=_account_equity(store, account_id=intent.account_id),
+    )
+    return {
+        "simulated_at": _utc_now_iso(),
+        "passed": decision.allowed
+        or (
+            decision.requires_approval
+            and set(decision.reasons).issubset({"operator_approval_required"})
+        ),
+        "ready_to_submit": decision.allowed,
+        "gate": decision.to_dict(),
+        "notional_usd": order_intent_notional(intent),
+        "router_path": "TradingEngine.submit_order_intent -> RiskAwareRouter.submit_order",
+    }
+
+
+def _router_submission_contract(intent: OrderIntent) -> dict[str, Any]:
+    return {
+        "router_path": "TradingEngine.submit_order_intent -> RiskAwareRouter.submit_order",
+        "order_request": {
+            "symbol": intent.symbol,
+            "side": intent.side,
+            "quantity": intent.quantity,
+            "order_type": intent.order_type,
+            "price": intent.requested_price if intent.requested_price > 0 else None,
+            "strategy_id": intent.strategy_id,
+            "expected_alpha_bps": intent.expected_alpha_bps,
+            "client_order_id": intent.order_id,
+            "decision_context": {"order_intent": intent.to_dict()},
+        },
+        "risk_note": "API approval does not place an order; runtime still must call RiskAwareRouter.submit_order().",
+    }
 
 
 def _default_agent_policy(agent_id: str) -> dict[str, Any]:
@@ -371,6 +540,7 @@ def _default_agent_policy(agent_id: str) -> dict[str, Any]:
             "propose": True,
             "simulate": True,
             "execute": False,
+            "steer": False,
             "hooks_manage": True,
         },
         "max_pending_intents": 20,
@@ -486,10 +656,14 @@ def _build_agent_gate_checks(intent: dict[str, Any], store: APIRuntimeStore) -> 
     promotion = store.promotion_records.get(strategy_id) or _default_promotion_record(strategy_id)
     current_stage = _coerce_stage(str(promotion.get("stage", "paper")))
     target_stage = _proposed_stage_for_action(action=action, current_stage=current_stage)
-    stage_ok, stage_reason = _evaluate_stage_gate(action=action, current_stage=current_stage, target_stage=target_stage)
+    stage_ok, stage_reason = _evaluate_stage_gate(
+        action=action, current_stage=current_stage, target_stage=target_stage
+    )
 
     risk = store.risk_states.get("paper-main")
-    kill_switch_active = bool(getattr(risk, "kill_switch_active", False)) if risk is not None else False
+    kill_switch_active = (
+        bool(getattr(risk, "kill_switch_active", False)) if risk is not None else False
+    )
     sync_rows = _collect_brokerage_sync_health(store)
     degraded = [row for row in sync_rows if bool(row.get("fail_closed_trade_block"))]
     has_links = len(sync_rows) > 0
@@ -559,14 +733,22 @@ def _record_agent_receipt(
 def _normalize_hook_url(raw: str) -> tuple[str, str]:
     parsed = urlparse(raw.strip())
     if parsed.scheme not in {"https", "http"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hook URL must be http(s)")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="hook URL must be http(s)"
+        )
     host = str(parsed.hostname or "").strip().lower()
     if not host:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hook URL missing host")
     if parsed.scheme == "http" and host not in {"localhost", "127.0.0.1"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="http hooks are limited to localhost")
-    if not any(host == allowed or host.endswith(f".{allowed}") for allowed in _AGENT_HOOK_ALLOWED_HOSTS):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="hook host not allowlisted")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="http hooks are limited to localhost"
+        )
+    if not any(
+        host == allowed or host.endswith(f".{allowed}") for allowed in _AGENT_HOOK_ALLOWED_HOSTS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="hook host not allowlisted"
+        )
     return parsed.geturl(), host
 
 
@@ -842,22 +1024,30 @@ def _workspace_ops_health(store: APIRuntimeStore, workspace_id: str) -> dict[str
         "account_id": account_id,
         "account": account.to_dict() if account is not None else None,
         "risk_state": risk.to_dict() if risk is not None else None,
-        "critical_incidents": len([row for row in incidents if str(row.get("severity", "")).lower() == "critical"]),
+        "critical_incidents": len(
+            [row for row in incidents if str(row.get("severity", "")).lower() == "critical"]
+        ),
         "sync_health": {
             "connections": len(sync_rows),
             "degraded_count": len(degraded_sync),
             "all_clear": len(degraded_sync) == 0,
         },
-        "kill_switch_active": bool(getattr(risk, "kill_switch_active", False)) if risk is not None else False,
+        "kill_switch_active": (
+            bool(getattr(risk, "kill_switch_active", False)) if risk is not None else False
+        ),
     }
 
 
-def _workspace_promotion_gate_status(store: APIRuntimeStore, workspace_id: str, strategy_id: str) -> dict[str, Any]:
+def _workspace_promotion_gate_status(
+    store: APIRuntimeStore, workspace_id: str, strategy_id: str
+) -> dict[str, Any]:
     _ = workspace_id
     promotion = store.promotion_records.get(strategy_id) or _default_promotion_record(strategy_id)
     stage = _coerce_stage(str(promotion.get("stage", "paper")))
     incidents = list(store.risk_incidents.get("paper-main", []))
-    unresolved_high = len([row for row in incidents if str(row.get("severity", "")).lower() in {"critical", "high"}])
+    unresolved_high = len(
+        [row for row in incidents if str(row.get("severity", "")).lower() in {"critical", "high"}]
+    )
     risk = store.risk_states.get("paper-main")
     gate = evaluate_promotion_gate(
         paper_campaign_passed=stage in {"paper", "shadow", "canary", "live"},
@@ -888,9 +1078,13 @@ def signup_workspace(
     accepted_disclaimer = bool(payload.get("accepted_risk_disclaimer", False))
     accepted_paper_first = bool(payload.get("accepted_paper_first_policy", False))
     if not email or "@" not in email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="valid email is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="valid email is required"
+        )
     if not organization:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="organization is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="organization is required"
+        )
     if not accepted_disclaimer or not accepted_paper_first:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -936,17 +1130,20 @@ def signup_workspace(
     }
     store.signup_events.insert(0, signup_event)
     del store.signup_events[500:]
-    return with_correlation(request, {
-        "workspace": workspace,
-        "subscription": subscription,
-        "plan_summary": plan_summary(catalog, plan),
-        "next_actions": [
-            f"POST /v1/workspaces/{workspace_id}/billing/subscribe",
-            f"POST /v1/workspaces/{workspace_id}/campaign/start",
-            f"GET /v1/workspaces/{workspace_id}/ops-health",
-            f"GET /v1/workspaces/{workspace_id}/promotion-gate",
-        ],
-    })
+    return with_correlation(
+        request,
+        {
+            "workspace": workspace,
+            "subscription": subscription,
+            "plan_summary": plan_summary(catalog, plan),
+            "next_actions": [
+                f"POST /v1/workspaces/{workspace_id}/billing/subscribe",
+                f"POST /v1/workspaces/{workspace_id}/campaign/start",
+                f"GET /v1/workspaces/{workspace_id}/ops-health",
+                f"GET /v1/workspaces/{workspace_id}/promotion-gate",
+            ],
+        },
+    )
 
 
 @router.post("/workspaces/{workspace_id}/billing/subscribe")
@@ -1009,12 +1206,15 @@ def workspace_billing_subscribe(
     }
     store.billing_events.insert(0, billing_event)
     del store.billing_events[1000:]
-    return with_correlation(request, {
-        "workspace": workspace,
-        "subscription": subscription,
-        "plan_summary": plan_info,
-        "checkout": checkout,
-    })
+    return with_correlation(
+        request,
+        {
+            "workspace": workspace,
+            "subscription": subscription,
+            "plan_summary": plan_info,
+            "checkout": checkout,
+        },
+    )
 
 
 @router.post("/workspaces/{workspace_id}/campaign/start")
@@ -1058,18 +1258,24 @@ def workspace_campaign_start(
         command.extend(["--symbols", symbols])
     execute = bool(payload.get("execute", False))
     if not execute:
-        return with_correlation(request, {
-            "workspace_id": workspace_id,
-            "dry_run": True,
-            "command": [sys.executable, *command],
-            "paper_first_enforced": True,
-        })
+        return with_correlation(
+            request,
+            {
+                "workspace_id": workspace_id,
+                "dry_run": True,
+                "command": [sys.executable, *command],
+                "paper_first_enforced": True,
+            },
+        )
     result = run_python_command(command, timeout_seconds=180)
-    return with_correlation(request, {
-        "workspace_id": workspace_id,
-        "dry_run": False,
-        **result,
-    })
+    return with_correlation(
+        request,
+        {
+            "workspace_id": workspace_id,
+            "dry_run": False,
+            **result,
+        },
+    )
 
 
 @router.get("/workspaces/{workspace_id}/ops-health")
@@ -1084,11 +1290,14 @@ def workspace_ops_health(
     workspace = _require_workspace(store, workspace_id)
     health = _workspace_ops_health(store, workspace_id)
     subscription = store.workspace_subscriptions.get(workspace_id, {})
-    return with_correlation(request, {
-        "workspace": workspace,
-        "subscription": subscription if isinstance(subscription, dict) else {},
-        "ops_health": health,
-    })
+    return with_correlation(
+        request,
+        {
+            "workspace": workspace,
+            "subscription": subscription if isinstance(subscription, dict) else {},
+            "ops_health": health,
+        },
+    )
 
 
 @router.get("/workspaces/{workspace_id}/promotion-gate")
@@ -1118,14 +1327,18 @@ def record_marketplace_sale(
     listing_id = str(payload.get("listing_id", "")).strip()
     buyer_workspace_id = str(payload.get("buyer_workspace_id", "")).strip()
     if not listing_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="listing_id is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="listing_id is required"
+        )
     if listing_id not in store.marketplace_listings:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="listing not found")
     _ = _require_workspace(store, buyer_workspace_id)
 
     gross_amount = float(payload.get("gross_amount_usd", 0.0) or 0.0)
     if gross_amount <= 0.0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="gross_amount_usd must be > 0")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="gross_amount_usd must be > 0"
+        )
     settings = request.app.state.settings
     catalog = load_plan_catalog(settings)
     commission = marketplace_commission(catalog, gross_amount)
@@ -1134,7 +1347,8 @@ def record_marketplace_sale(
         "sale_id": sale_id,
         "listing_id": listing_id,
         "buyer_workspace_id": buyer_workspace_id,
-        "seller_id": str(payload.get("seller_id", "community_author")).strip() or "community_author",
+        "seller_id": str(payload.get("seller_id", "community_author")).strip()
+        or "community_author",
         "currency": str(payload.get("currency", "USD")).strip().upper() or "USD",
         **commission,
         "created_at": _utc_now_iso(),
@@ -1156,13 +1370,18 @@ def marketplace_revenue_summary(
     gross = sum(float(row.get("gross_amount_usd", 0.0) or 0.0) for row in sales)
     commission = sum(float(row.get("commission_amount_usd", 0.0) or 0.0) for row in sales)
     seller_net = sum(float(row.get("seller_net_amount_usd", 0.0) or 0.0) for row in sales)
-    return with_correlation(request, {
-        "count": len(sales),
-        "gross_amount_usd": round(gross, 2),
-        "commission_amount_usd": round(commission, 2),
-        "seller_net_amount_usd": round(seller_net, 2),
-        "sales": sorted(sales, key=lambda row: str(row.get("created_at", "")), reverse=True)[:200],
-    })
+    return with_correlation(
+        request,
+        {
+            "count": len(sales),
+            "gross_amount_usd": round(gross, 2),
+            "commission_amount_usd": round(commission, 2),
+            "seller_net_amount_usd": round(seller_net, 2),
+            "sales": sorted(sales, key=lambda row: str(row.get("created_at", "")), reverse=True)[
+                :200
+            ],
+        },
+    )
 
 
 @router.get("/accounts/{account_id}")
@@ -1273,7 +1492,9 @@ def list_orders(
 ) -> dict[str, Any]:
     _enforce_read_limit(request, cache, identity)
     rows = (
-        persistence.list_orders(account_id) if persistence is not None else store.orders.get(account_id, [])
+        persistence.list_orders(account_id)
+        if persistence is not None
+        else store.orders.get(account_id, [])
     )
     return with_correlation(request, {"orders": [item.to_dict() for item in rows]})
 
@@ -1318,7 +1539,9 @@ def list_fills(
 ) -> dict[str, Any]:
     _enforce_read_limit(request, cache, identity)
     rows = (
-        persistence.list_fills(account_id) if persistence is not None else store.fills.get(account_id, [])
+        persistence.list_fills(account_id)
+        if persistence is not None
+        else store.fills.get(account_id, [])
     )
     return with_correlation(request, {"fills": [item.to_dict() for item in rows]})
 
@@ -1562,14 +1785,18 @@ def apply_promotion_action(
     strategy_id = str(payload.get("strategy_id", "")).strip()
     action = str(payload.get("action", "")).strip().lower()
     if not strategy_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required"
+        )
     if action not in {"advance", "hold", "rollback", "halt"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid action")
 
     current = store.promotion_records.get(strategy_id) or _default_promotion_record(strategy_id)
     stage_before = _coerce_stage(str(current.get("stage", "paper")))
     stage_after = _next_stage(stage_before, action)
-    adapter_provider = str(payload.get("adapter_provider", current.get("adapter_provider", ""))).strip().lower()
+    adapter_provider = (
+        str(payload.get("adapter_provider", current.get("adapter_provider", ""))).strip().lower()
+    )
     adapter_status = str(current.get("adapter_status", "")).strip().lower()
     adapter_gate_payload: Optional[dict[str, Any]] = None
     if adapter_provider and stage_after in {"paper", "canary", "live"}:
@@ -1652,10 +1879,14 @@ def evaluate_promotion_gate_bundle(
     _enforce_write_limit(request, cache, identity)
     strategy_id = str(payload.get("strategy_id", "")).strip()
     if not strategy_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required"
+        )
     metrics = payload.get("metrics", {})
     if not isinstance(metrics, dict):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="metrics must be an object")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="metrics must be an object"
+        )
 
     backtest = evaluate_backtest_readiness(
         net_expectancy=float(metrics.get("net_expectancy", 0.0) or 0.0),
@@ -1670,7 +1901,9 @@ def evaluate_promotion_gate_bundle(
     )
     promotion = evaluate_promotion_gate(
         paper_campaign_passed=bool(metrics.get("paper_campaign_passed", paper.passed)),
-        unresolved_high_severity_incidents=int(metrics.get("unresolved_high_severity_incidents", 0) or 0),
+        unresolved_high_severity_incidents=int(
+            metrics.get("unresolved_high_severity_incidents", 0) or 0
+        ),
         stress_replay_passed=bool(metrics.get("stress_replay_passed", False)),
         portfolio_limits_intact=bool(metrics.get("portfolio_limits_intact", True)),
     )
@@ -1706,6 +1939,342 @@ def evaluate_promotion_gate_bundle(
     return with_correlation(request, response)
 
 
+@router.get("/trading/modes")
+def list_trading_modes(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    modes = [mode_capability(mode).to_dict() for mode in sorted(TRADING_MODES)]
+    return with_correlation(request, {"modes": modes})
+
+
+@router.get("/trading/mode")
+def get_trading_mode(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    mode_state = _trading_mode_state(store)
+    return with_correlation(
+        request,
+        {
+            "mode": mode_state.to_dict(),
+            "capability": mode_capability(mode_state.mode).to_dict(),
+            "sync_health": _trading_sync_payload(store),
+        },
+    )
+
+
+@router.put("/trading/mode")
+def set_trading_mode(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    mode = normalize_trading_mode(payload.get("mode", "manual"))
+    live_enabled = bool(payload.get("live_execution_enabled", False))
+    if mode.startswith("live") and live_enabled:
+        risk = _risk_state_payload(store)
+        sync = _trading_sync_payload(store)
+        if bool(risk.get("kill_switch_active", False)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="kill switch active")
+        if bool(sync.get("fail_closed_trade_block", False)):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="sync health fail-closed"
+            )
+    updated = _store_trading_mode(
+        store,
+        mode=mode,
+        live_execution_enabled=live_enabled,
+        updated_by=identity.subject,
+        reason=str(payload.get("reason", "")).strip(),
+    )
+    entry = {
+        "id": f"op_{uuid4().hex[:10]}",
+        "kind": "set_trading_mode",
+        "actor": identity.subject,
+        "note": str(payload.get("reason", "")).strip(),
+        "created_at": _utc_now_iso(),
+        "metadata": {"mode": updated},
+    }
+    store.operator_actions.insert(0, entry)
+    del store.operator_actions[250:]
+    return with_correlation(
+        request,
+        {
+            "mode": updated,
+            "capability": mode_capability(mode).to_dict(),
+            "action": entry,
+        },
+    )
+
+
+@router.get("/trading/order-intents")
+def list_trading_order_intents(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    rows = sorted(
+        [dict(row) for row in store.trading_order_intents.values() if isinstance(row, dict)],
+        key=lambda row: str(row.get("updated_at", row.get("created_at", ""))),
+        reverse=True,
+    )[:limit]
+    return with_correlation(request, {"intents": rows, "count": len(rows)})
+
+
+@router.post("/trading/order-intents")
+def create_trading_order_intent(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    try:
+        intent = _build_order_intent(payload, identity=identity, store=store)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _invalid_payload(exc) from exc
+    now_iso = _utc_now_iso()
+    row = {
+        **intent.to_dict(),
+        "intent_id": intent.order_id,
+        "status": "proposed",
+        "created_by": identity.subject,
+        "updated_at": now_iso,
+    }
+    store.trading_order_intents[intent.order_id] = row
+    return with_correlation(
+        request,
+        {
+            "intent": row,
+            "mode": _trading_mode_state(store).to_dict(),
+            "capability": mode_capability(_trading_mode_state(store).mode).to_dict(),
+        },
+    )
+
+
+@router.get("/trading/order-intents/{intent_id}")
+def get_trading_order_intent(
+    intent_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    intent = store.trading_order_intents.get(str(intent_id).strip())
+    if not isinstance(intent, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order intent not found")
+    return with_correlation(request, {"intent": intent})
+
+
+@router.post("/trading/order-intents/{intent_id}/simulate")
+def simulate_trading_order_intent(
+    intent_id: str,
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    row = store.trading_order_intents.get(str(intent_id).strip())
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order intent not found")
+    intent = OrderIntent.from_dict(row)
+    simulation = _simulate_order_intent(store, intent)
+    row["last_simulation"] = simulation
+    row["status"] = "simulated" if simulation["passed"] else "rejected"
+    current_approval = str(row.get("approval_status", "proposed")).strip().lower()
+    if simulation["passed"] and current_approval not in {"approved", "auto_approved"}:
+        row["approval_status"] = "simulated"
+    elif not simulation["passed"]:
+        row["approval_status"] = "rejected"
+    row["updated_at"] = _utc_now_iso()
+    store.trading_order_intents[intent.order_id] = row
+    return with_correlation(request, {"intent": row, "simulation": simulation})
+
+
+@router.post("/trading/order-intents/{intent_id}/approve")
+def approve_trading_order_intent(
+    intent_id: str,
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    row = store.trading_order_intents.get(str(intent_id).strip())
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order intent not found")
+    simulation = row.get("last_simulation", {})
+    if not isinstance(simulation, dict) or not bool(simulation.get("passed", False)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="successful simulation required before approval",
+        )
+    row["approval_status"] = "approved"
+    row["status"] = "approved"
+    row["approved_by"] = identity.subject
+    row["approved_at"] = _utc_now_iso()
+    row["approval_note"] = str(payload.get("note", "")).strip()
+    row["updated_at"] = _utc_now_iso()
+    store.trading_order_intents[str(intent_id).strip()] = row
+    return with_correlation(request, {"intent": row})
+
+
+@router.post("/trading/order-intents/{intent_id}/reject")
+def reject_trading_order_intent(
+    intent_id: str,
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    row = store.trading_order_intents.get(str(intent_id).strip())
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order intent not found")
+    row["approval_status"] = "rejected"
+    row["status"] = "rejected"
+    row["rejected_by"] = identity.subject
+    row["rejected_at"] = _utc_now_iso()
+    row["rejection_reason"] = str(payload.get("reason", "")).strip()
+    row["updated_at"] = _utc_now_iso()
+    store.trading_order_intents[str(intent_id).strip()] = row
+    return with_correlation(request, {"intent": row})
+
+
+@router.post("/trading/order-intents/{intent_id}/submit")
+def prepare_trading_order_intent_submission(
+    intent_id: str,
+    identity: Annotated[APIIdentity, Depends(require_operator)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    row = store.trading_order_intents.get(str(intent_id).strip())
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="order intent not found")
+    payload = dict(row)
+    payload["approval_status"] = str(payload.get("approval_status", "proposed"))
+    intent = OrderIntent.from_dict(payload)
+    simulation = _simulate_order_intent(store, intent)
+    if not bool(simulation.get("ready_to_submit", False)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "order intent is not ready for router submission",
+                "reasons": simulation.get("gate", {}).get("reasons", []),
+            },
+        )
+    row["status"] = "ready_for_router"
+    row["submitted_by"] = identity.subject
+    row["submitted_at"] = _utc_now_iso()
+    row["updated_at"] = _utc_now_iso()
+    row["router_submission"] = _router_submission_contract(intent)
+    store.trading_order_intents[str(intent_id).strip()] = row
+    return with_correlation(
+        request,
+        {
+            "intent": row,
+            "simulation": simulation,
+            "router_submission": row["router_submission"],
+            "executed": False,
+            "router_only_execution_enforced": True,
+        },
+    )
+
+
+@router.get("/trading/steering-actions")
+def list_trading_steering_actions(
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> dict[str, Any]:
+    _enforce_read_limit(request, cache, identity)
+    return with_correlation(
+        request,
+        {"actions": [dict(row) for row in store.trading_steering_actions[:limit]]},
+    )
+
+
+@router.post("/trading/steering-actions")
+def create_trading_steering_action(
+    payload: dict[str, Any],
+    identity: Annotated[APIIdentity, Depends(require_identity)],
+    request: Request,
+    cache: Annotated[APICache, Depends(get_cache)],
+    store: Annotated[APIRuntimeStore, Depends(get_store)],
+) -> dict[str, Any]:
+    _enforce_write_limit(request, cache, identity)
+    command = SteeringCommand(
+        action=str(payload.get("action", "")).strip().lower(),
+        source=str(payload.get("source", "human")).strip().lower(),
+        requested_by=identity.subject,
+        reason=str(payload.get("reason", "")).strip(),
+        strategy_id=str(payload.get("strategy_id", "")).strip(),
+        symbol=str(payload.get("symbol", "")).strip(),
+        risk_budget_pct=float(payload.get("risk_budget_pct", 0.0) or 0.0),
+        target_mode=str(payload.get("target_mode", payload.get("mode", ""))).strip().lower(),
+        metadata=dict(payload.get("metadata", {}) or {}),
+    )
+    if command.source == "human" and not _identity_is_operator(identity):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="operator role required for human steering",
+        )
+    if command.source == "agent":
+        agent_id = str(payload.get("agent_id", identity.subject)).strip() or identity.subject
+        policy = _get_agent_policy(store, agent_id)
+        _ensure_agent_capability(policy, "steer")
+    decision = evaluate_steering_command(
+        command,
+        current_mode=_trading_mode_state(store).mode,
+        actor_role=identity.role.value,
+    )
+    status_value = "accepted" if decision.allowed else "rejected"
+    action_row = {
+        "action_id": f"steer_{uuid4().hex[:12]}",
+        **command.to_dict(),
+        "status": status_value,
+        "decision": decision.to_dict(),
+        "created_at": _utc_now_iso(),
+    }
+    if decision.allowed and command.action in {"set_mode", "kill_only"}:
+        target_mode = "kill_only" if command.action == "kill_only" else command.target_mode
+        action_row["applied_mode"] = _store_trading_mode(
+            store,
+            mode=target_mode,
+            live_execution_enabled=bool(payload.get("live_execution_enabled", False)),
+            updated_by=identity.subject,
+            reason=command.reason,
+        )
+    store.trading_steering_actions.insert(0, action_row)
+    del store.trading_steering_actions[250:]
+    return with_correlation(
+        request, {"action": action_row, "mode": _trading_mode_state(store).to_dict()}
+    )
+
+
 @router.get("/agent/context")
 def get_agent_context(
     identity: Annotated[APIIdentity, Depends(require_identity)],
@@ -1734,27 +2303,33 @@ def get_agent_context(
         ],
         key=lambda row: row["strategy_id"],
     )
-    return with_correlation(request, {
-        "agent_id": resolved_agent_id,
-        "system_facts": {
-            "hard_rules": [
-                "orders_must_flow_via_risk_aware_router",
-                "kill_switch_and_risk_limits_non_bypassable",
-                "promotion_stage_skips_disallowed_by_gate_policy",
-            ],
-            "allowed_actions": sorted(_AGENT_ACTIONS),
-        },
-        "current_state": {
-            "account": account.to_dict() if account is not None else None,
-            "risk_state": risk.to_dict() if risk is not None else None,
-            "sync_health": {
-                "degraded_count": degraded,
-                "all_clear": degraded == 0,
+    return with_correlation(
+        request,
+        {
+            "agent_id": resolved_agent_id,
+            "system_facts": {
+                "hard_rules": [
+                    "orders_must_flow_via_risk_aware_router",
+                    "kill_switch_and_risk_limits_non_bypassable",
+                    "promotion_stage_skips_disallowed_by_gate_policy",
+                    "manual_agent_strategy_orders_use_order_intents_before_router_submission",
+                ],
+                "allowed_actions": sorted(_AGENT_ACTIONS),
+                "trading_modes": sorted(TRADING_MODES),
             },
-            "promotion_stages": promotions,
+            "current_state": {
+                "account": account.to_dict() if account is not None else None,
+                "risk_state": risk.to_dict() if risk is not None else None,
+                "trading_mode": _trading_mode_state(store).to_dict(),
+                "sync_health": {
+                    "degraded_count": degraded,
+                    "all_clear": degraded == 0,
+                },
+                "promotion_stages": promotions,
+            },
+            "policy": policy,
         },
-        "policy": policy,
-    })
+    )
 
 
 @router.get("/agent/policies/{agent_id}")
@@ -1788,32 +2363,53 @@ def upsert_agent_policy(
     current = _get_agent_policy(store, resolved)
     capabilities = payload.get("capabilities", current.get("capabilities", {}))
     if not isinstance(capabilities, dict):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="capabilities must be an object")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="capabilities must be an object"
+        )
     sanitized_capabilities = {
         "read": bool(capabilities.get("read", True)),
         "propose": bool(capabilities.get("propose", True)),
         "simulate": bool(capabilities.get("simulate", True)),
         "execute": bool(capabilities.get("execute", False)),
+        "steer": bool(
+            capabilities.get("steer", current.get("capabilities", {}).get("steer", False))
+        ),
         "hooks_manage": bool(capabilities.get("hooks_manage", True)),
     }
     max_pending = int(payload.get("max_pending_intents", current.get("max_pending_intents", 20)))
     risk_budget = float(payload.get("risk_budget_pct", current.get("risk_budget_pct", 2.0)))
     allowed_markets = payload.get("allowed_markets", current.get("allowed_markets", ["crypto"]))
-    allowed_actions = payload.get("allowed_actions", current.get("allowed_actions", sorted(_AGENT_ACTIONS)))
-    if not isinstance(allowed_markets, list) or not all(isinstance(item, str) for item in allowed_markets):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="allowed_markets must be string array")
-    if not isinstance(allowed_actions, list) or not all(isinstance(item, str) for item in allowed_actions):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="allowed_actions must be string array")
-    normalized_actions = sorted({str(item).strip().lower() for item in allowed_actions if str(item).strip()})
+    allowed_actions = payload.get(
+        "allowed_actions", current.get("allowed_actions", sorted(_AGENT_ACTIONS))
+    )
+    if not isinstance(allowed_markets, list) or not all(
+        isinstance(item, str) for item in allowed_markets
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="allowed_markets must be string array"
+        )
+    if not isinstance(allowed_actions, list) or not all(
+        isinstance(item, str) for item in allowed_actions
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="allowed_actions must be string array"
+        )
+    normalized_actions = sorted(
+        {str(item).strip().lower() for item in allowed_actions if str(item).strip()}
+    )
     unknown_actions = [item for item in normalized_actions if item not in _AGENT_ACTIONS]
     if unknown_actions:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"unknown actions: {unknown_actions}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"unknown actions: {unknown_actions}"
+        )
     updated = {
         "agent_id": resolved,
         "capabilities": sanitized_capabilities,
         "max_pending_intents": max(1, min(max_pending, 500)),
         "risk_budget_pct": max(0.1, min(risk_budget, 100.0)),
-        "allowed_markets": sorted({str(item).strip().lower() for item in allowed_markets if str(item).strip()}),
+        "allowed_markets": sorted(
+            {str(item).strip().lower() for item in allowed_markets if str(item).strip()}
+        ),
         "allowed_actions": normalized_actions,
         "updated_at": _utc_now_iso(),
         "updated_by": identity.subject,
@@ -1835,15 +2431,21 @@ def create_agent_intent(
     _assert_agent_access(identity, resolved_agent_id)
     policy = _get_agent_policy(store, resolved_agent_id)
     _ensure_agent_capability(policy, "propose")
-    if _count_pending_intents(store, resolved_agent_id) >= int(policy.get("max_pending_intents", 20)):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="pending intent quota reached")
+    if _count_pending_intents(store, resolved_agent_id) >= int(
+        policy.get("max_pending_intents", 20)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="pending intent quota reached"
+        )
 
     errors = _validate_agent_intent_payload(payload)
     if errors:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"errors": errors})
     action = str(payload.get("action", "")).strip().lower()
     if action not in set(policy.get("allowed_actions", [])):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="action denied by agent policy")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="action denied by agent policy"
+        )
     intent_id = f"intent_{uuid4().hex[:12]}"
     intent = {
         "intent_id": intent_id,
@@ -1904,7 +2506,9 @@ def simulate_agent_intent(
     policy = _get_agent_policy(store, agent_id)
     _ensure_agent_capability(policy, "simulate")
     if str(intent.get("action", "")) not in set(policy.get("allowed_actions", [])):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="action denied by agent policy")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="action denied by agent policy"
+        )
     checks = _build_agent_gate_checks(intent, store)
     simulation = {
         "simulated_at": _utc_now_iso(),
@@ -1922,7 +2526,9 @@ def simulate_agent_intent(
         agent_id=agent_id,
         payload={"passed": simulation["passed"], "gate_checks": checks},
     )
-    return with_correlation(request, {"intent": intent, "simulation": simulation, "receipt": receipt})
+    return with_correlation(
+        request, {"intent": intent, "simulation": simulation, "receipt": receipt}
+    )
 
 
 @router.post("/agent/intents/{intent_id}/execute")
@@ -1935,7 +2541,9 @@ def execute_agent_intent(
 ) -> dict[str, Any]:
     _enforce_write_limit(request, cache, identity)
     if not _identity_is_operator(identity):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="operator role required for execute")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="operator role required for execute"
+        )
     intent = store.agent_intents.get(str(intent_id).strip())
     if not isinstance(intent, dict):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="intent not found")
@@ -1945,9 +2553,13 @@ def execute_agent_intent(
 
     checks = _build_agent_gate_checks(intent, store)
     simulation = intent.get("last_simulation", {})
-    simulated_passed = bool(simulation.get("passed", False)) if isinstance(simulation, dict) else False
+    simulated_passed = (
+        bool(simulation.get("passed", False)) if isinstance(simulation, dict) else False
+    )
     if not simulated_passed:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="intent requires successful simulation")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="intent requires successful simulation"
+        )
     if not bool(checks.get("passed", False)):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1987,7 +2599,11 @@ def execute_agent_intent(
         receipt_type="intent_executed",
         intent_id=str(intent.get("intent_id", "")),
         agent_id=agent_id,
-        payload={"stage_before": stage_before, "stage_after": stage_after, "strategy_id": strategy_id},
+        payload={
+            "stage_before": stage_before,
+            "stage_after": stage_after,
+            "strategy_id": strategy_id,
+        },
     )
     return with_correlation(request, {"intent": intent, "promotion": updated, "receipt": receipt})
 
@@ -2022,7 +2638,9 @@ def list_agent_hooks(
     rows = [
         dict(row)
         for row in store.agent_hooks.values()
-        if isinstance(row, dict) and str(row.get("agent_id", "")) == resolved_agent_id and str(row.get("status", "")) != "deleted"
+        if isinstance(row, dict)
+        and str(row.get("agent_id", "")) == resolved_agent_id
+        and str(row.get("status", "")) != "deleted"
     ]
     rows.sort(key=lambda row: str(row.get("hook_id", "")))
     return with_correlation(request, {"hooks": rows, "count": len(rows)})
@@ -2044,18 +2662,26 @@ def create_agent_hook(
 
     event_type = str(payload.get("event_type", "")).strip().lower()
     if event_type not in _AGENT_HOOK_EVENTS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unsupported event_type")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="unsupported event_type"
+        )
     target_url_raw = str(payload.get("target_url", "")).strip()
     if not target_url_raw:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_url is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="target_url is required"
+        )
     target_url, host = _normalize_hook_url(target_url_raw)
     existing = [
         row
         for row in store.agent_hooks.values()
-        if isinstance(row, dict) and str(row.get("agent_id", "")) == resolved_agent_id and str(row.get("status", "")) != "deleted"
+        if isinstance(row, dict)
+        and str(row.get("agent_id", "")) == resolved_agent_id
+        and str(row.get("status", "")) != "deleted"
     ]
     if len(existing) >= 20:
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="hook quota reached")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="hook quota reached"
+        )
     hook = {
         "hook_id": f"hook_{uuid4().hex[:10]}",
         "agent_id": resolved_agent_id,
@@ -2125,15 +2751,18 @@ def start_plaid_link(
         "token_fingerprint": "",
     }
     store.brokerage_links[link_id] = row
-    return with_correlation(request, {
-        "link_id": link_id,
-        "link_token": link_token,
-        "provider": "plaid",
-        "scope": scope,
-        "permissions": row["permissions"],
-        "trade_permission_enabled": False,
-        "next": ["complete_link"],
-    })
+    return with_correlation(
+        request,
+        {
+            "link_id": link_id,
+            "link_token": link_token,
+            "provider": "plaid",
+            "scope": scope,
+            "permissions": row["permissions"],
+            "trade_permission_enabled": False,
+            "next": ["complete_link"],
+        },
+    )
 
 
 @router.post("/integrations/brokerage/plaid/link/complete")
@@ -2150,7 +2779,9 @@ def complete_plaid_link(
     if not link_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="link_id is required")
     if not public_token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="public_token is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="public_token is required"
+        )
 
     existing = store.brokerage_links.get(link_id)
     if existing is None:
@@ -2165,7 +2796,10 @@ def complete_plaid_link(
         )
 
     connection_id = f"conn_{uuid4().hex[:10]}"
-    institution = str(payload.get("institution", existing.get("institution", "demo_broker"))).strip() or "demo_broker"
+    institution = (
+        str(payload.get("institution", existing.get("institution", "demo_broker"))).strip()
+        or "demo_broker"
+    )
     accounts = _build_demo_brokerage_accounts(connection_id=connection_id, institution=institution)
     now_iso = _utc_now_iso()
     updated = {
@@ -2177,17 +2811,21 @@ def complete_plaid_link(
         "last_sync_at": now_iso,
         "token_fingerprint": _fingerprint_secret(public_token),
         "trade_permission_enabled": bool(requested_trade and acknowledge),
-        "permissions": ["accounts:read"] + (["orders:trade"] if requested_trade and acknowledge else []),
+        "permissions": ["accounts:read"]
+        + (["orders:trade"] if requested_trade and acknowledge else []),
         "completed_by": identity.subject,
     }
     store.brokerage_links[link_id] = updated
     store.brokerage_accounts[connection_id] = accounts
     sync_state = _compute_sync_state(updated)
-    return with_correlation(request, {
-        "connection": updated,
-        "accounts": accounts,
-        "sync": sync_state,
-    })
+    return with_correlation(
+        request,
+        {
+            "connection": updated,
+            "accounts": accounts,
+            "sync": sync_state,
+        },
+    )
 
 
 @router.get("/integrations/brokerage/accounts")
@@ -2199,10 +2837,13 @@ def list_brokerage_accounts(
 ) -> dict[str, Any]:
     _enforce_read_limit(request, cache, identity)
     rows = _collect_brokerage_accounts(store)
-    return with_correlation(request, {
-        "accounts": rows,
-        "totals": _portfolio_totals(rows),
-    })
+    return with_correlation(
+        request,
+        {
+            "accounts": rows,
+            "totals": _portfolio_totals(rows),
+        },
+    )
 
 
 @router.get("/integrations/brokerage/sync-health")
@@ -2215,11 +2856,14 @@ def get_brokerage_sync_health(
     _enforce_read_limit(request, cache, identity)
     rows = _collect_brokerage_sync_health(store)
     degraded = [row for row in rows if bool(row.get("fail_closed_trade_block"))]
-    return with_correlation(request, {
-        "connections": rows,
-        "degraded_count": len(degraded),
-        "all_clear": len(degraded) == 0,
-    })
+    return with_correlation(
+        request,
+        {
+            "connections": rows,
+            "degraded_count": len(degraded),
+            "all_clear": len(degraded) == 0,
+        },
+    )
 
 
 @router.get("/integrations/connectors")
@@ -2233,11 +2877,16 @@ def list_connectors(
 ) -> dict[str, Any]:
     _enforce_read_limit(request, cache, identity)
     rows = _collect_connectors()
-    filtered = _filter_connectors(rows, connector_class=connector_class, market_class=market_class, status=status)
-    return with_correlation(request, {
-        "count": len(filtered),
-        "connectors": filtered,
-    })
+    filtered = _filter_connectors(
+        rows, connector_class=connector_class, market_class=market_class, status=status
+    )
+    return with_correlation(
+        request,
+        {
+            "count": len(filtered),
+            "connectors": filtered,
+        },
+    )
 
 
 @router.get("/integrations/connectors/{connector_id_or_provider}")
@@ -2329,7 +2978,9 @@ def train_studio_strategy(
     _enforce_write_limit(request, cache, identity)
     strategy_id = str(payload.get("strategy_id", "")).strip()
     if not strategy_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required"
+        )
     mode = str(payload.get("mode", "adaptive")).strip().lower()
     if mode == "adaptive":
         candidates = payload.get("candidate_models", [])
@@ -2356,7 +3007,9 @@ def train_studio_strategy(
             best_fitness=float(payload.get("best_fitness", 0.0) or 0.0),
         )
     else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mode must be adaptive|rl|evolutionary")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="mode must be adaptive|rl|evolutionary"
+        )
     return with_correlation(request, {"artifact": artifact.to_dict()})
 
 
@@ -2370,7 +3023,9 @@ def evaluate_execution_failover(
     _enforce_read_limit(request, cache, identity)
     rows = payload.get("venues", [])
     if not isinstance(rows, list):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="venues must be an array")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="venues must be an array"
+        )
     report = select_primary_and_fallback(
         [row for row in rows if isinstance(row, dict)],
         max_latency_ms=float(payload.get("max_latency_ms", 250.0) or 250.0),
@@ -2417,7 +3072,9 @@ def upsert_marketplace_listing(
     _enforce_write_limit(request, cache, identity)
     listing = StrategyListing.from_payload(payload)
     if not listing.strategy_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="strategy_id is required"
+        )
     store.marketplace_listings[listing.listing_id] = listing.to_dict()
     summary = summarize_marketplace([dict(row) for row in store.marketplace_listings.values()])
     return with_correlation(request, {"listing": listing.to_dict(), "summary": summary})
@@ -2442,22 +3099,25 @@ def get_personal_terminal(
     account_rows = _collect_brokerage_accounts(store)
     sync_rows = _collect_brokerage_sync_health(store)
     degraded_count = len([row for row in sync_rows if bool(row.get("fail_closed_trade_block"))])
-    return with_correlation(request, {
-        "subject": identity.subject,
-        "always_on": True,
-        "profile": merged,
-        "portfolio_totals": _portfolio_totals(account_rows),
-        "sync_health": {
-            "degraded_count": degraded_count,
-            "all_clear": degraded_count == 0,
+    return with_correlation(
+        request,
+        {
+            "subject": identity.subject,
+            "always_on": True,
+            "profile": merged,
+            "portfolio_totals": _portfolio_totals(account_rows),
+            "sync_health": {
+                "degraded_count": degraded_count,
+                "all_clear": degraded_count == 0,
+            },
+            "next_actions": [
+                "connect_brokerage_accounts" if not account_rows else "open_execution_console",
+                "review_sync_health",
+                "run_paper_campaign",
+            ],
+            "generated_at": _utc_now_iso(),
         },
-        "next_actions": [
-            "connect_brokerage_accounts" if not account_rows else "open_execution_console",
-            "review_sync_health",
-            "run_paper_campaign",
-        ],
-        "generated_at": _utc_now_iso(),
-    })
+    )
 
 
 @router.put("/studio/terminal/preferences")
@@ -2489,7 +3149,11 @@ def list_assistant_audit(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> dict[str, Any]:
     _enforce_read_limit(request, cache, identity)
-    rows = [dict(item) for item in store.assistant_audit if str(item.get("subject", "")) == identity.subject]
+    rows = [
+        dict(item)
+        for item in store.assistant_audit
+        if str(item.get("subject", "")) == identity.subject
+    ]
     rows = rows[:limit]
     return with_correlation(request, {"events": rows, "count": len(rows)})
 
@@ -2509,7 +3173,9 @@ def assistant_turn(
 
     message_lc = message.lower()
     requested_action = str(payload.get("requested_action", "")).strip().lower()
-    capital_affecting = any(token in message_lc for token in _CAPITAL_ACTION_TOKENS) or requested_action in {
+    capital_affecting = any(
+        token in message_lc for token in _CAPITAL_ACTION_TOKENS
+    ) or requested_action in {
         "trade",
         "rebalance",
         "execute",
@@ -2539,19 +3205,22 @@ def assistant_turn(
     }
     store.assistant_audit.insert(0, audit_row)
     del store.assistant_audit[500:]
-    return with_correlation(request, {
-        "assistant_message": (
-            "Recommendation generated using constrained operator policy. "
-            "Review linked surfaces before any capital-affecting action."
-        ),
-        "suggestions": suggestions,
-        "action_policy": {
-            "mode": "analysis_only" if not capital_affecting else "requires_confirmation",
-            "capital_affecting": capital_affecting,
-            "executed": False,
+    return with_correlation(
+        request,
+        {
+            "assistant_message": (
+                "Recommendation generated using constrained operator policy. "
+                "Review linked surfaces before any capital-affecting action."
+            ),
+            "suggestions": suggestions,
+            "action_policy": {
+                "mode": "analysis_only" if not capital_affecting else "requires_confirmation",
+                "capital_affecting": capital_affecting,
+                "executed": False,
+            },
+            "audit_id": audit_row["id"],
         },
-        "audit_id": audit_row["id"],
-    })
+    )
 
 
 @router.post("/onboarding/runs")
@@ -2695,11 +3364,14 @@ def run_data_seed(
     command = build_data_seed_command(payload)
     execute = bool(payload.get("execute", False))
     if not execute:
-        return with_correlation(request, {
-            "dry_run": True,
-            "command": [sys.executable, *command],
-            "note": "Set execute=true to run bounded data bootstrap with cache/checksum/retry controls.",
-        })
+        return with_correlation(
+            request,
+            {
+                "dry_run": True,
+                "command": [sys.executable, *command],
+                "note": "Set execute=true to run bounded data bootstrap with cache/checksum/retry controls.",
+            },
+        )
     job = _create_ops_job(
         store,
         job_type="data_seed",
@@ -2719,12 +3391,15 @@ def run_data_seed(
         daemon=True,
     )
     worker.start()
-    return with_correlation(request, {
-        "accepted": True,
-        "dry_run": False,
-        "job": job,
-        "poll_path": f"/v1/ops/jobs/{job['job_id']}",
-    })
+    return with_correlation(
+        request,
+        {
+            "accepted": True,
+            "dry_run": False,
+            "job": job,
+            "poll_path": f"/v1/ops/jobs/{job['job_id']}",
+        },
+    )
 
 
 @router.post("/ops/notify/test")
@@ -2759,12 +3434,15 @@ def run_notify_test(
         daemon=True,
     )
     worker.start()
-    return with_correlation(request, {
-        "accepted": True,
-        "dry_run": False,
-        "job": job,
-        "poll_path": f"/v1/ops/jobs/{job['job_id']}",
-    })
+    return with_correlation(
+        request,
+        {
+            "accepted": True,
+            "dry_run": False,
+            "job": job,
+            "poll_path": f"/v1/ops/jobs/{job['job_id']}",
+        },
+    )
 
 
 @router.get("/ops/jobs")

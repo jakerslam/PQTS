@@ -6,7 +6,7 @@ CLI, API, and web surfaces.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timezone
 from typing import Any
 
@@ -27,12 +27,36 @@ class OrderIntent:
     order_type: str
     requested_price: float
     expected_alpha_bps: float
+    account_id: str = "paper-main"
+    source: str = "strategy"
+    mode: str = "paper_autopilot"
+    venue: str = ""
+    market: str = "crypto"
+    notional_usd: float = 0.0
+    risk_budget_pct: float = 0.0
+    approval_status: str = "proposed"
+    reason: str = ""
+    time_in_force: str = "gtc"
+    reduce_only: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=_utc_now)
 
     def to_dict(self) -> dict[str, Any]:
         out = asdict(self)
         out["created_at"] = self.created_at.isoformat()
         return out
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "OrderIntent":
+        kwargs: dict[str, Any] = {}
+        for item in fields(cls):
+            if item.name not in payload:
+                continue
+            value = payload[item.name]
+            if item.name == "created_at" and isinstance(value, str):
+                value = datetime.fromisoformat(value)
+            kwargs[item.name] = value
+        return cls(**kwargs)
 
 
 @dataclass(frozen=True)
@@ -68,4 +92,3 @@ class ExecutionOutcome:
         out = asdict(self)
         out["created_at"] = self.created_at.isoformat()
         return out
-

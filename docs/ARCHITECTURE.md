@@ -62,6 +62,11 @@ Canonical layer rules enforced by `tools/check_architecture_boundaries.py`:
 
 Prediction-market and adjacent forecast-trading venues must plug into this same composed runtime path. No venue-specific shortcut may bypass canonical risk, router, provenance, or reconciliation contracts.
 
+Manual, agent-assisted, and autopilot trading controls are represented as
+`OrderIntent` objects and trading-mode state before execution. See
+`docs/TRADING_CONTROL_PLANE.md` for the runtime/API contract. The only capital
+path remains `TradingEngine.submit_order_intent()` -> `RiskAwareRouter.submit_order()`.
+
 ## R Analytics Boundary
 
 - Optional bridge:

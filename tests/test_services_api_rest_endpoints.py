@@ -64,7 +64,9 @@ def test_post_order_requires_operator_role() -> None:
     allowed = client.post("/v1/execution/orders", json=payload, headers=_operator())
     assert allowed.status_code == 200
 
-    listed = client.get("/v1/execution/orders", params={"account_id": "paper-main"}, headers=_viewer())
+    listed = client.get(
+        "/v1/execution/orders", params={"account_id": "paper-main"}, headers=_viewer()
+    )
     assert listed.status_code == 200
     orders = listed.json()["orders"]
     assert any(item["order_id"] == "ord-1" for item in orders)
@@ -136,7 +138,12 @@ def test_promotion_action_blocks_non_certified_adapter_for_canary() -> None:
     strategy_id = "adapter_lockout_beta"
     first = client.post(
         "/v1/promotions/actions",
-        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "binance", "actor": "ops"},
+        json={
+            "strategy_id": strategy_id,
+            "action": "advance",
+            "adapter_provider": "binance",
+            "actor": "ops",
+        },
         headers=_operator(),
     )
     assert first.status_code == 200
@@ -144,7 +151,12 @@ def test_promotion_action_blocks_non_certified_adapter_for_canary() -> None:
 
     blocked = client.post(
         "/v1/promotions/actions",
-        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "binance", "actor": "ops"},
+        json={
+            "strategy_id": strategy_id,
+            "action": "advance",
+            "adapter_provider": "binance",
+            "actor": "ops",
+        },
         headers=_operator(),
     )
     assert blocked.status_code == 409
@@ -158,7 +170,12 @@ def test_promotion_action_allows_provider_meeting_stage_requirement() -> None:
     strategy_id = "adapter_lockout_active"
     first = client.post(
         "/v1/promotions/actions",
-        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "polymarket", "actor": "ops"},
+        json={
+            "strategy_id": strategy_id,
+            "action": "advance",
+            "adapter_provider": "polymarket",
+            "actor": "ops",
+        },
         headers=_operator(),
     )
     assert first.status_code == 200
@@ -166,7 +183,12 @@ def test_promotion_action_allows_provider_meeting_stage_requirement() -> None:
 
     second = client.post(
         "/v1/promotions/actions",
-        json={"strategy_id": strategy_id, "action": "advance", "adapter_provider": "polymarket", "actor": "ops"},
+        json={
+            "strategy_id": strategy_id,
+            "action": "advance",
+            "adapter_provider": "polymarket",
+            "actor": "ops",
+        },
         headers=_operator(),
     )
     assert second.status_code == 200
@@ -280,7 +302,11 @@ def test_connector_registry_endpoints() -> None:
     connectors = payload["connectors"]
     assert isinstance(connectors, list)
 
-    filtered = client.get("/v1/integrations/connectors", params={"class": "venue", "status": "beta"}, headers=_viewer())
+    filtered = client.get(
+        "/v1/integrations/connectors",
+        params={"class": "venue", "status": "beta"},
+        headers=_viewer(),
+    )
     assert filtered.status_code == 200
     filtered_rows = filtered.json()["connectors"]
     assert all(row.get("connector_class") == "venue" for row in filtered_rows)
@@ -295,12 +321,16 @@ def test_connector_registry_endpoints() -> None:
 
 def test_assistant_turn_returns_constrained_suggestions() -> None:
     client = TestClient(create_app(_settings()))
-    response = client.post("/v1/assistant/turn", json={"message": "show risk and reject reasons"}, headers=_viewer())
+    response = client.post(
+        "/v1/assistant/turn", json={"message": "show risk and reject reasons"}, headers=_viewer()
+    )
     assert response.status_code == 200
     payload = response.json()
     assert "assistant_message" in payload
     assert isinstance(payload.get("suggestions"), list)
-    assert any("/dashboard/risk" in str(item.get("href", "")) for item in payload.get("suggestions", []))
+    assert any(
+        "/dashboard/risk" in str(item.get("href", "")) for item in payload.get("suggestions", [])
+    )
 
 
 def test_onboarding_run_start_and_status_progression() -> None:
@@ -387,7 +417,9 @@ def test_brokerage_sync_health_fail_closed_and_manual_sync_receipt() -> None:
     rows = stale_state.json()["connections"]
     assert any(row["link_id"] == link_id for row in rows)
 
-    sync = client.post("/v1/integrations/brokerage/sync", json={"link_id": link_id}, headers=_operator())
+    sync = client.post(
+        "/v1/integrations/brokerage/sync", json={"link_id": link_id}, headers=_operator()
+    )
     assert sync.status_code == 200
     assert link_id in sync.json()["synced_links"]
     assert "synced_at" in sync.json()
@@ -544,7 +576,15 @@ def test_agent_execute_requires_operator_role_even_with_policy() -> None:
     agent_id = me.json()["identity"]["subject"]
     client.put(
         f"/v1/agent/policies/{agent_id}",
-        json={"capabilities": {"read": True, "propose": True, "simulate": True, "execute": True, "hooks_manage": True}},
+        json={
+            "capabilities": {
+                "read": True,
+                "propose": True,
+                "simulate": True,
+                "execute": True,
+                "hooks_manage": True,
+            }
+        },
         headers=_operator(),
     )
 
@@ -596,6 +636,168 @@ def test_agent_default_policy_blocks_execute_even_for_operator() -> None:
     assert denied.status_code == 403
 
 
+def test_trading_mode_order_intent_manual_ticket_flow() -> None:
+    client = TestClient(create_app(_settings()))
+
+    modes = client.get("/v1/trading/modes", headers=_viewer())
+    assert modes.status_code == 200
+    assert any(row["mode"] == "assisted_manual" for row in modes.json()["modes"])
+
+    mode_write = client.put(
+        "/v1/trading/mode",
+        json={"mode": "assisted_manual", "reason": "manual desk test"},
+        headers=_operator(),
+    )
+    assert mode_write.status_code == 200
+    assert mode_write.json()["mode"]["mode"] == "assisted_manual"
+
+    viewer_denied = client.post(
+        "/v1/trading/order-intents",
+        json={
+            "symbol": "BTC-USD",
+            "side": "buy",
+            "quantity": 0.1,
+            "order_type": "limit",
+            "price": 50_000.0,
+        },
+        headers=_viewer(),
+    )
+    assert viewer_denied.status_code == 403
+
+    created = client.post(
+        "/v1/trading/order-intents",
+        json={
+            "source": "human",
+            "symbol": "BTC-USD",
+            "side": "buy",
+            "quantity": 0.1,
+            "order_type": "limit",
+            "price": 50_000.0,
+            "risk_budget_pct": 10.0,
+            "reason": "manual assisted entry",
+        },
+        headers=_operator(),
+    )
+    assert created.status_code == 200
+    intent_id = created.json()["intent"]["intent_id"]
+
+    simulated = client.post(f"/v1/trading/order-intents/{intent_id}/simulate", headers=_operator())
+    assert simulated.status_code == 200
+    assert simulated.json()["simulation"]["passed"] is True
+    assert simulated.json()["simulation"]["ready_to_submit"] is False
+
+    approved = client.post(
+        f"/v1/trading/order-intents/{intent_id}/approve",
+        json={"note": "operator reviewed"},
+        headers=_operator(),
+    )
+    assert approved.status_code == 200
+    assert approved.json()["intent"]["approval_status"] == "approved"
+
+    submission = client.post(f"/v1/trading/order-intents/{intent_id}/submit", headers=_operator())
+    assert submission.status_code == 200
+    payload = submission.json()
+    assert payload["executed"] is False
+    assert payload["router_only_execution_enforced"] is True
+    assert "RiskAwareRouter.submit_order" in payload["router_submission"]["router_path"]
+
+
+def test_trading_kill_only_blocks_new_risk_and_steering_applies_mode() -> None:
+    client = TestClient(create_app(_settings()))
+
+    steering = client.post(
+        "/v1/trading/steering-actions",
+        json={"action": "kill_only", "source": "human", "reason": "incident drill"},
+        headers=_operator(),
+    )
+    assert steering.status_code == 200
+    assert steering.json()["mode"]["mode"] == "kill_only"
+
+    blocked = client.post(
+        "/v1/trading/order-intents",
+        json={
+            "source": "human",
+            "symbol": "BTC-USD",
+            "side": "buy",
+            "quantity": 0.1,
+            "order_type": "market",
+            "price": 50_000.0,
+        },
+        headers=_operator(),
+    )
+    assert blocked.status_code == 200
+    blocked_id = blocked.json()["intent"]["intent_id"]
+    blocked_sim = client.post(
+        f"/v1/trading/order-intents/{blocked_id}/simulate", headers=_operator()
+    )
+    assert blocked_sim.status_code == 200
+    assert blocked_sim.json()["simulation"]["passed"] is False
+
+    emergency = client.post(
+        "/v1/trading/order-intents",
+        json={
+            "source": "emergency",
+            "symbol": "BTC-USD",
+            "side": "sell",
+            "quantity": 0.1,
+            "order_type": "market",
+            "price": 50_000.0,
+            "reduce_only": True,
+            "approval_status": "approved",
+        },
+        headers=_operator(),
+    )
+    emergency_id = emergency.json()["intent"]["intent_id"]
+    emergency_sim = client.post(
+        f"/v1/trading/order-intents/{emergency_id}/simulate", headers=_operator()
+    )
+    assert emergency_sim.status_code == 200
+    assert emergency_sim.json()["simulation"]["passed"] is True
+    assert emergency_sim.json()["intent"]["approval_status"] == "approved"
+    emergency_submit = client.post(
+        f"/v1/trading/order-intents/{emergency_id}/submit",
+        headers=_operator(),
+    )
+    assert emergency_submit.status_code == 200
+    assert emergency_submit.json()["router_only_execution_enforced"] is True
+
+
+def test_agent_steering_requires_policy_and_operator_review_for_privileged_actions() -> None:
+    client = TestClient(create_app(_settings()))
+    denied = client.post(
+        "/v1/trading/steering-actions",
+        json={"action": "set_mode", "source": "agent", "target_mode": "live_autopilot"},
+        headers=_viewer(),
+    )
+    assert denied.status_code == 403
+
+    me = client.get("/v1/auth/me", headers=_viewer())
+    agent_id = me.json()["identity"]["subject"]
+    client.put(
+        f"/v1/agent/policies/{agent_id}",
+        json={
+            "capabilities": {
+                "read": True,
+                "propose": True,
+                "simulate": True,
+                "execute": False,
+                "steer": True,
+            }
+        },
+        headers=_operator(),
+    )
+
+    rejected = client.post(
+        "/v1/trading/steering-actions",
+        json={"action": "set_mode", "source": "agent", "target_mode": "live_autopilot"},
+        headers=_viewer(),
+    )
+    assert rejected.status_code == 200
+    action = rejected.json()["action"]
+    assert action["status"] == "rejected"
+    assert "operator_role_required" in action["decision"]["reasons"]
+
+
 def test_strategy_studio_preview_training_and_gate_evaluation_contracts() -> None:
     client = TestClient(create_app(_settings()))
 
@@ -606,7 +808,9 @@ def test_strategy_studio_preview_training_and_gate_evaluation_contracts() -> Non
             "code": "def signal(x):\n    return x\n",
             "nodes": [{"node_id": "n1", "kind": "signal", "params": {"window": 20}}],
             "edges": [["n1", "sink"]],
-            "sample_rows": [{"feature_ts": "2026-03-10T00:00:00", "target_ts": "2026-03-10T00:00:00"}],
+            "sample_rows": [
+                {"feature_ts": "2026-03-10T00:00:00", "target_ts": "2026-03-10T00:00:00"}
+            ],
         },
         headers=_viewer(),
     )
@@ -662,8 +866,20 @@ def test_failover_instrument_and_marketplace_endpoints() -> None:
         "/v1/execution/failover/evaluate",
         json={
             "venues": [
-                {"venue": "binance", "latency_ms": 25, "reject_rate": 0.01, "connected": True, "liquidity_score": 0.95},
-                {"venue": "coinbase", "latency_ms": 45, "reject_rate": 0.02, "connected": True, "liquidity_score": 0.9},
+                {
+                    "venue": "binance",
+                    "latency_ms": 25,
+                    "reject_rate": 0.01,
+                    "connected": True,
+                    "liquidity_score": 0.95,
+                },
+                {
+                    "venue": "coinbase",
+                    "latency_ms": 45,
+                    "reject_rate": 0.02,
+                    "connected": True,
+                    "liquidity_score": 0.9,
+                },
             ]
         },
         headers=_viewer(),

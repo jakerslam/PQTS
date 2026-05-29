@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import ast
 import asyncio
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ROOT = ROOT / "src" if (ROOT / "src").exists() else ROOT
@@ -36,12 +35,12 @@ ORDER_ENTRY_NAMES = {"submit_order", "place_order", "create_order", "send_order"
 
 sys.path.insert(0, str(ROOT))
 
-from execution.risk_aware_router import RiskAwareRouter, _RouterToken
-from markets.crypto.binance_adapter import BinanceAdapter
-from markets.crypto.coinbase_adapter import CoinbaseAdapter
-from markets.equities.alpaca_adapter import AlpacaAdapter
-from markets.forex.oanda_adapter import OandaAdapter
-from risk.kill_switches import KillSwitchMonitor, RiskLimits
+from execution.risk_aware_router import RiskAwareRouter, _RouterToken  # noqa: E402
+from markets.crypto.binance_adapter import BinanceAdapter  # noqa: E402
+from markets.crypto.coinbase_adapter import CoinbaseAdapter  # noqa: E402
+from markets.equities.alpaca_adapter import AlpacaAdapter  # noqa: E402
+from markets.forex.oanda_adapter import OandaAdapter  # noqa: E402
+from risk.kill_switches import KillSwitchMonitor, RiskLimits  # noqa: E402
 
 
 def _is_under(path: Path, parent: Path) -> bool:
@@ -54,7 +53,7 @@ def _is_under(path: Path, parent: Path) -> bool:
 
 def _iter_repo_python_files() -> list[Path]:
     files: list[Path] = []
-    skip_dirs = {".venv", "venv", "node_modules", "build", "dist"}
+    skip_dirs = {".venv", "venv", "node_modules", "build", "dist", "external_repos"}
     for path in ROOT.rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
@@ -113,7 +112,10 @@ class TestSingleOrderPath:
             rel = path.relative_to(ROOT)
 
             for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "submit_order":
+                if (
+                    isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and node.name == "submit_order"
+                ):
                     if rel != ROUTER_REL:
                         violations.append(f"{rel}:{node.lineno}")
 
@@ -171,8 +173,7 @@ class TestSingleOrderPath:
                     violations.append(f"{rel}:{adapter_import}")
 
         assert not violations, (
-            "VIOLATION: adapter modules imported outside RiskAwareRouter: "
-            f"{violations}"
+            "VIOLATION: adapter modules imported outside RiskAwareRouter: " f"{violations}"
         )
 
     def test_place_order_calls_outside_router_are_blocked(self):
@@ -295,21 +296,19 @@ class TestRouterTokenProtection:
             )
         with pytest.raises(RuntimeError):
             asyncio.run(
-                coinbase.place_order("BTC-USD", "buy", order_type="market", funds=100, router_token=object())
+                coinbase.place_order(
+                    "BTC-USD", "buy", order_type="market", funds=100, router_token=object()
+                )
             )
         with pytest.raises(RuntimeError):
-            asyncio.run(
-                alpaca.place_order("AAPL", 1, "buy", router_token=object())
-            )
+            asyncio.run(alpaca.place_order("AAPL", 1, "buy", router_token=object()))
         with pytest.raises(RuntimeError):
-            asyncio.run(
-                oanda.place_order("EUR_USD", 1000, router_token=object())
-            )
+            asyncio.run(oanda.place_order("EUR_USD", 1000, router_token=object()))
 
         assert asyncio.run(binance.place_order("BTCUSDT", "buy", "market", 0.01))["ok"]
-        assert asyncio.run(
-            coinbase.place_order("BTC-USD", "buy", order_type="market", funds=100)
-        )["ok"]
+        assert asyncio.run(coinbase.place_order("BTC-USD", "buy", order_type="market", funds=100))[
+            "ok"
+        ]
         assert asyncio.run(alpaca.place_order("AAPL", 1, "buy"))["ok"]
         assert asyncio.run(oanda.place_order("EUR_USD", 1000))["ok"]
 
@@ -332,8 +331,7 @@ class TestCapitalInjectionHardStop:
                     violations.append(f"{path.relative_to(ROOT)}:{idx}:{line.strip()}")
 
         assert not violations, (
-            "VIOLATION: capital fallback pattern found. Capital must be injected: "
-            f"{violations}"
+            "VIOLATION: capital fallback pattern found. Capital must be injected: " f"{violations}"
         )
 
     def test_capital_raises_if_not_set(self):

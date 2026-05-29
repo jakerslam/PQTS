@@ -1107,6 +1107,14 @@ class RiskAwareRouter:
             audit_entry,
             trace_id=str(getattr(order, "trace_id", "") or ""),
         )
+        decision_context = (
+            dict(order.decision_context) if isinstance(order.decision_context, dict) else {}
+        )
+        upstream_intent = (
+            decision_context.get("order_intent", {})
+            if isinstance(decision_context.get("order_intent", {}), dict)
+            else {}
+        )
         intent = OrderIntent(
             order_id=str(audit_entry["order_id"]),
             strategy_id=str(order.strategy_id),
@@ -1116,6 +1124,18 @@ class RiskAwareRouter:
             order_type=str(order.order_type.value),
             requested_price=float(order.price or market_data.get("last_price", 0.0) or 0.0),
             expected_alpha_bps=float(getattr(order, "expected_alpha_bps", 0.0) or 0.0),
+            account_id=str(upstream_intent.get("account_id", "paper-main")),
+            source=str(upstream_intent.get("source", "strategy")),
+            mode=str(upstream_intent.get("mode", "paper_autopilot")),
+            venue=str(upstream_intent.get("venue", "")),
+            market=str(upstream_intent.get("market", "crypto")),
+            notional_usd=float(upstream_intent.get("notional_usd", 0.0) or 0.0),
+            risk_budget_pct=float(upstream_intent.get("risk_budget_pct", 0.0) or 0.0),
+            approval_status=str(upstream_intent.get("approval_status", "proposed")),
+            reason=str(upstream_intent.get("reason", "")),
+            time_in_force=str(upstream_intent.get("time_in_force", "gtc")),
+            reduce_only=bool(upstream_intent.get("reduce_only", False)),
+            metadata=dict(upstream_intent.get("metadata", {}) or {}),
         )
         audit_entry["order_intent"] = intent.to_dict()
         audit_entry["trace_id"] = trace_id

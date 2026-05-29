@@ -13,6 +13,7 @@ import numpy as np
 import yaml
 
 from analytics.ops_observability import OpsEventStore
+from contracts.execution_flow import OrderIntent
 from core.autopilot import HumanStrategyOverride, StrategyAutopilot
 from core.autopilot_policy import enforce_autopilot_policy, resolve_autopilot_policy_pack
 from core.config_validation import validate_engine_config
@@ -31,9 +32,15 @@ from core.secret_manager import SecretResolutionMetadata, hydrate_config_secrets
 from core.secrets_policy import enforce_live_secrets
 from core.strategy_contracts import validate_strategy_contract
 from core.toggle_manager import MarketStrategyToggleManager, ToggleValidationError
+from core.trading_control import (
+    evaluate_order_intent,
+    trading_mode_state_from_config,
+)
 from execution.paper_fill_model import MicrostructurePaperFillProvider, PaperFillModelConfig
 from execution.risk_aware_router import OrderResult, RiskAwareRouter
-from execution.smart_router import OrderRequest as RouterOrderRequest, OrderType as RouterOrderType
+from execution.smart_router import OrderRequest as RouterOrderRequest
+from execution.smart_router import OrderType as RouterOrderType
+from risk.kill_switches import RiskDecision
 from risk.kill_switches import RiskLimits as KillSwitchLimits
 from risk.risk_tolerance import (
     RiskToleranceProfile,
@@ -118,6 +125,7 @@ class TradingEngine:
         self.config, self.secret_resolution = self._load_config(config_path)
         self._validate_config()
         self.mode = self.config.get("mode", "paper_trading")
+        self.trading_mode_state = trading_mode_state_from_config(self.config)
         self.toggle_manager = MarketStrategyToggleManager(self.config)
         runtime_cfg_raw = self.config.get("runtime", {})
         runtime_cfg = runtime_cfg_raw if isinstance(runtime_cfg_raw, dict) else {}
@@ -624,21 +632,172 @@ class TradingEngine:
         if not await self.risk_manager.check_signal(signal):
             return
 
-        # Create order
-        order = Order(
-            id=self._generate_order_id(),
-            symbol=signal["symbol"],
-            side=OrderSide(signal["side"]),
-            order_type=OrderType(signal.get("order_type", "market")),
-            quantity=signal["quantity"],
-            price=signal.get("price"),
-            market=MarketType(normalized_market),
+        order_id = self._generate_order_id()
+        intent = OrderIntent(
+            order_id=order_id,
+            strategy_id=str(signal.get("strategy_id", signal.get("strategy", "strategy"))),
+            symbol=str(signal["symbol"]),
+            side=str(signal["side"]),
+            quantity=float(signal["quantity"]),
+            order_type=str(signal.get("order_type", "market")),
+            requested_price=float(signal.get("price") or signal.get("reference_price") or 0.0),
+            expected_alpha_bps=float(signal.get("expected_alpha_bps", 0.0) or 0.0),
+            source="strategy",
+            mode=self.trading_mode_state.mode,
+            market=normalized_market,
+            approval_status=(
+                "auto_approved"
+                if self.trading_mode_state.mode == "paper_autopilot"
+                else str(signal.get("approval_status", "proposed"))
+            ),
+            reason=str(signal.get("reason", "strategy_signal")),
+            metadata={"signal": dict(signal)},
+        )
+        await self.submit_order_intent(intent)
+
+    def set_trading_mode(
+        self,
+        mode: str,
+        *,
+        updated_by: str = "operator",
+        reason: str = "",
+        live_execution_enabled: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        normalized = trading_mode_state_from_config(
+            {
+                "mode": self.mode,
+                "runtime": {
+                    "trading_control": {
+                        "mode": mode,
+                        "live_execution_enabled": (
+                            bool(live_execution_enabled)
+                            if live_execution_enabled is not None
+                            else str(mode).strip().lower().startswith("live")
+                        ),
+                        "updated_by": updated_by,
+                        "reason": reason,
+                    }
+                },
+            },
+            updated_by=updated_by,
+        )
+        self.trading_mode_state = normalized
+        logger.info("Trading mode set to %s by %s", normalized.mode, updated_by)
+        return normalized.to_dict()
+
+    def _order_intent_rejection(
+        self,
+        intent: OrderIntent,
+        *,
+        reason: str,
+        decision: Optional[Dict[str, Any]] = None,
+    ) -> OrderResult:
+        audit_log = {
+            "order_id": intent.order_id,
+            "timestamp": _utc_now().isoformat(),
+            "order_intent": intent.to_dict(),
+            "trading_mode": self.trading_mode_state.to_dict(),
+            "rejected": True,
+            "reject_reason": reason,
+            "control_gate": decision or {},
+        }
+        return OrderResult(
+            success=False,
+            decision=RiskDecision.HALT,
+            risk_state=None,
+            order_id=None,
+            exchange=None,
+            rejected_reason=reason,
+            audit_log=audit_log,
         )
 
-        # Enqueue order for router submission
-        await self._enqueue_order(order)
+    @staticmethod
+    def _coerce_engine_order_type(value: str) -> OrderType:
+        token = str(value or "market").strip().lower()
+        if token == "stop_limit":
+            return OrderType.STOP_LIMIT
+        if token == "stop":
+            return OrderType.STOP
+        if token == "limit":
+            return OrderType.LIMIT
+        return OrderType.MARKET
 
-    async def _enqueue_order(self, order: Order):
+    @staticmethod
+    def _coerce_engine_market(value: str) -> MarketType:
+        token = str(value or "crypto").strip().lower()
+        for market in MarketType:
+            if market.value == token:
+                return market
+        return MarketType.CRYPTO
+
+    def _router_risk_status(self) -> Dict[str, Any]:
+        if self.router is None:
+            return {}
+        risk_engine = getattr(self.router, "risk_engine", None)
+        if risk_engine is None or not hasattr(risk_engine, "get_status"):
+            return {}
+        try:
+            return dict(risk_engine.get_status())
+        except Exception:
+            return {}
+
+    async def submit_order_intent(self, intent: OrderIntent) -> OrderResult:
+        """
+        Submit an approved manual/agent/strategy intent through the only order path.
+
+        This method is the runtime bridge from control-plane intent to
+        `RiskAwareRouter.submit_order()`. It performs mode/approval checks first,
+        then hands the order to `_enqueue_order()`, which calls the router.
+        """
+        if self.router is None:
+            raise RuntimeError("RiskAwareRouter is not initialized")
+
+        risk_cfg, _profile = self._effective_risk_config()
+        account_equity = float(risk_cfg.get("initial_capital", 0.0) or 0.0)
+        max_order_notional = float(
+            getattr(getattr(self.router, "risk_limits", None), "max_order_notional", 0.0)
+            or risk_cfg.get("max_order_notional", 0.0)
+            or 0.0
+        )
+        gate = evaluate_order_intent(
+            intent,
+            mode_state=self.trading_mode_state,
+            risk_state=self._router_risk_status(),
+            sync_health={"all_clear": True},
+            account_equity=account_equity,
+            max_order_notional=max_order_notional,
+        )
+        if not gate.allowed:
+            logger.warning(
+                "Order intent rejected before router handoff: %s reasons=%s",
+                intent.order_id,
+                gate.reasons,
+            )
+            return self._order_intent_rejection(
+                intent,
+                reason=";".join(gate.reasons) or "control_gate_rejected",
+                decision=gate.to_dict(),
+            )
+
+        order = Order(
+            id=intent.order_id or self._generate_order_id(),
+            symbol=intent.symbol,
+            side=OrderSide(str(intent.side).strip().lower()),
+            order_type=self._coerce_engine_order_type(intent.order_type),
+            quantity=float(intent.quantity),
+            price=(
+                float(intent.requested_price) if float(intent.requested_price or 0.0) > 0 else None
+            ),
+            market=self._coerce_engine_market(intent.market),
+        )
+        return await self._enqueue_order(order, intent=intent)
+
+    async def _enqueue_order(
+        self,
+        order: Order,
+        *,
+        intent: Optional[OrderIntent] = None,
+    ) -> OrderResult:
         """Queue order for risk-aware routing."""
         logger.info(f"Submitting order: {order}")
         self.orders[order.id] = order
@@ -652,6 +811,13 @@ class TradingEngine:
             order_type=self._to_router_order_type(order.order_type),
             price=order.price,
             stop_price=order.stop_price,
+            strategy_id=(intent.strategy_id if intent is not None else "unknown"),
+            expected_alpha_bps=(float(intent.expected_alpha_bps) if intent is not None else 0.0),
+            client_order_id=order.id,
+            decision_context={
+                "order_intent": intent.to_dict() if intent is not None else {},
+                "trading_mode": self.trading_mode_state.to_dict(),
+            },
         )
         market_snapshot = self.latest_router_snapshot or await self.router.fetch_market_snapshot()
         result = await self.router.submit_order(
@@ -662,6 +828,7 @@ class TradingEngine:
             portfolio_changes=list(self._portfolio_change_history[-30:]),
         )
         self._apply_order_result(order, result)
+        return result
 
     def _to_router_order_type(self, order_type: OrderType) -> RouterOrderType:
         mapping = {
@@ -1036,6 +1203,7 @@ class TradingEngine:
         state["risk_profile_scale"] = float(profile.risk_limit_scale)
         state["operator_tier"] = self.operator_tier.name
         state["autopilot_mode"] = self.autopilot.mode
+        state["trading_mode"] = self.trading_mode_state.to_dict()
         state["autopilot_last_decision"] = dict(self.last_autopilot_decision)
         state["tenant_id"] = self.tenant_entitlements.tenant_id
         state["tenant_plan"] = self.tenant_entitlements.plan

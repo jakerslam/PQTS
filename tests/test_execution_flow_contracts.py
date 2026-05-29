@@ -16,8 +16,32 @@ def test_order_intent_to_dict_has_iso_timestamp() -> None:
     ).to_dict()
     assert payload["order_id"] == "ord_1"
     assert payload["strategy_id"] == "strat_a"
+    assert payload["source"] == "strategy"
+    assert payload["mode"] == "paper_autopilot"
     assert "created_at" in payload
     assert "T" in payload["created_at"]
+
+
+def test_order_intent_from_dict_roundtrip_keeps_control_fields() -> None:
+    payload = {
+        "order_id": "ord_2",
+        "strategy_id": "manual_trade",
+        "symbol": "ETH-USD",
+        "side": "sell",
+        "quantity": 2.0,
+        "order_type": "market",
+        "requested_price": 3000.0,
+        "expected_alpha_bps": 0.0,
+        "source": "human",
+        "mode": "assisted_manual",
+        "approval_status": "approved",
+        "reduce_only": True,
+    }
+    intent = OrderIntent.from_dict(payload)
+    assert intent.source == "human"
+    assert intent.mode == "assisted_manual"
+    assert intent.approval_status == "approved"
+    assert intent.reduce_only is True
 
 
 def test_route_preview_to_dict_roundtrip() -> None:
@@ -50,4 +74,3 @@ def test_execution_outcome_to_dict_has_iso_timestamp() -> None:
     assert payload["rejected_reason"] == "RISK_LIMIT"
     assert payload["latency_ms"] == 12.4
     assert "created_at" in payload
-
