@@ -345,3 +345,131 @@ def test_capture_cli_discovers_multiple_polymarket_books(tmp_path: Path, capsys,
     assert [snapshot.outcome_id for snapshot in snapshots] == ["m1_yes", "m1_no", "m2_yes"]
     assert snapshots[0].metadata["gamma_market_id"] == "m1"
     assert snapshots[2].metadata["question"] == "Second market?"
+
+
+def test_capture_cli_writes_polymarket_sidecars(tmp_path: Path, capsys, monkeypatch) -> None:
+    module = _load_capture_cli()
+    raw_path = tmp_path / "polymarket_sidecars.jsonl"
+    manifest_path = tmp_path / "polymarket_sidecars_manifest.json"
+    market_metadata_path = tmp_path / "market_metadata.jsonl"
+    trades_path = tmp_path / "trades.jsonl"
+    fees_path = tmp_path / "fees.jsonl"
+
+    class _Response:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return self._payload
+
+    def fake_get(url, *, params=None, timeout=0):
+        if url == "https://gamma.example/markets":
+            return _Response(
+                [
+                    {
+                        "id": "m1",
+                        "conditionId": "condition-1",
+                        "question": "First market?",
+                        "slug": "first-market",
+                        "enableOrderBook": True,
+                        "acceptingOrders": True,
+                        "endDate": "2026-06-01T00:00:00Z",
+                        "resolutionSource": "official-source",
+                        "liquidity": "1000",
+                        "volume": "500",
+                        "bestBid": "0.40",
+                        "bestAsk": "0.42",
+                        "clobTokenIds": '["m1_yes","m1_no"]',
+                    }
+                ]
+            )
+        if url == "https://clob.example/book":
+            return _Response(
+                {
+                    "market": "condition-1",
+                    "asset_id": params["token_id"],
+                    "timestamp": "1780172484142",
+                    "bids": [{"price": "0.40", "size": "10"}],
+                    "asks": [{"price": "0.42", "size": "9"}],
+                    "min_order_size": "5",
+                    "tick_size": "0.01",
+                }
+            )
+        if url == "https://clob.example/clob-markets/condition-1":
+            return _Response({"mos": 5, "mts": 0.01, "mbf": 1000})
+        if url == "https://clob.example/fee-rate":
+            return _Response({"base_fee": 1000})
+        if url == "https://data.example/trades":
+            assert params["market"] == "condition-1"
+            assert params["limit"] == 7
+            return _Response(
+                [
+                    {
+                        "conditionId": "condition-1",
+                        "asset": "m1_yes",
+                        "side": "BUY",
+                        "price": 0.41,
+                        "size": 3.0,
+                        "timestamp": 1780172500,
+                    }
+                ]
+            )
+        raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr(module.requests, "get", fake_get)
+
+    rc = module.main(
+        [
+            "--polymarket-active-book",
+            "--out",
+            str(raw_path),
+            "--manifest-out",
+            str(manifest_path),
+            "--source",
+            "polymarket_clob",
+            "--gamma-markets-url",
+            "https://gamma.example/markets",
+            "--clob-book-url",
+            "https://clob.example/book",
+            "--clob-market-info-url",
+            "https://clob.example/clob-markets",
+            "--fee-rate-url",
+            "https://clob.example/fee-rate",
+            "--data-trades-url",
+            "https://data.example/trades",
+            "--tokens-per-market",
+            "2",
+            "--max-snapshots",
+            "2",
+            "--trades-limit",
+            "7",
+            "--market-metadata-out",
+            str(market_metadata_path),
+            "--trades-out",
+            str(trades_path),
+            "--fees-out",
+            str(fees_path),
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    market_rows = [
+        json.loads(line) for line in market_metadata_path.read_text(encoding="utf-8").splitlines()
+    ]
+    trade_rows = [json.loads(line) for line in trades_path.read_text(encoding="utf-8").splitlines()]
+    fee_rows = [json.loads(line) for line in fees_path.read_text(encoding="utf-8").splitlines()]
+
+    assert rc == 0
+    assert payload["ok"] is True
+    assert payload["metadata"]["sidecar_artifacts"]["market_metadata"]["row_count"] == 1
+    assert payload["metadata"]["sidecar_artifacts"]["trades"]["row_count"] == 1
+    assert payload["metadata"]["sidecar_artifacts"]["fees"]["row_count"] == 2
+    assert manifest["metadata"]["sidecar_artifacts"] == payload["metadata"]["sidecar_artifacts"]
+    assert market_rows[0]["resolution_source"] == "official-source"
+    assert market_rows[0]["clob_market_info"]["mbf"] == 1000
+    assert trade_rows[0]["asset"] == "m1_yes"
+    assert fee_rows[0]["fee_rate"]["base_fee"] == 1000

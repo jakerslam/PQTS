@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -20,6 +21,41 @@ if str(ROOT) not in sys.path:
     sys.path[:] = [str(ROOT), *sys.path]
 
 from research.prediction_market_capture import append_prediction_market_capture  # noqa: E402
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _line_count(path: Path) -> int:
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
+def _append_jsonl_rows(rows: list[dict[str, Any]], path: str | Path, *, append: bool) -> None:
+    if not rows:
+        return
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    mode = "a" if append and output_path.exists() else "w"
+    with output_path.open(mode, encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def _artifact_descriptor(path: str | Path) -> dict[str, Any]:
+    artifact_path = Path(path)
+    if not artifact_path.exists():
+        return {"path": str(artifact_path), "row_count": 0, "sha256": ""}
+    return {
+        "path": str(artifact_path),
+        "row_count": _line_count(artifact_path),
+        "sha256": _sha256_file(artifact_path),
+    }
 
 
 def _parse_metadata(rows: list[str]) -> dict[str, Any]:
@@ -57,6 +93,20 @@ def _fetch_url_payload(url: str, *, timeout_seconds: float) -> Any:
     return response.json()
 
 
+def _fetch_json_or_error(url: str, *, params: dict[str, Any] | None, timeout_seconds: float) -> Any:
+    try:
+        response = requests.get(url, params=params, timeout=float(timeout_seconds))
+        response.raise_for_status()
+        return response.json()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "error": str(exc),
+            "url": url,
+            "params": dict(params or {}),
+        }
+
+
 def _parse_token_ids(value: Any) -> list[str]:
     if isinstance(value, str):
         raw = value.strip()
@@ -70,6 +120,142 @@ def _parse_token_ids(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
     return []
+
+
+def _condition_id_from_book(book: dict[str, Any]) -> str:
+    metadata = dict(book.get("metadata", {}) or {})
+    return str(
+        metadata.get("condition_id")
+        or metadata.get("conditionId")
+        or book.get("market")
+        or book.get("conditionId")
+        or ""
+    ).strip()
+
+
+def _token_id_from_book(book: dict[str, Any]) -> str:
+    metadata = dict(book.get("metadata", {}) or {})
+    return str(
+        metadata.get("clob_token_id")
+        or book.get("asset_id")
+        or book.get("token_id")
+        or ""
+    ).strip()
+
+
+def _polymarket_market_metadata_rows(
+    books: list[dict[str, Any]],
+    *,
+    args: argparse.Namespace,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    captured_at = _now_iso()
+    for book in books:
+        condition_id = _condition_id_from_book(book)
+        if not condition_id or condition_id in seen:
+            continue
+        seen.add(condition_id)
+        metadata = dict(book.get("metadata", {}) or {})
+        clob_market_info = _fetch_json_or_error(
+            f"{str(args.clob_market_info_url).rstrip('/')}/{condition_id}",
+            params=None,
+            timeout_seconds=float(args.timeout_seconds),
+        )
+        rows.append(
+            {
+                "captured_at": captured_at,
+                "source": "polymarket",
+                "condition_id": condition_id,
+                "gamma_market_id": metadata.get("gamma_market_id", ""),
+                "question": metadata.get("question", ""),
+                "slug": metadata.get("slug", ""),
+                "end_date": metadata.get("end_date", ""),
+                "resolution_source": metadata.get("resolution_source", ""),
+                "accepting_orders": metadata.get("accepting_orders", ""),
+                "gamma_liquidity": metadata.get("gamma_liquidity", ""),
+                "gamma_volume": metadata.get("gamma_volume", ""),
+                "gamma_best_bid": metadata.get("gamma_best_bid", ""),
+                "gamma_best_ask": metadata.get("gamma_best_ask", ""),
+                "clob_market_info": clob_market_info,
+            }
+        )
+    return rows
+
+
+def _polymarket_fee_rows(
+    books: list[dict[str, Any]],
+    *,
+    args: argparse.Namespace,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    captured_at = _now_iso()
+    for book in books:
+        token_id = _token_id_from_book(book)
+        if not token_id or token_id in seen:
+            continue
+        seen.add(token_id)
+        rows.append(
+            {
+                "captured_at": captured_at,
+                "source": "polymarket_clob",
+                "condition_id": _condition_id_from_book(book),
+                "token_id": token_id,
+                "fee_rate": _fetch_json_or_error(
+                    str(args.fee_rate_url),
+                    params={"token_id": token_id},
+                    timeout_seconds=float(args.timeout_seconds),
+                ),
+                "min_order_size": book.get("min_order_size", ""),
+                "tick_size": book.get("tick_size", ""),
+            }
+        )
+    return rows
+
+
+def _polymarket_trade_rows(
+    books: list[dict[str, Any]],
+    *,
+    args: argparse.Namespace,
+) -> list[dict[str, Any]]:
+    condition_ids = sorted(
+        {condition_id for book in books if (condition_id := _condition_id_from_book(book))}
+    )
+    if not condition_ids:
+        return []
+    payload = _fetch_json_or_error(
+        str(args.data_trades_url),
+        params={
+            "market": ",".join(condition_ids),
+            "limit": max(int(args.trades_limit), 1),
+        },
+        timeout_seconds=float(args.timeout_seconds),
+    )
+    captured_at = _now_iso()
+    if isinstance(payload, list):
+        return [
+            {
+                "captured_at": captured_at,
+                "source": "polymarket_data_api",
+                "query_markets": condition_ids,
+                **dict(row),
+            }
+            for row in payload
+            if isinstance(row, dict)
+        ]
+    return [
+        {
+            "captured_at": captured_at,
+            "source": "polymarket_data_api",
+            "query_markets": condition_ids,
+            "error_payload": payload,
+        }
+    ]
+
+
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def _discover_polymarket_books(
@@ -190,6 +376,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Maximum CLOB token books to capture per market each poll.",
     )
     parser.add_argument("--token-index", type=int, default=0)
+    parser.add_argument("--market-metadata-out", help="Optional JSONL path for market/resolution metadata.")
+    parser.add_argument("--trades-out", help="Optional JSONL path for public Data API trade rows.")
+    parser.add_argument("--fees-out", help="Optional JSONL path for CLOB fee-rate rows.")
+    parser.add_argument(
+        "--data-trades-url",
+        default="https://data-api.polymarket.com/trades",
+        help="Public Polymarket Data API trades endpoint.",
+    )
+    parser.add_argument(
+        "--fee-rate-url",
+        default="https://clob.polymarket.com/fee-rate",
+        help="Polymarket CLOB fee-rate endpoint.",
+    )
+    parser.add_argument(
+        "--clob-market-info-url",
+        default="https://clob.polymarket.com/clob-markets",
+        help="Polymarket CLOB market-info base URL.",
+    )
+    parser.add_argument("--trades-limit", type=int, default=100)
     parser.add_argument(
         "--metadata",
         action="append",
@@ -202,6 +407,12 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    sidecar_paths = [
+        value
+        for value in (args.market_metadata_out, args.trades_out, args.fees_out)
+        if str(value or "").strip()
+    ]
+    sidecar_artifacts: dict[str, Any] = {}
     try:
         metadata = _parse_metadata(list(args.metadata or []))
         limit = max(int(args.max_snapshots), 0) or None
@@ -247,6 +458,24 @@ def main(argv: list[str] | None = None) -> int:
             while limit is None or captured < limit:
                 batch_limit = None if limit is None else max(limit - captured, 0)
                 payloads = _discover_polymarket_books(args, max_books=batch_limit)
+                if args.market_metadata_out:
+                    _append_jsonl_rows(
+                        _polymarket_market_metadata_rows(payloads, args=args),
+                        args.market_metadata_out,
+                        append=bool(args.append or captured > 0),
+                    )
+                if args.fees_out:
+                    _append_jsonl_rows(
+                        _polymarket_fee_rows(payloads, args=args),
+                        args.fees_out,
+                        append=bool(args.append or captured > 0),
+                    )
+                if args.trades_out:
+                    _append_jsonl_rows(
+                        _polymarket_trade_rows(payloads, args=args),
+                        args.trades_out,
+                        append=bool(args.append or captured > 0),
+                    )
                 manifest = append_prediction_market_capture(
                     payloads,
                     raw_snapshot_path=args.out,
@@ -265,11 +494,27 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError("no snapshots captured")
         else:  # pragma: no cover - argparse makes this unreachable.
             raise RuntimeError("no capture source selected")
+        sidecar_artifacts = {
+            "market_metadata": _artifact_descriptor(args.market_metadata_out)
+            if args.market_metadata_out
+            else {},
+            "trades": _artifact_descriptor(args.trades_out) if args.trades_out else {},
+            "fees": _artifact_descriptor(args.fees_out) if args.fees_out else {},
+        }
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True), file=sys.stderr)
         return 1
 
     payload = manifest.to_dict()
+    if sidecar_paths:
+        payload["metadata"] = {
+            **dict(payload.get("metadata", {}) or {}),
+            "sidecar_artifacts": sidecar_artifacts,
+        }
+        Path(args.manifest_out).write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     payload["ok"] = True
     print(json.dumps(payload, sort_keys=True))
     return 0
