@@ -18,6 +18,29 @@ Sorted execution queue (auto-generated):
 - `docs/TODO_SORTED.md` (human-readable rank order of all open items)
 - `docs/TODO_SORTED.json` (machine-readable rank order)
 
+## 02af. Production Quant Profitability Parity Sprint (2026-05-30)
+
+Dependency order: repo integrity -> live prediction-market capture -> falsifiable alpha card -> order-level replay simulation -> baseline tournament -> paper/live evidence ladder -> agent challenger governance.
+
+- [ ] Restore CI/repo integrity so full architecture, stack-direction, and control-plane checks pass without relying on dirty local state (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: COMP-6, COMP-11, UI-031, MOAT-12`, `Impact: 10`, `Evidence: pending`)
+  Files: `apps/web/package.json`, `tools/check_stack_direction.py`, `docs/PRODUCTION_READINESS_LEDGER.md`, `tests/`
+- [ ] Implement continuous prediction-market microstructure capture for raw order books, trades, market metadata, fees, liquidity, and resolution metadata with immutable manifests (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-2, PMKT-7, PMKT-16, RCG-1, RCG-2, NFR-3`, `Impact: 10`, `Evidence: pending`)
+  Files: `src/research/prediction_market_capture.py`, `scripts/capture_prediction_market_snapshots.py`, `data/prediction_markets/raw/`, `data/prediction_markets/manifests/`, `tests/`
+- [ ] Create the first schema-valid prediction-market microstructure alpha card with a falsifiable claim, OOS evidence target, deflated Sharpe target, realistic costs, decision rules, risk constraints, and failure boundaries (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: FR-1, FR-2, FR-3, FR-4, FR-5, AC-1, AC-2, AC-3`, `Impact: 10`, `Evidence: pending`)
+  Files: `src/research/agent_corpus_schema.json`, `research/`, `data/reports/alpha/`, `tests/`
+- [ ] Upgrade prediction-market replay from point-in-time feature snapshots to order-level executable simulation with queue position, spread crossing, maker/taker fees, partial fills, rejects, latency, stale books, and market-impact assumptions (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-7, RCG-2, RCG-3, RCG-4, RCG-5, AC-2, NFR-3`, `Impact: 10`, `Evidence: pending`)
+  Files: `src/research/prediction_market_replay.py`, `src/execution/paper_fill_model.py`, `src/execution/microstructure_quant_stack.py`, `tests/`
+- [ ] Run candidate strategy tournaments against no-trade, passive hold-to-resolution, random-entry, spread/imbalance, and event-time baselines with post-cost metrics and explicit kill/hold/promote decisions (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: AC-1, AC-2, AC-3, COMP-5, MOAT-12`, `Impact: 10`, `Evidence: pending`)
+  Files: `scripts/run_strategy_tournament.py`, `data/reports/`, `docs/REFERENCE_PERFORMANCE.md`, `tests/`
+- [ ] Enforce promotion gates that require OOS, walk-forward, overfit controls, robustness, capacity, cost realism, and no unresolved high-severity data defects before paper promotion (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: AC-1, AC-2, AC-3, PMKT-16, MOAT-3, MOAT-4`, `Impact: 10`, `Evidence: pending`)
+  Files: `src/analytics/promotion_gates.py`, `src/analytics/readiness_gates.py`, `docs/PRODUCTION_READINESS_LEDGER.md`, `tests/`
+- [ ] Run paper mode with the exact live order-intent, risk, router, reconciliation, and TCA path until minimum duration/fill/slippage evidence supports or rejects live canary (`ROI: very_high`, `Type: engineering`, `Track: parity`, `Ref: PMKT-7, PMKT-12, PMKT-14, AC-3, RCG-6`, `Impact: 10`, `Evidence: pending`)
+  Files: `scripts/run_continuous_paper.py`, `scripts/paper_readiness_report.py`, `src/analytics/paper_readiness.py`, `src/execution/tca_feedback.py`, `tests/`
+- [ ] Keep agent steering in challenger mode until A/B metrics show improved net evidence without increasing hard-control violations or false promotions (`ROI: high`, `Type: engineering`, `Track: moat`, `Ref: AGP-1, AGP-2, AGP-3, AGP-4, AGP-9, MOAT-14`, `Impact: 9`, `Evidence: pending`)
+  Files: `src/core/agent_proposal_store.py`, `src/app/ollama_agent_pilot.py`, `docs/AGENT_PILOT_CORPUS_AND_AB.md`, `tests/`
+- [ ] Gate live canary behind human legal/account/venue eligibility approval, tiny capped capital, manual expansion only, emergency drills, and daily reconciliation/TCA review (`ROI: very_high`, `Type: human_only`, `Track: parity`, `Ref: PMKT-15, PRDY-8, AC-3, RCG-6`, `Impact: 10`, `Evidence: pending`)
+  Files: `docs/HUMAN_DECISIONS_LOG.md`, `docs/OFFICIAL_INTEGRATIONS.md`, `docs/PRODUCTION_READINESS_LEDGER.md`
+
 ## 02y. Prediction-Market Purpose Pivot and Polymarket Certification Program (2026-03-17)
 
 Dependency order: canonical product language -> router-only Polymarket adapter -> settlement/reconciliation/certification -> legal venue eligibility.

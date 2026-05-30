@@ -2,6 +2,110 @@
   {
     "rank": 1,
     "score": 500.0,
+    "title": "Restore CI/repo integrity so full architecture, stack-direction, and control-plane checks pass without relying on dirty local state",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "COMP-6, COMP-11, UI-031, MOAT-12",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 25
+  },
+  {
+    "rank": 2,
+    "score": 500.0,
+    "title": "Implement continuous prediction-market microstructure capture for raw order books, trades, market metadata, fees, liquidity, and resolution metadata with immutable manifests",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "PMKT-2, PMKT-7, PMKT-16, RCG-1, RCG-2, NFR-3",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 27
+  },
+  {
+    "rank": 3,
+    "score": 500.0,
+    "title": "Create the first schema-valid prediction-market microstructure alpha card with a falsifiable claim, OOS evidence target, deflated Sharpe target, realistic costs, decision rules, risk constraints, and failure boundaries",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "FR-1, FR-2, FR-3, FR-4, FR-5, AC-1, AC-2, AC-3",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 29
+  },
+  {
+    "rank": 4,
+    "score": 500.0,
+    "title": "Upgrade prediction-market replay from point-in-time feature snapshots to order-level executable simulation with queue position, spread crossing, maker/taker fees, partial fills, rejects, latency, stale books, and market-impact assumptions",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "PMKT-7, RCG-2, RCG-3, RCG-4, RCG-5, AC-2, NFR-3",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 31
+  },
+  {
+    "rank": 5,
+    "score": 500.0,
+    "title": "Run candidate strategy tournaments against no-trade, passive hold-to-resolution, random-entry, spread/imbalance, and event-time baselines with post-cost metrics and explicit kill/hold/promote decisions",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "AC-1, AC-2, AC-3, COMP-5, MOAT-12",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 33
+  },
+  {
+    "rank": 6,
+    "score": 500.0,
+    "title": "Enforce promotion gates that require OOS, walk-forward, overfit controls, robustness, capacity, cost realism, and no unresolved high-severity data defects before paper promotion",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "AC-1, AC-2, AC-3, PMKT-16, MOAT-3, MOAT-4",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 35
+  },
+  {
+    "rank": 7,
+    "score": 500.0,
+    "title": "Run paper mode with the exact live order-intent, risk, router, reconciliation, and TCA path until minimum duration/fill/slippage evidence supports or rejects live canary",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "engineering",
+    "refs": "PMKT-7, PMKT-12, PMKT-14, AC-3, RCG-6",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 37
+  },
+  {
+    "rank": 8,
+    "score": 500.0,
+    "title": "Gate live canary behind human legal/account/venue eligibility approval, tiny capped capital, manual expansion only, emergency drills, and daily reconciliation/TCA review",
+    "roi": "very_high",
+    "impact": 10,
+    "track": "parity",
+    "item_type": "human_only",
+    "refs": "PMKT-15, PRDY-8, AC-3, RCG-6",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 41
+  },
+  {
+    "rank": 9,
+    "score": 500.0,
     "title": "Run venue-terms, jurisdiction, account-eligibility, and regulatory review for Polymarket before enabling any live trading mode",
     "roi": "very_high",
     "impact": 10,
@@ -10,10 +114,10 @@
     "refs": "PMKT-15",
     "depends": "",
     "section": "02y. Prediction-Market Purpose Pivot and Polymarket Certification Program (2026-03-17)",
-    "line_no": 32
+    "line_no": 55
   },
   {
-    "rank": 2,
+    "rank": 10,
     "score": 500.0,
     "title": "Define and maintain on-call escalation matrix and incident/rollback runbook ownership with severity-based response targets",
     "roi": "very_high",
@@ -23,10 +127,10 @@
     "refs": "PRDY-8, PMKT-15",
     "depends": "",
     "section": "02ae. Production Readiness Hardening Sprint (2026-03-19)",
-    "line_no": 100
+    "line_no": 123
   },
   {
-    "rank": 3,
+    "rank": 11,
     "score": 500.0,
     "title": "Trigger first public release + GitHub Pages leaderboard export workflows, then publish links/status in README/docs",
     "roi": "very_high",
@@ -36,10 +140,10 @@
     "refs": "COMP-2, COMP-5, MOAT-12",
     "depends": "",
     "section": "02c. Visibility Polish (Open, High ROI)",
-    "line_no": 363
+    "line_no": 386
   },
   {
-    "rank": 4,
+    "rank": 12,
     "score": 490.0,
     "title": "Run at least one external beginner cohort and one external pro cohort for each release window and archive completed evidence in monthly user research artifacts",
     "roi": "very_high",
@@ -49,10 +153,10 @@
     "refs": "COMP-19",
     "depends": "",
     "section": "02x. Competitive Gap Closure Sprint (2026-03-12)",
-    "line_no": 239
+    "line_no": 262
   },
   {
-    "rank": 5,
+    "rank": 13,
     "score": 384.0,
     "title": "Perform legal/compliance review for copy-trade workflows in target jurisdictions before enabling live copy-follow mode",
     "roi": "high",
@@ -62,10 +166,10 @@
     "refs": "LUNR-6",
     "depends": "",
     "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
-    "line_no": 340
+    "line_no": 363
   },
   {
-    "rank": 6,
+    "rank": 14,
     "score": 384.0,
     "title": "Own canonical docs-surface migration and update package/release/docs links after cutover",
     "roi": "high",
@@ -75,10 +179,23 @@
     "refs": "COMP-1, CGPT-4, COMP-15",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 514
+    "line_no": 537
   },
   {
-    "rank": 7,
+    "rank": 15,
+    "score": 382.0,
+    "title": "Keep agent steering in challenger mode until A/B metrics show improved net evidence without increasing hard-control violations or false promotions",
+    "roi": "high",
+    "impact": 9,
+    "track": "moat",
+    "item_type": "engineering",
+    "refs": "AGP-1, AGP-2, AGP-3, AGP-4, AGP-9, MOAT-14",
+    "depends": "",
+    "section": "02af. Production Quant Profitability Parity Sprint (2026-05-30)",
+    "line_no": 39
+  },
+  {
+    "rank": 16,
     "score": 382.0,
     "title": "Run monthly user interviews for casual and professional cohorts and feed roadmap deltas",
     "roi": "high",
@@ -88,10 +205,10 @@
     "refs": "COMP-7, COMP-8, MOAT-8",
     "depends": "",
     "section": "03. Human-Only Parallel Lane",
-    "line_no": 511
+    "line_no": 534
   },
   {
-    "rank": 8,
+    "rank": 17,
     "score": 268.0,
     "title": "Perform third-party bot/operator security due-diligence checklist before adding external signal adapters to production allowlist",
     "roi": "medium",
@@ -101,6 +218,6 @@
     "refs": "LUNR-6",
     "depends": "",
     "section": "02w. LunarResearcher Assimilation Sprint (2026-03-12)",
-    "line_no": 341
+    "line_no": 364
   }
 ]
