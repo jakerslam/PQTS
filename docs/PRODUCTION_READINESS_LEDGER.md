@@ -44,7 +44,7 @@ This ledger is the working checklist for turning PQTS into a serious production 
 - [x] Agent proposal queue is connected to API/operator approval surfaces.
 - [ ] No live-capable route can execute without `TradingEngine.submit_order_intent()`.
 - [x] Prediction-market raw snapshots have JSONL replay manifests with content hashes.
-- [x] Prediction-market raw snapshot capture has a CLI, append-only manifest contract, and Polymarket active-book discovery path.
+- [x] Prediction-market raw snapshot capture has a CLI, append-only manifest contract, and Polymarket multi-market active-book discovery path.
 - [x] Prediction-market replay manifests can be built by CLI with row-count and quality-flag gates.
 - [x] Feature builder is point-in-time and excludes future resolution labels from feature artifacts.
 - [ ] At least one prediction-market/microstructure alpha card exists and passes quality threshold.

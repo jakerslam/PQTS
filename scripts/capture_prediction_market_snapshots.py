@@ -72,7 +72,11 @@ def _parse_token_ids(value: Any) -> list[str]:
     return []
 
 
-def _discover_polymarket_book(args: argparse.Namespace) -> dict[str, Any]:
+def _discover_polymarket_books(
+    args: argparse.Namespace,
+    *,
+    max_books: int | None = None,
+) -> list[dict[str, Any]]:
     response = requests.get(
         str(args.gamma_markets_url),
         params={
@@ -87,39 +91,62 @@ def _discover_polymarket_book(args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(payload, list):
         raise TypeError("Polymarket Gamma markets response must be a list")
 
-    token_index = max(int(args.token_index), 0)
+    market_limit = max(int(args.markets_per_poll), 1)
+    tokens_per_market = max(int(args.tokens_per_market), 1)
+    max_book_count = None if max_books is None or int(max_books) <= 0 else int(max_books)
+    start_token_index = max(int(args.token_index), 0)
+    books: list[dict[str, Any]] = []
     for market in payload:
         if not isinstance(market, dict):
             continue
         if market.get("enableOrderBook") is False:
             continue
         token_ids = _parse_token_ids(market.get("clobTokenIds"))
-        if not token_ids or token_index >= len(token_ids):
+        if not token_ids or start_token_index >= len(token_ids):
             continue
-        token_id = token_ids[token_index]
-        book_response = requests.get(
-            str(args.clob_book_url),
-            params={"token_id": token_id},
-            timeout=float(args.timeout_seconds),
-        )
-        book_response.raise_for_status()
-        book = book_response.json()
-        if not isinstance(book, dict):
-            raise TypeError("Polymarket CLOB book response must be a JSON object")
-        metadata = dict(book.get("metadata", {}) or {})
-        metadata.update(
-            {
-                "gamma_market_id": market.get("id", ""),
-                "question": market.get("question", ""),
-                "slug": market.get("slug", ""),
-                "clob_token_index": token_index,
-                "gamma_markets_url": str(args.gamma_markets_url),
-                "clob_book_url": str(args.clob_book_url),
-            }
-        )
-        book["metadata"] = metadata
-        return book
-    raise RuntimeError("no active Polymarket CLOB market with token IDs was found")
+        token_slice = token_ids[start_token_index : start_token_index + tokens_per_market]
+        for offset, token_id in enumerate(token_slice):
+            book_response = requests.get(
+                str(args.clob_book_url),
+                params={"token_id": token_id},
+                timeout=float(args.timeout_seconds),
+            )
+            book_response.raise_for_status()
+            book = book_response.json()
+            if not isinstance(book, dict):
+                raise TypeError("Polymarket CLOB book response must be a JSON object")
+            token_index = start_token_index + offset
+            metadata = dict(book.get("metadata", {}) or {})
+            metadata.update(
+                {
+                    "gamma_market_id": market.get("id", ""),
+                    "condition_id": market.get("conditionId", ""),
+                    "question": market.get("question", ""),
+                    "slug": market.get("slug", ""),
+                    "end_date": market.get("endDate", ""),
+                    "resolution_source": market.get("resolutionSource", ""),
+                    "accepting_orders": market.get("acceptingOrders", ""),
+                    "gamma_liquidity": market.get("liquidity", ""),
+                    "gamma_volume": market.get("volume", ""),
+                    "gamma_best_bid": market.get("bestBid", ""),
+                    "gamma_best_ask": market.get("bestAsk", ""),
+                    "clob_token_id": token_id,
+                    "clob_token_index": token_index,
+                    "gamma_markets_url": str(args.gamma_markets_url),
+                    "clob_book_url": str(args.clob_book_url),
+                }
+            )
+            book["metadata"] = metadata
+            books.append(book)
+            if max_book_count is not None and len(books) >= max_book_count:
+                break
+        if max_book_count is not None and len(books) >= max_book_count:
+            break
+        if len(books) >= market_limit * tokens_per_market:
+            break
+    if not books:
+        raise RuntimeError("no active Polymarket CLOB market with token IDs was found")
+    return books
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -150,6 +177,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Polymarket CLOB book URL used with --polymarket-active-book.",
     )
     parser.add_argument("--market-limit", type=int, default=25)
+    parser.add_argument(
+        "--markets-per-poll",
+        type=int,
+        default=1,
+        help="Maximum active Polymarket markets to capture each poll.",
+    )
+    parser.add_argument(
+        "--tokens-per-market",
+        type=int,
+        default=1,
+        help="Maximum CLOB token books to capture per market each poll.",
+    )
     parser.add_argument("--token-index", type=int, default=0)
     parser.add_argument(
         "--metadata",
@@ -207,9 +246,9 @@ def main(argv: list[str] | None = None) -> int:
             manifest = None
             while limit is None or captured < limit:
                 batch_limit = None if limit is None else max(limit - captured, 0)
-                payload = _discover_polymarket_book(args)
+                payloads = _discover_polymarket_books(args, max_books=batch_limit)
                 manifest = append_prediction_market_capture(
-                    [payload],
+                    payloads,
                     raw_snapshot_path=args.out,
                     source=args.source,
                     manifest_path=args.manifest_out,

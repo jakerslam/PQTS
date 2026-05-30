@@ -253,3 +253,95 @@ def test_capture_cli_discovers_polymarket_active_book(tmp_path: Path, capsys, mo
     assert snapshots[0].market_id == "0xabc"
     assert snapshots[0].yes_bid == 0.41
     assert snapshots[0].metadata["question"] == "Example market?"
+
+
+def test_capture_cli_discovers_multiple_polymarket_books(tmp_path: Path, capsys, monkeypatch) -> None:
+    module = _load_capture_cli()
+    raw_path = tmp_path / "polymarket_multi.jsonl"
+    manifest_path = tmp_path / "polymarket_multi_manifest.json"
+    requested_tokens: list[str] = []
+
+    class _Response:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return self._payload
+
+    def fake_get(url, *, params=None, timeout=0):
+        if url == "https://gamma.example/markets":
+            return _Response(
+                [
+                    {
+                        "id": "m1",
+                        "conditionId": "condition-1",
+                        "question": "First market?",
+                        "slug": "first-market",
+                        "enableOrderBook": True,
+                        "acceptingOrders": True,
+                        "liquidity": "1000",
+                        "volume": "500",
+                        "clobTokenIds": '["m1_yes","m1_no"]',
+                    },
+                    {
+                        "id": "m2",
+                        "conditionId": "condition-2",
+                        "question": "Second market?",
+                        "slug": "second-market",
+                        "enableOrderBook": True,
+                        "acceptingOrders": True,
+                        "liquidity": "2000",
+                        "volume": "600",
+                        "clobTokenIds": '["m2_yes","m2_no"]',
+                    },
+                ]
+            )
+        assert url == "https://clob.example/book"
+        token = params["token_id"]
+        requested_tokens.append(token)
+        return _Response(
+            {
+                "market": f"condition-{token[:2]}",
+                "asset_id": token,
+                "timestamp": "1780172484142",
+                "bids": [{"price": "0.40", "size": "10"}],
+                "asks": [{"price": "0.42", "size": "9"}],
+            }
+        )
+
+    monkeypatch.setattr(module.requests, "get", fake_get)
+
+    rc = module.main(
+        [
+            "--polymarket-active-book",
+            "--out",
+            str(raw_path),
+            "--manifest-out",
+            str(manifest_path),
+            "--source",
+            "polymarket_clob",
+            "--gamma-markets-url",
+            "https://gamma.example/markets",
+            "--clob-book-url",
+            "https://clob.example/book",
+            "--markets-per-poll",
+            "2",
+            "--tokens-per-market",
+            "2",
+            "--max-snapshots",
+            "3",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    snapshots = load_prediction_market_snapshot_jsonl(raw_path)
+    assert rc == 0
+    assert payload["ok"] is True
+    assert payload["row_count"] == 3
+    assert requested_tokens == ["m1_yes", "m1_no", "m2_yes"]
+    assert [snapshot.outcome_id for snapshot in snapshots] == ["m1_yes", "m1_no", "m2_yes"]
+    assert snapshots[0].metadata["gamma_market_id"] == "m1"
+    assert snapshots[2].metadata["question"] == "Second market?"
