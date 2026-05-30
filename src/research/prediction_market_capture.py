@@ -55,6 +55,48 @@ def _payload_rows(payload: Any) -> list[dict[str, Any]]:
     return [payload]
 
 
+def _best_book_level(levels: Any, *, side: str) -> tuple[float | None, float]:
+    if not isinstance(levels, list):
+        return None, 0.0
+    best_price: float | None = None
+    best_size = 0.0
+    for level in levels:
+        if not isinstance(level, dict):
+            continue
+        try:
+            price = float(level.get("price"))
+            size = max(float(level.get("size", 0.0)), 0.0)
+        except (TypeError, ValueError):
+            continue
+        if best_price is None:
+            best_price = price
+            best_size = size
+            continue
+        if side == "bid" and price > best_price:
+            best_price = price
+            best_size = size
+        if side == "ask" and price < best_price:
+            best_price = price
+            best_size = size
+    return best_price, best_size
+
+
+def _book_liquidity(payload: dict[str, Any]) -> float:
+    total = 0.0
+    for side in ("bids", "asks"):
+        levels = payload.get(side)
+        if not isinstance(levels, list):
+            continue
+        for level in levels:
+            if not isinstance(level, dict):
+                continue
+            try:
+                total += max(float(level.get("size", 0.0)), 0.0)
+            except (TypeError, ValueError):
+                continue
+    return total
+
+
 @dataclass(frozen=True)
 class PredictionMarketCaptureManifest:
     """Manifest for an append-only raw prediction-market snapshot capture."""
@@ -107,31 +149,60 @@ def normalize_prediction_market_capture_payload(
     else:
         row = dict(payload)
     source_token = str(source or row.get("source") or "unknown").strip() or "unknown"
+    book_bid, book_bid_size = _best_book_level(row.get("bids"), side="bid")
+    book_ask, book_ask_size = _best_book_level(row.get("asks"), side="ask")
+    yes_bid = _first_present(
+        row,
+        ("yes_bid", "best_bid", "bid"),
+        book_bid if book_bid is not None else row.get("last_price"),
+    )
+    yes_ask = _first_present(
+        row,
+        ("yes_ask", "best_ask", "ask"),
+        book_ask if book_ask is not None else row.get("last_price"),
+    )
     normalized = {
-        "market_id": _first_present(row, ("market_id", "condition_id", "question_id", "id"), ""),
+        "market_id": _first_present(
+            row,
+            ("market_id", "condition_id", "conditionId", "question_id", "market", "id"),
+            "",
+        ),
         "outcome_id": _first_present(
             row,
             ("outcome_id", "token_id", "asset_id", "outcome", "clob_token_id"),
             "",
         ),
         "timestamp": _first_present(row, ("timestamp", "ts", "captured_at"), _utc_now()),
-        "yes_bid": _first_present(row, ("yes_bid", "best_bid", "bid"), row.get("last_price")),
-        "yes_ask": _first_present(row, ("yes_ask", "best_ask", "ask"), row.get("last_price")),
-        "yes_bid_size": _first_present(row, ("yes_bid_size", "bid_size", "best_bid_size"), 0.0),
-        "yes_ask_size": _first_present(row, ("yes_ask_size", "ask_size", "best_ask_size"), 0.0),
+        "yes_bid": yes_bid,
+        "yes_ask": yes_ask,
+        "yes_bid_size": _first_present(
+            row,
+            ("yes_bid_size", "bid_size", "best_bid_size"),
+            book_bid_size,
+        ),
+        "yes_ask_size": _first_present(
+            row,
+            ("yes_ask_size", "ask_size", "best_ask_size"),
+            book_ask_size,
+        ),
         "no_bid": _first_present(row, ("no_bid",), float("nan")),
         "no_ask": _first_present(row, ("no_ask",), float("nan")),
         "no_bid_size": _first_present(row, ("no_bid_size",), 0.0),
         "no_ask_size": _first_present(row, ("no_ask_size",), 0.0),
         "last_price": _first_present(row, ("last_price", "price", "mid"), float("nan")),
         "traded_volume": _first_present(row, ("traded_volume", "volume", "volume_num"), 0.0),
-        "liquidity": _first_present(row, ("liquidity", "liquidity_num"), 0.0),
+        "liquidity": _first_present(row, ("liquidity", "liquidity_num"), _book_liquidity(row)),
         "source": source_token,
         "sequence": _first_present(row, ("sequence", "seq"), 0),
         "resolved_probability": row.get("resolved_probability"),
         "metadata": {
             **dict(row.get("metadata", {}) or {}),
             "capture_source": source_token,
+            "book_hash": row.get("hash", ""),
+            "min_order_size": row.get("min_order_size", ""),
+            "tick_size": row.get("tick_size", ""),
+            "bids": row.get("bids", []),
+            "asks": row.get("asks", []),
         },
     }
     return PredictionMarketBookSnapshot.from_dict(normalized)

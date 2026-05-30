@@ -14,7 +14,15 @@ def _coerce_timestamp(value: datetime | str) -> datetime:
     if isinstance(value, datetime):
         parsed = value
     else:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        raw_value = str(value).strip()
+        try:
+            numeric = float(raw_value)
+        except ValueError:
+            parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        else:
+            if numeric > 10_000_000_000:
+                numeric = numeric / 1000.0
+            parsed = datetime.fromtimestamp(numeric, tz=timezone.utc)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)

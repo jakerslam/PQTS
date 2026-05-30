@@ -45,6 +45,38 @@ def test_normalize_capture_payload_accepts_common_book_aliases() -> None:
     assert snapshot.metadata["capture_source"] == "polymarket_ws"
 
 
+def test_normalize_capture_payload_accepts_polymarket_clob_book() -> None:
+    snapshot = normalize_prediction_market_capture_payload(
+        {
+            "market": "0xabc",
+            "asset_id": "token-yes",
+            "timestamp": "1780172484142",
+            "hash": "book_hash",
+            "bids": [
+                {"price": "0.40", "size": "10"},
+                {"price": "0.44", "size": "25"},
+            ],
+            "asks": [
+                {"price": "0.50", "size": "20"},
+                {"price": "0.48", "size": "15"},
+            ],
+            "min_order_size": "5",
+            "tick_size": "0.01",
+        },
+        source="polymarket_clob",
+    )
+
+    assert snapshot.market_id == "0xabc"
+    assert snapshot.outcome_id == "token-yes"
+    assert snapshot.yes_bid == 0.44
+    assert snapshot.yes_ask == 0.48
+    assert snapshot.yes_bid_size == 25.0
+    assert snapshot.yes_ask_size == 15.0
+    assert snapshot.timestamp.isoformat().startswith("2026-05-30T")
+    assert snapshot.metadata["book_hash"] == "book_hash"
+    assert len(snapshot.metadata["bids"]) == 2
+
+
 def test_append_prediction_market_capture_writes_manifest_and_appends(tmp_path: Path) -> None:
     raw_path = tmp_path / "raw.jsonl"
     manifest_path = tmp_path / "manifest.json"
@@ -152,3 +184,72 @@ def test_capture_prediction_market_snapshots_cli_backfills_jsonl(tmp_path: Path,
     assert manifest_path.exists()
     assert len(snapshots) == 1
     assert snapshots[0].source == "fixture_feed"
+
+
+def test_capture_cli_discovers_polymarket_active_book(tmp_path: Path, capsys, monkeypatch) -> None:
+    module = _load_capture_cli()
+    raw_path = tmp_path / "polymarket.jsonl"
+    manifest_path = tmp_path / "polymarket_manifest.json"
+
+    class _Response:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return self._payload
+
+    def fake_get(url, *, params=None, timeout=0):
+        assert timeout == 10.0
+        if url == "https://gamma.example/markets":
+            return _Response(
+                [
+                    {
+                        "id": "540817",
+                        "question": "Example market?",
+                        "slug": "example-market",
+                        "enableOrderBook": True,
+                        "clobTokenIds": '["token_yes","token_no"]',
+                    }
+                ]
+            )
+        assert url == "https://clob.example/book"
+        assert params == {"token_id": "token_yes"}
+        return _Response(
+            {
+                "market": "0xabc",
+                "asset_id": "token_yes",
+                "timestamp": "1780172484142",
+                "bids": [{"price": "0.41", "size": "12"}],
+                "asks": [{"price": "0.43", "size": "8"}],
+            }
+        )
+
+    monkeypatch.setattr(module.requests, "get", fake_get)
+
+    rc = module.main(
+        [
+            "--polymarket-active-book",
+            "--out",
+            str(raw_path),
+            "--manifest-out",
+            str(manifest_path),
+            "--source",
+            "polymarket_clob",
+            "--gamma-markets-url",
+            "https://gamma.example/markets",
+            "--clob-book-url",
+            "https://clob.example/book",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    snapshots = load_prediction_market_snapshot_jsonl(raw_path)
+    assert rc == 0
+    assert payload["ok"] is True
+    assert payload["row_count"] == 1
+    assert snapshots[0].market_id == "0xabc"
+    assert snapshots[0].yes_bid == 0.41
+    assert snapshots[0].metadata["question"] == "Example market?"
